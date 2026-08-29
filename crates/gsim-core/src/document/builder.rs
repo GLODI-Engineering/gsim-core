@@ -221,6 +221,43 @@ impl ModelBuilder {
         Ok(())
     }
 
+    /// Arranges every block via [`crate::layout::layered_layout`] using wire connectivity, so a
+    /// caller building a schematic entirely in code doesn't have to hand-pick every coordinate.
+    /// `bbox_of` supplies each block's `(w, h)` — this module doesn't depend on `crate::contract`
+    /// (GSF v2) to stay decoupled from rendering concerns, so the caller (which does have the
+    /// component contracts) provides sizes rather than this method looking them up itself.
+    pub fn auto_arrange(
+        &mut self,
+        bbox_of: impl Fn(&Block) -> (i64, i64),
+        column_gap: i64,
+        row_gap: i64,
+    ) {
+        let grid = self.model.grid;
+        let positions = {
+            let inputs: Vec<crate::layout::LayoutInput> = self
+                .model
+                .blocks
+                .iter()
+                .map(|b| crate::layout::LayoutInput {
+                    id: &b.id,
+                    size: bbox_of(b),
+                })
+                .collect();
+            let edges: Vec<(&str, &str)> = self
+                .model
+                .wires
+                .iter()
+                .map(|w| (w.from.block.as_str(), w.to.block.as_str()))
+                .collect();
+            crate::layout::layered_layout(&inputs, &edges, column_gap, row_gap, grid)
+        };
+        for block in &mut self.model.blocks {
+            if let Some(&pos) = positions.get(&block.id) {
+                block.position = pos;
+            }
+        }
+    }
+
     /// Validates both endpoints exist and that the two blocks' paradigms are connectable (same
     /// paradigm, or one side bridges — see [`Paradigm::bridges_paradigms`]), then appends a
     /// wire whose `kind` matches what the caller asserts the ports to be (there is no catalogue
@@ -419,5 +456,37 @@ mod tests {
         let mut b = ModelBuilder::new("m", "M", 10);
         let err = b.set_param("ghost", "R", Value::from(1000));
         assert_eq!(err, Err(BuilderError::UnknownBlock("ghost".to_string())));
+    }
+
+    #[test]
+    fn auto_arrange_places_a_wired_chain_left_to_right_without_hand_picked_coordinates() {
+        let mut b = ModelBuilder::new("m", "M", 10);
+        // Added out of visual order on purpose -- auto_arrange must not just trust insertion
+        // order, only wire connectivity.
+        block(&mut b, "gain1", Paradigm::SignalFlow, "control.gain");
+        block(&mut b, "src1", Paradigm::SignalFlow, "signal.step");
+        block(&mut b, "scope1", Paradigm::SignalFlow, "sinks.scope");
+        b.connect(
+            Endpoint::new("src1", "out"),
+            Endpoint::new("gain1", "in"),
+            "signal",
+            ConnectOptions::default(),
+        )
+        .unwrap();
+        b.connect(
+            Endpoint::new("gain1", "out"),
+            Endpoint::new("scope1", "in"),
+            "signal",
+            ConnectOptions::default(),
+        )
+        .unwrap();
+
+        b.auto_arrange(|_block| (60, 40), 20, 10);
+
+        let src_x = b.get_block("src1").unwrap().position.0;
+        let gain_x = b.get_block("gain1").unwrap().position.0;
+        let scope_x = b.get_block("scope1").unwrap().position.0;
+        assert!(src_x < gain_x);
+        assert!(gain_x < scope_x);
     }
 }

@@ -12,14 +12,17 @@
 //!   [`contract::evaluate_component`] pipeline tying all of the above together (GSF v2, done).
 //! - [`document`] — the `.gsim_sch` document/builder model, superseding
 //!   `packages/gsim-model`'s Python-only equivalent (done).
+//! - [`layout`] — real autolayout (auto-spacing/collision avoidance), which existed nowhere in
+//!   the codebase before this crate (done — all three Phase 1 deliverables now complete).
 //!
-//! Still to come: autolayout (Phase 1's third deliverable, not started). No `eval`/dynamic code
-//! execution of any kind belongs in this crate — see the module doc on [`expr`].
+//! No `eval`/dynamic code execution of any kind belongs in this crate — see the module doc on
+//! [`expr`].
 
 pub mod contract;
 pub mod document;
 pub mod expr;
 mod fmt;
+pub mod layout;
 pub mod port;
 pub mod primitive;
 pub mod resolve;
