@@ -1,0 +1,22 @@
+/target
+# Library workspace (all members are libs/cdylibs meant for publishing) -- Cargo.lock is not
+# committed, per standard Rust convention for published libraries.
+Cargo.lock
+
+# Python (future gsim-py packaging: maturin/PyO3 build artifacts)
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+dist/
+build/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Node/WASM (future gsim-wasm packaging: wasm-pack output)
+node_modules/
+pkg/
+*.wasm
+
+.DS_Store

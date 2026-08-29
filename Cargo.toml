@@ -1,0 +1,14 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/gsim-core",
+    "crates/gsim-py",
+    "crates/gsim-wasm",
+]
+
+[workspace.package]
+edition = "2021"
+license = "MIT"
+publish = true
+repository = "https://github.com/Elvis-codeur/gsim-core"
+homepage = "https://github.com/Elvis-codeur/gsim-core"
