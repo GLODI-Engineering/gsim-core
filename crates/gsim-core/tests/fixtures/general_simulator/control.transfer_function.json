@@ -1,0 +1,23 @@
+{
+  "name": "control.transfer_function",
+  "label": "Transfer Function",
+  "category": "control",
+  "parameters": [
+    { "name": "num", "type": "array", "default": [1] },
+    {
+      "name": "den",
+      "type": "array",
+      "default": [1, 1],
+      "validate": "${{ count(value) > 0 && at(value, 0) != 0 && count(params.num) <= count(value) }}",
+      "error": "den must be non-empty, den[0] must be nonzero, and len(num) <= len(den)"
+    }
+  ],
+  "ports": [
+    { "id": "in", "side": "left", "kind": "signal", "direction": "in" },
+    { "id": "out", "side": "right", "kind": "signal", "direction": "out" }
+  ],
+  "geometry": {
+    "bbox": [70, 30],
+    "primitives": [{ "type": "rect", "x": 0, "y": 0, "w": 70, "h": 30 }]
+  }
+}

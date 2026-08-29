@@ -1,0 +1,32 @@
+{
+  "name": "passive.diode.ideal",
+  "label": "Ideal Diode",
+  "category": "passive",
+  "parameters": [
+    { "name": "g_breakdown", "type": "number", "default": 0.0, "unit": "S" },
+    {
+      "name": "v_breakdown",
+      "type": "number",
+      "default": -100.0,
+      "unit": "V",
+      "validate": "${{ value < params.v_th }}",
+      "error": "v_breakdown must be less than v_th"
+    },
+    { "name": "g_off", "type": "number", "default": 1e-9, "unit": "S" },
+    { "name": "v_th", "type": "number", "default": 0.6, "unit": "V" },
+    { "name": "g_on", "type": "number", "default": 5.0, "unit": "S" }
+  ],
+  "ports": [
+    { "id": "a", "side": "left", "kind": "electrical", "direction": "inout", "label": "A" },
+    { "id": "k", "side": "right", "kind": "electrical", "direction": "inout", "label": "K" }
+  ],
+  "geometry": {
+    "bbox": [40, 20],
+    "primitives": [
+      { "type": "line", "x1": 0, "y1": 10, "x2": 12, "y2": 10 },
+      { "type": "polygon", "pts": [[12, 2], [12, 18], [28, 10]] },
+      { "type": "line", "x1": 28, "y1": 2, "x2": 28, "y2": 18 },
+      { "type": "line", "x1": 28, "y1": 10, "x2": 40, "y2": 10 }
+    ]
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "name": "logic.gate",
+  "label": "Logic Gate",
+  "category": "logic",
+  "parameters": [
+    {
+      "name": "op",
+      "type": "enum",
+      "default": "and",
+      "validate": "${{ matches(value, '^(and|or|xor|nand|nor|xnor|not)$') }}",
+      "error": "op must be one of and/or/xor/nand/nor/xnor/not"
+    },
+    {
+      "name": "n_operands",
+      "type": "integer",
+      "default": 2,
+      "validate": "${{ value >= 2 }}",
+      "error": "n_operands must be at least 2 (ignored when op is 'not')"
+    }
+  ],
+  "ports": [
+    {
+      "for_each": "${{ if(params.op == 'not', range(1), range(params.n_operands)) }}",
+      "as": "i",
+      "emit": { "id": "in${{ i }}", "side": "left", "kind": "signal", "direction": "in" }
+    },
+    { "id": "out", "side": "right", "kind": "signal", "direction": "out" }
+  ],
+  "geometry": {
+    "bbox": [40, "${{ if(params.op == 'not', 20, max(20, params.n_operands * 12)) }}"],
+    "primitives": [{ "type": "text", "x": 20, "y": 10, "text": "${{ params.op }}" }]
+  }
+}

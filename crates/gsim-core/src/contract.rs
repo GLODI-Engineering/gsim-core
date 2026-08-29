@@ -99,6 +99,27 @@ impl std::fmt::Display for ContractError {
 
 impl std::error::Error for ContractError {}
 
+/// Every declared parameter's default, overridden by whatever the caller actually supplied.
+/// Both [`validate_parameters`] and [`evaluate_component`] evaluate against this, not against
+/// the caller's map directly — an expression that cross-references another parameter
+/// (`${{ value < params.v_th }}` inside `v_breakdown`'s own `validate`) must see `v_th`'s
+/// default even when the caller only supplied `v_breakdown`, or every such cross-reference would
+/// spuriously fail as "unknown field" whenever a caller omits an unrelated, defaulted parameter.
+fn resolved_params(
+    contract: &ComponentContract,
+    supplied: &Map<String, Value>,
+) -> Map<String, Value> {
+    let mut resolved: Map<String, Value> = contract
+        .parameters
+        .iter()
+        .map(|p| (p.name.clone(), p.default.clone()))
+        .collect();
+    for (k, v) in supplied {
+        resolved.insert(k.clone(), v.clone());
+    }
+    resolved
+}
+
 /// Validates every parameter with a `validate` expression against the supplied (or defaulted)
 /// values. Returns one failure per parameter that fails — an empty vec means everything passed.
 /// A parameter with no `validate` expression is never checked here (schema/type-level checks,
@@ -107,18 +128,16 @@ pub fn validate_parameters(
     contract: &ComponentContract,
     params: &Map<String, Value>,
 ) -> Vec<ValidationFailure> {
+    let resolved = resolved_params(contract, params);
     let mut failures = Vec::new();
     for p in &contract.parameters {
         let Some(validate_src) = &p.validate else {
             continue;
         };
-        let value = params
-            .get(&p.name)
-            .cloned()
-            .unwrap_or_else(|| p.default.clone());
+        let value = resolved.get(&p.name).cloned().unwrap_or(Value::Null);
         let mut bindings = Map::new();
         bindings.insert("value".to_string(), value);
-        let ctx = Context::new(params.clone()).child(bindings);
+        let ctx = Context::new(resolved.clone()).child(bindings);
         match Template::parse(validate_src).eval(&ctx) {
             Ok(Value::Bool(true)) => {}
             Ok(Value::Bool(false)) => failures.push(ValidationFailure {
@@ -152,7 +171,7 @@ pub fn evaluate_component(
     contract: &ComponentContract,
     params: &Map<String, Value>,
 ) -> Result<EvaluatedSymbol, ContractError> {
-    let ctx = Context::new(params.clone());
+    let ctx = Context::new(resolved_params(contract, params));
 
     let width = resolve::resolve_scalar(&contract.geometry.bbox[0], &ctx)?
         .as_f64()

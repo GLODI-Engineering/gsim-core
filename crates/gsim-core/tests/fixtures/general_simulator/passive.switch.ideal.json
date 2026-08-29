@@ -1,0 +1,39 @@
+{
+  "name": "passive.switch.ideal",
+  "label": "Ideal Switch",
+  "category": "passive",
+  "parameters": [
+    {
+      "name": "r_on",
+      "type": "number",
+      "default": 0.1,
+      "unit": "Ohm",
+      "validate": "${{ value > 0 }}",
+      "error": "r_on must be positive"
+    },
+    { "name": "g_breakdown", "type": "number", "default": 0.0, "unit": "S" },
+    {
+      "name": "v_breakdown",
+      "type": "number",
+      "default": -100.0,
+      "unit": "V",
+      "validate": "${{ value < params.v_th }}",
+      "error": "v_breakdown must be less than v_th"
+    },
+    { "name": "g_off", "type": "number", "default": 1e-9, "unit": "S" },
+    { "name": "v_th", "type": "number", "default": 0.6, "unit": "V" },
+    { "name": "g_on", "type": "number", "default": 5.0, "unit": "S" }
+  ],
+  "ports": [
+    { "id": "d", "side": "top", "kind": "electrical", "direction": "inout", "label": "D" },
+    { "id": "s", "side": "bottom", "kind": "electrical", "direction": "inout", "label": "S" },
+    { "id": "g", "side": "left", "kind": "signal", "direction": "in", "label": "gate" }
+  ],
+  "geometry": {
+    "bbox": [40, 60],
+    "primitives": [
+      { "type": "line", "x1": 20, "y1": 0, "x2": 20, "y2": 60 },
+      { "type": "line", "x1": 0, "y1": 30, "x2": 15, "y2": 30 }
+    ]
+  }
+}

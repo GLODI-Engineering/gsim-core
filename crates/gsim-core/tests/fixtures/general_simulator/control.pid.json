@@ -1,0 +1,28 @@
+{
+  "name": "control.pid",
+  "label": "PID",
+  "category": "control",
+  "parameters": [
+    { "name": "kp", "type": "number", "default": 1.0 },
+    { "name": "ki", "type": "number", "default": 0.0 },
+    { "name": "kd", "type": "number", "default": 0.0 },
+    {
+      "name": "n",
+      "type": "number",
+      "default": 100.0,
+      "validate": "${{ value > 0 }}",
+      "error": "n (derivative filter coefficient) must be positive"
+    }
+  ],
+  "ports": [
+    { "id": "in", "side": "left", "kind": "signal", "direction": "in" },
+    { "id": "out", "side": "right", "kind": "signal", "direction": "out" }
+  ],
+  "geometry": {
+    "bbox": [60, 40],
+    "primitives": [
+      { "type": "rect", "x": 0, "y": 0, "w": 60, "h": 40 },
+      { "type": "text", "x": 30, "y": 20, "text": "PID" }
+    ]
+  }
+}

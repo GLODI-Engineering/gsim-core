@@ -1,0 +1,26 @@
+{
+  "name": "control.product",
+  "label": "Product",
+  "category": "control",
+  "parameters": [
+    {
+      "name": "n_inputs",
+      "type": "integer",
+      "default": 2,
+      "validate": "${{ value >= 2 && value <= 8 }}",
+      "error": "Product must have between 2 and 8 inputs"
+    }
+  ],
+  "ports": [
+    {
+      "for_each": "${{ range(params.n_inputs) }}",
+      "as": "i",
+      "emit": { "id": "in${{ i }}", "side": "left", "kind": "signal", "direction": "in" }
+    },
+    { "id": "out", "side": "right", "kind": "signal", "direction": "out" }
+  ],
+  "geometry": {
+    "bbox": [40, "${{ max(30, params.n_inputs * 14) }}"],
+    "primitives": [{ "type": "text", "x": 20, "y": 15, "text": "x" }]
+  }
+}
