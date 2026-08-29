@@ -11,5 +11,6 @@ description = "Phase 1: parametric component-contract schema (GSF v2) + .gsim_sc
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+regex = "1"
 
 [dev-dependencies]

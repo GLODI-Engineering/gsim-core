@@ -1,31 +1,30 @@
 //! `gsim-core` — Phase 1 of the shared Rust implementation behind `general-simulator-gui`'s
-//! schematic tooling:
+//! schematic tooling. See `README.md` and `docs/decisions/0001-scope-and-naming.md` for full
+//! scope and rationale. This module currently implements GSF v2 — the parametric
+//! component-contract schema — end to end:
 //!
-//! - **GSF v2**: a parametric component-contract schema (ports/geometry/parameter validation
-//!   that can depend on parameter values, evaluated live while a user edits — unlike today's
-//!   `.gsim_sym`/GSF v1, which bakes primitives to fixed coordinates at authoring time only;
-//!   see `docs/decisions/0001-scope-and-naming.md`).
-//! - **`.gsim_sch` document model**: block/wire/hierarchy construction and validation,
-//!   superseding `general-simulator-gui`'s existing Python-only `packages/gsim-model`.
-//! - **Autolayout**: real auto-spacing/collision-avoidance placement helpers, which do not
-//!   exist anywhere in the codebase today (confirmed by audit — `gsim_model/layout.py` is pure
-//!   port-geometry math, not autolayout) — needed so a programmatic (agent/automation) caller
-//!   can produce a visually clean schematic without manually reasoning about every coordinate.
+//! - [`expr`] — the closed-grammar `${{ ... }}` expression language (lexer/parser/AST/eval).
+//! - [`template`] — `${{ }}` string interpolation on top of `expr`.
+//! - [`resolve`] — the `for_each`/`when`/`emit` mechanism that expands a dynamic `ports:`/
+//!   `primitives:` list into its concrete, static form for a given set of parameter values.
+//! - [`port`] / [`primitive`] — the resolved, static shapes, matching the frontend's existing
+//!   port-geometry convention and its `Primitive` union exactly.
+//! - [`contract`] — `ComponentContract`, `Parameter` validation, and the top-level
+//!   [`contract::evaluate_component`] pipeline tying all of the above together.
 //!
-//! **Out of scope for Phase 1**: compiling a `.gsim_sch` document to an ngspice/Xyce/
-//! general-simulator netlist. That logic currently lives in the much larger
-//! `packages/simulator/src/simulator/compiler/` pipeline and stays there until a later phase.
-//!
-//! Two thin binding crates expose this crate: `gsim-py` (PyO3, for the Python automation
-//! library) and `gsim-wasm` (wasm-bindgen, for the frontend). Neither should reimplement any
-//! schema, validation, or layout logic of their own — see the repo README.
-//!
-//! No `eval`/dynamic code execution of any kind belongs here — the expression DSL (`${{ }}`,
-//! used for parametric ports/geometry/validation) is a closed-grammar, pure-data interpreter by
-//! design, safe to load from third-party component definitions.
+//! Still to come (see the journal for what's pending): the `.gsim_sch` document/builder model,
+//! and autolayout. No `eval`/dynamic code execution of any kind belongs in this crate — see the
+//! module doc on [`expr`].
 
-/// Crate version, exposed for FFI smoke tests in `gsim-py`/`gsim-wasm` before there is any real
-/// surface to bind against.
+pub mod contract;
+pub mod expr;
+mod fmt;
+pub mod port;
+pub mod primitive;
+pub mod resolve;
+pub mod template;
+
+/// Crate version, exposed for FFI smoke tests in `gsim-py`/`gsim-wasm`.
 pub fn version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
