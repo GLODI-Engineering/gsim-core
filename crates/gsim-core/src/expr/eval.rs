@@ -58,10 +58,29 @@ pub fn eval(expr: &Expr, ctx: &Context) -> Result<Value, EvalError> {
         Expr::Var(path) => eval_var(path, ctx),
         Expr::Unary(op, inner) => eval_unary(op, eval(inner, ctx)?),
         Expr::Binary(op, lhs, rhs) => eval_binary(op, lhs, rhs, ctx),
+        Expr::Call(name, args) if name == "if" => eval_if(args, ctx),
         Expr::Call(name, args) => {
             let values: Result<Vec<Value>, EvalError> = args.iter().map(|a| eval(a, ctx)).collect();
             eval_call(name, values?)
         }
+    }
+}
+
+/// `if(cond, then, else)` short-circuits: only the taken branch is evaluated, so e.g.
+/// `if(count(x) == 0, 0, at(x, 0))` never runs the out-of-bounds `at()` when `x` is empty. This
+/// is why `if` is special-cased here rather than living in [`eval_call`], whose arguments are
+/// always evaluated eagerly before it runs.
+fn eval_if(args: &[Expr], ctx: &Context) -> Result<Value, EvalError> {
+    let [cond, then_branch, else_branch] = args else {
+        return Err(EvalError::new(format!(
+            "if() expects 3 arguments (cond, then, else), got {}",
+            args.len()
+        )));
+    };
+    if as_bool(&eval(cond, ctx)?, "if() condition")? {
+        eval(then_branch, ctx)
+    } else {
+        eval(else_branch, ctx)
     }
 }
 
@@ -166,10 +185,23 @@ fn eval_binary_values(op: &BinOp, l: Value, r: Value) -> Result<Value, EvalError
         BinOp::Rem => Ok(Value::from(
             as_number(&l, "'%' left")? % as_number(&r, "'%' right")?,
         )),
-        BinOp::Eq => Ok(Value::from(l == r)),
-        BinOp::Ne => Ok(Value::from(l != r)),
+        BinOp::Eq => Ok(Value::from(values_equal(&l, &r))),
+        BinOp::Ne => Ok(Value::from(!values_equal(&l, &r))),
         BinOp::Lt | BinOp::Le | BinOp::Gt | BinOp::Ge => eval_ordering(op, &l, &r),
         BinOp::And | BinOp::Or => unreachable!("handled by eval_binary's short-circuit path"),
+    }
+}
+
+/// `==`/`!=` compare two numbers *by value*, not by `serde_json::Number`'s internal
+/// representation. This matters because expression literals always lex as `f64`
+/// (`Value::from(5.0)`), while a parameter's actual value may arrive from external JSON as an
+/// integer-backed `Number` (`Value::from(5i64)`) — those are numerically equal but not `==` as
+/// raw `Value`s, which would otherwise make `${{ value == 5 }}` silently false for a perfectly
+/// valid integer parameter.
+fn values_equal(l: &Value, r: &Value) -> bool {
+    match (l, r) {
+        (Value::Number(_), Value::Number(_)) => l.as_f64() == r.as_f64(),
+        _ => l == r,
     }
 }
 
@@ -220,6 +252,46 @@ fn eval_call(name: &str, args: Vec<Value>) -> Result<Value, EvalError> {
             Ok(Value::from(n as f64))
         }
         "concat" => Ok(Value::from(args.iter().map(stringify).collect::<String>())),
+        "range" => {
+            let [n] = take1(&args, "range")?;
+            let n = as_number(&n, "range(n)")?;
+            if n < 0.0 || n.fract() != 0.0 {
+                return Err(EvalError::new(format!(
+                    "range(n) expects a non-negative integer, got {n}"
+                )));
+            }
+            Ok(Value::Array(
+                (0..n as i64).map(|i| Value::from(i as f64)).collect(),
+            ))
+        }
+        "at" => {
+            let [container, key] = take2(&args, "at")?;
+            match container {
+                Value::Array(items) => {
+                    let idx = as_number(&key, "at(array, index)")?;
+                    if idx < 0.0 || idx.fract() != 0.0 {
+                        return Err(EvalError::new(format!(
+                            "at(array, index) expects a non-negative integer index, got {idx}"
+                        )));
+                    }
+                    items.get(idx as usize).cloned().ok_or_else(|| {
+                        EvalError::new(format!(
+                            "at(): index {idx} out of bounds for array of length {}",
+                            items.len()
+                        ))
+                    })
+                }
+                Value::Object(map) => {
+                    let key = as_str(&key, "at(object, key)")?;
+                    map.get(&key)
+                        .cloned()
+                        .ok_or_else(|| EvalError::new(format!("at(): no field '{key}'")))
+                }
+                other => Err(EvalError::new(format!(
+                    "at() expects an array or object, got {other}"
+                ))),
+            }
+        }
         "max" => reduce_numbers(&args, "max", f64::max),
         "min" => reduce_numbers(&args, "min", f64::min),
         "matches" => {
@@ -268,4 +340,83 @@ fn reduce_numbers(
     let first = nums.next().unwrap()?;
     let result = nums.try_fold(first, |acc, n| n.map(|n| f(acc, n)))?;
     Ok(Value::from(result))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::expr::parse;
+    use serde_json::json;
+
+    fn eval_expr(src: &str) -> Result<Value, EvalError> {
+        let expr = parse(src).expect("parse");
+        eval(&expr, &Context::new(Map::new()))
+    }
+
+    #[test]
+    fn range_produces_zero_indexed_integers() {
+        assert_eq!(eval_expr("range(3)").unwrap(), json!([0.0, 1.0, 2.0]));
+        assert_eq!(eval_expr("range(0)").unwrap(), json!([]));
+    }
+
+    #[test]
+    fn at_indexes_arrays_and_looks_up_object_fields() {
+        assert_eq!(eval_expr("at(range(5), 2)").unwrap(), json!(2.0));
+        let ctx = Context::new(
+            json!({"b": [[1, 2, 3], [4, 5, 6]]})
+                .as_object()
+                .unwrap()
+                .clone(),
+        );
+        let row0 = eval(&parse("at(params.b, 0)").unwrap(), &ctx).unwrap();
+        // `at()` passes the stored value through unchanged (no numeric coercion), and
+        // serde_json's `Number` distinguishes integer-backed from float-backed representations
+        // for equality -- match the literal ints the fixture's `json!` macro actually produced.
+        assert_eq!(row0, json!([1, 2, 3]));
+        assert_eq!(
+            eval(&parse("count(at(params.b, 0))").unwrap(), &ctx).unwrap(),
+            json!(3.0)
+        );
+    }
+
+    #[test]
+    fn at_out_of_bounds_is_an_error_not_a_panic() {
+        assert!(eval_expr("at(range(2), 5)").is_err());
+    }
+
+    #[test]
+    fn if_picks_the_matching_branch() {
+        assert_eq!(eval_expr("if(true, 1, 2)").unwrap(), json!(1.0));
+        assert_eq!(eval_expr("if(false, 1, 2)").unwrap(), json!(2.0));
+    }
+
+    #[test]
+    fn equality_compares_numbers_by_value_not_by_json_representation() {
+        // `5` in source always lexes as f64; `value` may arrive integer-backed from external
+        // JSON (a parameter's `default`/supplied value). Both must compare equal.
+        let ctx = Context::new(json!({"n": 5}).as_object().unwrap().clone());
+        assert_eq!(
+            eval(&parse("params.n == 5").unwrap(), &ctx).unwrap(),
+            json!(true)
+        );
+        assert_eq!(
+            eval(&parse("params.n != 5").unwrap(), &ctx).unwrap(),
+            json!(false)
+        );
+    }
+
+    #[test]
+    fn if_short_circuits_the_untaken_branch() {
+        // at(range(1), 5) would error if evaluated -- it must not be, since the condition
+        // selects the other branch. This is exactly the shape a real gated for_each source
+        // needs: `if(params.op == 'not', [], range(count(params.operands)))`.
+        assert_eq!(
+            eval_expr("if(true, 0, at(range(1), 5))").unwrap(),
+            json!(0.0)
+        );
+        assert_eq!(
+            eval_expr("if(false, at(range(1), 5), 0)").unwrap(),
+            json!(0.0)
+        );
+    }
 }
