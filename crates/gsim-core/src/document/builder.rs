@@ -10,6 +10,7 @@ use super::block::{Block, BlockError, Mirror, NewBlock};
 use super::model::Model;
 use super::paradigm::Paradigm;
 use super::wire::{Endpoint, Wire};
+use serde::Deserialize;
 use serde_json::{Map, Value};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -46,17 +47,30 @@ impl std::fmt::Display for BuilderError {
 
 impl std::error::Error for BuilderError {}
 
+/// Deserializable so `gsim-py`/`gsim-wasm` can parse a JSON spec straight into this type instead
+/// of hand-rolling an equivalent shadow struct per binding (that would be exactly the
+/// "reimplementing the shape" duplication `AGENTS.md`'s "one implementation, thin bindings" rule
+/// warns about). `type`/`paradigm`/`domain`/`position`/`rotation` are required in the JSON; the
+/// rest default the same way [`NewBlockSpec::default`] does.
+#[derive(Deserialize)]
 pub struct NewBlockSpec {
+    #[serde(rename = "type")]
     pub r#type: String,
     pub paradigm: Paradigm,
     pub domain: String,
+    #[serde(default)]
     pub fidelity: Option<String>,
     pub position: (i64, i64),
     pub rotation: i64,
+    #[serde(default)]
     pub mirror: Mirror,
+    #[serde(default)]
     pub params: Map<String, Value>,
+    #[serde(default)]
     pub ic: Map<String, Value>,
+    #[serde(default)]
     pub label: Option<String>,
+    #[serde(default)]
     pub id: Option<String>,
 }
 
@@ -78,12 +92,19 @@ impl Default for NewBlockSpec {
     }
 }
 
-#[derive(Default)]
+/// Deserializable for the same reason [`NewBlockSpec`] is -- every field is optional, matching
+/// `ConnectOptions::default()`, so `"{}"` is a valid JSON payload.
+#[derive(Default, Deserialize)]
 pub struct ConnectOptions {
+    #[serde(default)]
     pub waypoints: Vec<(i64, i64)>,
+    #[serde(default)]
     pub net: Option<String>,
+    #[serde(default)]
     pub id: Option<String>,
+    #[serde(default)]
     pub pinned: bool,
+    #[serde(default)]
     pub label: Option<String>,
 }
 

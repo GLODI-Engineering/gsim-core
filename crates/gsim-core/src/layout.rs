@@ -14,9 +14,12 @@
 //!   crossings — only to guarantee no overlap and a left-to-right reading order, which is the
 //!   actual gap (today: nothing, or every block stacked at the origin).
 
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+/// Serializable/deserializable so bindings can parse a caller's `{"x":..,"y":..,"w":..,"h":..}`
+/// JSON straight into this type instead of hand-rolling an equivalent shadow struct per binding.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Rect {
     pub x: i64,
     pub y: i64,
