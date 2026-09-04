@@ -57,6 +57,11 @@ pub enum ElementTail {
 pub enum Arity {
     /// The number of entries in an array parameter (`input_names`, `output_names`).
     ParamLen(&'static str),
+    /// A plain non-negative integer parameter holding the count itself
+    /// (`control.product`'s `n_inputs`, `logic.gate`'s `n_operands`) — the GSF v2 fixtures for
+    /// both drive their `for_each` from `range(params.<n>)`, so the emitted `inputs=` list must
+    /// use the same number.
+    ParamCount(&'static str),
     /// The column count of a matrix parameter. `general-mna`'s
     /// `parse_matrix_or_vector_shorthand` accepts either a real matrix (`b=[[1,0],[0,1]]`,
     /// `n x p` for `p` inputs) or a **flat vector as SISO shorthand** (`b=[1,0]` means one
@@ -68,6 +73,10 @@ impl Arity {
     pub fn count(&self, block: &Block) -> Option<usize> {
         match self {
             Arity::ParamLen(p) => block.params.get(*p)?.as_array().map(Vec::len),
+            Arity::ParamCount(p) => {
+                let n = block.params.get(*p)?.as_f64()?;
+                (n >= 0.0).then_some(n as usize)
+            }
             Arity::MatrixCols(p) => {
                 let rows = block.params.get(*p)?.as_array()?;
                 match rows.first() {
@@ -101,6 +110,18 @@ pub enum FieldSpec {
         param: &'static str,
         required: bool,
     },
+    /// `field=<the block's array param, comma-joined, with no brackets>` — `signs=1,-1,1`.
+    ///
+    /// **Not** the same rendering as [`Self::Param`], and the difference is load-bearing:
+    /// `kind=sum`'s own arm does `get_str("signs")?.split(',').map(|s| s.parse::<f64>())`, so the
+    /// bracketed list literal [`render_value`] produces for a JSON array (`[1,-1,1]`) fails with
+    /// `field 'signs' entry '[1' is not a number`. Only the matrix/vector fields
+    /// (`a=`/`b=`/`points=`) go through `parse_matrix_rows`, which is what strips brackets.
+    ParamList {
+        field: &'static str,
+        param: &'static str,
+        required: bool,
+    },
     /// `field=<fixed text>`.
     Literal {
         field: &'static str,
@@ -125,6 +146,32 @@ pub enum FieldSpec {
         field: &'static str,
         prefix: &'static str,
         arity: Arity,
+    },
+    /// Like [`Self::Ref`], but **omitted entirely** when the port is absent or undriven rather
+    /// than being a hard [`super::CompileError::UnconnectedRef`].
+    ///
+    /// This is the emitter half of GSF v2's `when`-gated optional pins: `control.counter`'s
+    /// `up_down`/`reset` and `logic.flip_flop`'s `reset` pins only exist on the symbol when the
+    /// matching parameter is non-empty, and `general-mna` decides the block's *shape* from mere
+    /// field presence (`let reset = fields.contains_key("reset")` in both arms) — emitting an
+    /// empty `reset=` would build a reset-capable block with a bogus input, not a plain one.
+    OptionalRef {
+        field: &'static str,
+        port: &'static str,
+    },
+    /// Emit `inner` only when parameter `param`'s rendered value is (or, with `negate`, is not)
+    /// one of `values`.
+    ///
+    /// Needed by the two families whose *field set*, not just their `kind=` string, depends on a
+    /// selector parameter: `logic.gate` (`op=not` reads a single `in=`, every other op reads a
+    /// comma-joined `inputs=`) and `logic.flip_flop` (`d=` / `t=` / `j=`+`k=` per `kind=`). It
+    /// also gates `control.counter`'s `modulus=`, which must not be emitted at its documented
+    /// "unbounded" value of `0` — see that entry.
+    Guarded {
+        param: &'static str,
+        values: &'static [&'static str],
+        negate: bool,
+        inner: &'static FieldSpec,
     },
     /// `outputs=<comma-joined output names>`, emitted only when this block declares more than
     /// one output and is not content with the target's own defaults.
@@ -373,6 +420,127 @@ const fn opt(field: &'static str, param: &'static str) -> FieldSpec {
     }
 }
 
+/// A signal-flow block with exactly one implicit output (`out`) and no element card.
+macro_rules! signal_block {
+    ($type_name:literal, $kind:expr, [$($field:expr),* $(,)?]) => {
+        TypeSpec {
+            kind: Some(KindSpec {
+                kind: $kind,
+                fields: &[$($field,)*],
+            }),
+            output_ports: &["out"],
+            ..TypeSpec::empty($type_name)
+        }
+    };
+}
+
+/// `general-mna`'s `build_kind` has **no `mathfn1`/`mathfn2`/`mathfn3` arm at all**: its final
+/// `other =>` fallback tries `MathFn1::from_name(other)`, then `MathFn2`, then `MathFn3`, then
+/// `LogicOp`, then `FlipFlopKind` — so the netlist form is `kind=sgn`, not
+/// `kind=mathfn1 fn=sgn`, and likewise `kind=and` / `kind=dff`. Each map below is
+/// value-for-value that family's own `from_name` table (in
+/// `general-simulator/crates/continuous-blocks/src/{waveform_arithmetic,logic}.rs`), which is
+/// also exactly the alternation each fixture's `fn`/`op`/`kind` regex already validates.
+///
+/// The `...wave` sources are named that way *because* of this fallback: a bare `kind=sin` is
+/// already `MathFn1::Sin` (`sin(x)` of an input signal), so the time-varying source had to be
+/// `kind=sinwave`. See `system_builder.rs`'s own comment above the `"sinwave"` arm.
+const MATH_FN1: &[(&str, &str)] = &[
+    ("abs", "abs"),
+    ("acos", "acos"),
+    ("acosh", "acosh"),
+    ("asin", "asin"),
+    ("asinh", "asinh"),
+    ("atan", "atan"),
+    ("atanh", "atanh"),
+    ("buf", "buf"),
+    ("ceil", "ceil"),
+    ("cos", "cos"),
+    ("cosh", "cosh"),
+    ("exp", "exp"),
+    ("floor", "floor"),
+    ("int", "int"),
+    ("inv", "inv"),
+    ("ln", "ln"),
+    ("log10", "log10"),
+    ("round", "round"),
+    ("sgn", "sgn"),
+    ("sin", "sin"),
+    ("sinh", "sinh"),
+    ("sqrt", "sqrt"),
+    ("tan", "tan"),
+    ("tanh", "tanh"),
+    ("u", "u"),
+    ("uramp", "uramp"),
+];
+
+const MATH_FN2: &[(&str, &str)] = &[
+    ("atan2", "atan2"),
+    ("anglewrap", "anglewrap"),
+    ("hypot", "hypot"),
+    ("max", "max"),
+    ("min", "min"),
+    ("pow", "pow"),
+    ("pwr", "pwr"),
+    ("pwrs", "pwrs"),
+];
+
+const MATH_FN3: &[(&str, &str)] = &[("if", "if"), ("limit", "limit")];
+
+const LOGIC_OPS: &[(&str, &str)] = &[
+    ("and", "and"),
+    ("or", "or"),
+    ("xor", "xor"),
+    ("nand", "nand"),
+    ("nor", "nor"),
+    ("xnor", "xnor"),
+    ("not", "not"),
+];
+
+const FLIP_FLOP_KINDS: &[(&str, &str)] = &[("dff", "dff"), ("jkff", "jkff"), ("tff", "tff")];
+
+/// The guarded inner specs, as named consts: a [`FieldSpec::Guarded`] holds a
+/// `&'static FieldSpec`, and naming each one keeps the registry entries readable.
+const GATE_UNARY_IN: FieldSpec = FieldSpec::Ref {
+    // The unary arm reads `in=`, but GSF v2's `logic.gate` numbers even its single pin `in0`
+    // (its `for_each` is `if(params.op == 'not', range(1), range(params.n_operands))`), so the
+    // field name and the port id genuinely differ here.
+    field: "in",
+    port: "in0",
+};
+const GATE_INPUTS: FieldSpec = FieldSpec::RefsIndexed {
+    field: "inputs",
+    prefix: "in",
+    arity: Arity::ParamCount("n_operands"),
+};
+const FF_D: FieldSpec = FieldSpec::Ref {
+    field: "d",
+    port: "d",
+};
+const FF_T: FieldSpec = FieldSpec::Ref {
+    field: "t",
+    port: "t",
+};
+const FF_J: FieldSpec = FieldSpec::Ref {
+    field: "j",
+    port: "j",
+};
+const FF_K: FieldSpec = FieldSpec::Ref {
+    field: "k",
+    port: "k",
+};
+const COUNTER_MODULUS: FieldSpec = FieldSpec::Param {
+    field: "modulus",
+    param: "modulus",
+    required: false,
+};
+
+const NOT_OP: &[&str] = &["not"];
+const DFF: &[&str] = &["dff"];
+const TFF: &[&str] = &["tff"];
+const JKFF: &[&str] = &["jkff"];
+const UNBOUNDED_MODULUS: &[&str] = &["0"];
+
 const TWO_PIN: &[&str] = &["p1", "p2"];
 const SOURCE_PINS: &[&str] = &["p", "n"];
 const ABC: &[&str] = &["a", "b", "c"];
@@ -385,20 +553,45 @@ const DQ_ZERO_OUT: &[&str] = &["d", "q", "zero_out"];
 /// # `in=` versus `inputs=`
 ///
 /// These are **not** interchangeable in `general-mna`. Its `build_kind` reads one or the other
-/// per family, from `fields` directly: `gain`/`vco`/`saturation`/`hysteresis`/`pwm`/`tf`/
-/// `discretetf`/`sig2phys` take a single `in=<signal>`; `pspwm`/`pmsm`/the six coordinate
-/// transforms/`product` take a comma-joined `inputs=`; `statespace`/`discretestatespace`/the
-/// script-hosted families accept `inputs=` with `in=` as the one-input special case. Getting
-/// this wrong produces `device '<name>' missing field 'in'` at load time, not a silent
+/// per family, from `fields` directly:
+///
+/// | input field(s) | families |
+/// |---|---|
+/// | `in=` (single) | `gain`, `vco`, `saturation`, `hysteresis`, `pwm`, `tf`, `discretetf`, `sig2phys`, `pid`, `table`, every `MathFn1` (`sin`/`sgn`/…), `not` |
+/// | `inputs=` (comma-joined) | `pspwm`, `pmsm`, the six coordinate transforms, `product`, `sum`, every non-`not` logic gate |
+/// | `inputs=` with `in=` as the one-input special case | `statespace`, `discretestatespace`, the script-hosted families |
+/// | numbered `in1=`/`in2=`/`in3=` | every `MathFn2` (`atan2`/`max`/…) and `MathFn3` (`if`/`limit`) |
+/// | named per-role fields | `srlatch` (`set=`/`reset=`), `counter` (`clk=`/`up_down=`/`reset=`), flip-flops (`clk=` plus `d=`/`t=`/`j=`+`k=`, optional `reset=`) |
+/// | none at all | `const`, `time`, `phys2sig`, and the four `…wave` sources |
+///
+/// Getting this wrong produces `device '<name>' missing field 'in'` at load time, not a silent
 /// mis-simulation -- but it is still a netlist that never runs, so each entry below names its
 /// source arm.
 ///
+/// # Other gotchas found by reading the real arms
+///
+/// * **There is no `mathfn1`/`logicgate`/`flipflop` kind.** `build_kind`'s final `other =>`
+///   fallback resolves the `kind=` token through `MathFn1::from_name`, then `MathFn2`, `MathFn3`,
+///   `LogicOp`, `FlipFlopKind` -- so it is `kind=sgn`, `kind=and`, `kind=dff`, never
+///   `kind=mathfn1 fn=sgn`. That is also why the transient sources are `kind=sinwave` and not
+///   `kind=sin`: the latter was already taken by `MathFn1::Sin`.
+/// * **List fields come in two incompatible renderings.** `signs=` (and any `inputs=`) is split
+///   on `,` and parsed entry by entry, so it must be bare (`signs=1,-1`); `a=`/`b=`/`points=` go
+///   through `parse_matrix_rows`, which wants the bracketed literal (`points=[[0,0],[1,1]]`).
+///   See [`FieldSpec::ParamList`].
+/// * **Presence, not value, decides shape** for `counter`'s `up_down=`/`reset=` and a
+///   flip-flop's `reset=` (`fields.contains_key(...)`), so an unwired optional pin must emit no
+///   field at all -- see [`FieldSpec::OptionalRef`].
+/// * **`counter`'s `modulus=0` is a run-time panic, not "unbounded"** (`count.rem_euclid(0)`);
+///   omitting the field is what gives an unbounded counter.
+/// * **`pid`'s `clamp_lo=`/`clamp_hi=` are required**, with no engine-side default.
+///
 /// Seeded with exactly the set a switching-converter acceptance circuit needs (that circuit
-/// compiling and running is the acceptance bar), then extended across the existing
-/// `tests/fixtures/general_simulator/*.json` families whose netlist shape is unambiguous from
-/// `general-mna`'s own dispatch. Families needing shapes not yet exercised by a real circuit
-/// are deliberately left out rather than guessed — an unknown type is a hard
-/// `CompileError::UnknownType`, never a silently-dropped block.
+/// compiling and running is the acceptance bar), then extended across **every**
+/// `tests/fixtures/general_simulator/*.json` family --
+/// `tests/general_simulator_registry_coverage.rs` is the regression that keeps the two lists in
+/// sync. An unregistered type is a hard `CompileError::UnknownType`, never a silently-dropped
+/// block.
 pub const REGISTRY: &[TypeSpec] = &[
     // -- structural ---------------------------------------------------------
     TypeSpec {
@@ -954,6 +1147,325 @@ pub const REGISTRY: &[TypeSpec] = &[
             opt("xc_count", "xc_count")
         ]
     ),
+    // -- summation and product ----------------------------------------------
+    //
+    // Both read a comma-joined `inputs=`; neither has an `in=` special case. `sum` additionally
+    // needs `signs=`, which is **not** a bracketed list literal -- see [`FieldSpec::ParamList`].
+    // Its own arm hard-errors when `inputs` and `signs` differ in length, which is exactly the
+    // invariant GSF v2 already enforces by generating one `in<i>` pin per `signs` entry.
+    signal_block!(
+        "control.sum",
+        KindName::Fixed("sum"),
+        [
+            FieldSpec::RefsIndexed {
+                field: "inputs",
+                prefix: "in",
+                arity: Arity::ParamLen("signs"),
+            },
+            FieldSpec::ParamList {
+                field: "signs",
+                param: "signs",
+                required: true,
+            },
+        ]
+    ),
+    signal_block!(
+        "control.product",
+        KindName::Fixed("product"),
+        [FieldSpec::RefsIndexed {
+            field: "inputs",
+            prefix: "in",
+            arity: Arity::ParamCount("n_inputs"),
+        }]
+    ),
+    // -- PID ----------------------------------------------------------------
+    //
+    // `kind=pid` takes a single `in=` error signal plus `kp`/`ki`/`kd`/`n` and a **required**
+    // fixed anti-windup clamp pair (`clamp_lo=`/`clamp_hi=`): its arm reads
+    // `PidClamp::Fixed(get("clamp_lo")?, get("clamp_hi")?)` with no default. The GSF v2 fixture
+    // originally declared only kp/ki/kd/n, so every compiled PID would have failed at load with
+    // `missing field 'clamp_lo'`; the two parameters were added to the fixture (defaulting to
+    // +/-1e30, the same "effectively unbounded" sentinel `source.pulsewave`'s `pw`/`per` already
+    // use) rather than emitted as optional, since an omitted clamp is not a thing the engine has.
+    //
+    // The alternative `PidClamp::Dynamic` form (`clamp_lo_in=`/`clamp_hi_in=`, both or neither)
+    // is deliberately **not** emitted: it would need two more input pins than the fixture draws,
+    // and the engine rejects supplying only one of the pair.
+    signal_block!(
+        "control.pid",
+        KindName::Fixed("pid"),
+        [
+            req("kp", "kp"),
+            req("ki", "ki"),
+            req("kd", "kd"),
+            req("n", "n"),
+            req("clamp_lo", "clamp_lo"),
+            req("clamp_hi", "clamp_hi"),
+            FieldSpec::Ref {
+                field: "in",
+                port: "in",
+            },
+        ]
+    ),
+    // -- table lookup -------------------------------------------------------
+    //
+    // `points=` goes through `parse_xy_points` -> `parse_matrix_rows`, so the bracketed nested
+    // list `render_value` produces (`[[0,0],[1,1]]`) is the right form here -- the opposite of
+    // `sum`'s `signs=`. The engine sorts the points by `x` itself.
+    signal_block!(
+        "math.table_lookup",
+        KindName::Fixed("table"),
+        [
+            req("points", "points"),
+            FieldSpec::Ref {
+                field: "in",
+                port: "in",
+            },
+        ]
+    ),
+    // -- waveform-arithmetic function families -------------------------------
+    //
+    // `kind=<the function name itself>` (see [`MATH_FN1`]). Arity and field spelling differ per
+    // family and are **not** `inputs=`: `MathFn1` reads `in=`; `MathFn2` reads `in1=`/`in2=`;
+    // `MathFn3` reads `in1=`/`in2=`/`in3=`. Each matches its fixture's own pin ids exactly.
+    signal_block!(
+        "math.fn1",
+        KindName::PerVariant {
+            param: "fn",
+            map: MATH_FN1,
+        },
+        [FieldSpec::Ref {
+            field: "in",
+            port: "in",
+        }]
+    ),
+    signal_block!(
+        "math.fn2",
+        KindName::PerVariant {
+            param: "fn",
+            map: MATH_FN2,
+        },
+        [
+            FieldSpec::Ref {
+                field: "in1",
+                port: "in1",
+            },
+            FieldSpec::Ref {
+                field: "in2",
+                port: "in2",
+            },
+        ]
+    ),
+    signal_block!(
+        "math.fn3",
+        KindName::PerVariant {
+            param: "fn",
+            map: MATH_FN3,
+        },
+        [
+            FieldSpec::Ref {
+                field: "in1",
+                port: "in1",
+            },
+            FieldSpec::Ref {
+                field: "in2",
+                port: "in2",
+            },
+            FieldSpec::Ref {
+                field: "in3",
+                port: "in3",
+            },
+        ]
+    ),
+    // -- logic --------------------------------------------------------------
+    //
+    // `kind=<the op itself>`, and the *field set* changes with it: `LogicOp::is_unary` sends
+    // `not` down a `get_str("in")` path while every other op reads a comma-joined `inputs=` of
+    // at least two entries. Hence the guarded pair rather than one shape for the family.
+    signal_block!(
+        "logic.gate",
+        KindName::PerVariant {
+            param: "op",
+            map: LOGIC_OPS,
+        },
+        [
+            FieldSpec::Guarded {
+                param: "op",
+                values: NOT_OP,
+                negate: false,
+                inner: &GATE_UNARY_IN,
+            },
+            FieldSpec::Guarded {
+                param: "op",
+                values: NOT_OP,
+                negate: true,
+                inner: &GATE_INPUTS,
+            },
+        ]
+    ),
+    // `kind=srlatch set=<sig> reset=<sig> priority=set|reset` -- level-triggered, no clock.
+    // `priority` is optional in the engine (defaulting to `set`); emitted unconditionally here
+    // because the fixture always has a value for it.
+    TypeSpec {
+        kind: Some(KindSpec {
+            kind: KindName::Fixed("srlatch"),
+            fields: &[
+                req("priority", "priority"),
+                FieldSpec::Ref {
+                    field: "set",
+                    port: "set",
+                },
+                FieldSpec::Ref {
+                    field: "reset",
+                    port: "reset",
+                },
+            ],
+        }),
+        output_ports: &["q"],
+        ..TypeSpec::empty("logic.sr_latch")
+    },
+    // `kind=dff|jkff|tff clk=<sig> (d=|t=|j=+k=) [reset=<sig>]`. The data-input *field names*
+    // are per-variant, matching the fixture's own `when`-gated `d`/`t`/`j`/`k` pins. `reset=` is
+    // presence-detected (`fields.contains_key("reset")`), so it is emitted only when actually
+    // wired -- see [`FieldSpec::OptionalRef`].
+    TypeSpec {
+        kind: Some(KindSpec {
+            kind: KindName::PerVariant {
+                param: "kind",
+                map: FLIP_FLOP_KINDS,
+            },
+            fields: &[
+                FieldSpec::Ref {
+                    field: "clk",
+                    port: "clk",
+                },
+                FieldSpec::Guarded {
+                    param: "kind",
+                    values: DFF,
+                    negate: false,
+                    inner: &FF_D,
+                },
+                FieldSpec::Guarded {
+                    param: "kind",
+                    values: TFF,
+                    negate: false,
+                    inner: &FF_T,
+                },
+                FieldSpec::Guarded {
+                    param: "kind",
+                    values: JKFF,
+                    negate: false,
+                    inner: &FF_J,
+                },
+                FieldSpec::Guarded {
+                    param: "kind",
+                    values: JKFF,
+                    negate: false,
+                    inner: &FF_K,
+                },
+                FieldSpec::OptionalRef {
+                    field: "reset",
+                    port: "reset",
+                },
+            ],
+        }),
+        output_ports: &["q"],
+        ..TypeSpec::empty("logic.flip_flop")
+    },
+    // `kind=counter clk=<sig> [up_down=<sig>] [reset=<sig>] [modulus=<n>]`, output pin `count`.
+    //
+    // Two presence-detected optional inputs, same as the flip-flop's `reset`. `modulus=` is
+    // guarded on its *value*, not on presence: GSF v2 documents `modulus = 0` as "unbounded",
+    // but the engine's counter does `count.rem_euclid(modulus as i64)` on every rising edge, so
+    // emitting `modulus=0` is a divide-by-zero panic at run time rather than an unbounded
+    // counter. Omitting the field is what actually produces `modulus: None`.
+    TypeSpec {
+        kind: Some(KindSpec {
+            kind: KindName::Fixed("counter"),
+            fields: &[
+                FieldSpec::Guarded {
+                    param: "modulus",
+                    values: UNBOUNDED_MODULUS,
+                    negate: true,
+                    inner: &COUNTER_MODULUS,
+                },
+                FieldSpec::Ref {
+                    field: "clk",
+                    port: "clk",
+                },
+                FieldSpec::OptionalRef {
+                    field: "up_down",
+                    port: "up_down",
+                },
+                FieldSpec::OptionalRef {
+                    field: "reset",
+                    port: "reset",
+                },
+            ],
+        }),
+        output_ports: &["count"],
+        ..TypeSpec::empty("control.counter")
+    },
+    // -- time-varying signal sources ----------------------------------------
+    //
+    // Four distinct `kind=` values, zero input pins (they read `t` directly, like
+    // `converter.phys2sig` reads circuit state). Field names/order/defaults are ngspice's own
+    // SIN()/PULSE()/EXP()/SFFM(); `general-mna` reuses `TransientFunction` verbatim so a
+    // `kind=sinwave` block and a `V1 a 0 SIN(...)` card built from the same numbers are the same
+    // waveform. Which fields are required is read straight off each arm: a `get(...)` is
+    // required, a `get_opt(..., default)` is not. Every optional one is still emitted here,
+    // because the fixture always carries a value for it -- and one of those defaults genuinely
+    // differs between the two sides (`expwave`'s `td2` is `f64::MAX/4` in the engine and `1e30`
+    // in the fixture; both mean "never falls", and emitting the fixture's value keeps the
+    // netlist honest about what the document says).
+    signal_block!(
+        "source.sinwave",
+        KindName::Fixed("sinwave"),
+        [
+            req("va", "va"),
+            req("freq", "freq"),
+            opt("v0", "v0"),
+            opt("td", "td"),
+            opt("theta", "theta"),
+            opt("phase", "phase"),
+        ]
+    ),
+    signal_block!(
+        "source.pulsewave",
+        KindName::Fixed("pulsewave"),
+        [
+            req("v1", "v1"),
+            req("v2", "v2"),
+            opt("td", "td"),
+            opt("tr", "tr"),
+            opt("tf", "tf"),
+            opt("pw", "pw"),
+            opt("per", "per"),
+        ]
+    ),
+    signal_block!(
+        "source.expwave",
+        KindName::Fixed("expwave"),
+        [
+            req("v1", "v1"),
+            req("v2", "v2"),
+            opt("td1", "td1"),
+            opt("tau1", "tau1"),
+            opt("td2", "td2"),
+            opt("tau2", "tau2"),
+        ]
+    ),
+    signal_block!(
+        "source.sffmwave",
+        KindName::Fixed("sffmwave"),
+        [
+            req("va", "va"),
+            req("fc", "fc"),
+            req("fs", "fs"),
+            opt("v0", "v0"),
+            opt("mdi", "mdi"),
+        ]
+    ),
 ];
 
 pub fn lookup(type_name: &str) -> Option<&'static TypeSpec> {
@@ -980,6 +1492,61 @@ mod tests {
         for spec in REGISTRY {
             assert!(seen.insert(spec.type_name), "duplicate {}", spec.type_name);
         }
+    }
+
+    #[test]
+    fn param_count_arity_reads_the_integer_itself_not_the_length_of_anything() {
+        let block = |params: serde_json::Value| {
+            Block::new(crate::document::NewBlock {
+                id: "b".to_string(),
+                r#type: "control.product".to_string(),
+                paradigm: crate::document::Paradigm::SignalFlow,
+                domain: "electrical".to_string(),
+                fidelity: None,
+                position: (0, 0),
+                rotation: 0,
+                mirror: crate::document::Mirror::default(),
+                params: params.as_object().cloned().unwrap_or_default(),
+                ic: Default::default(),
+                label: None,
+                comment_before: Vec::new(),
+                comment_after: Vec::new(),
+                subckt_ref: None,
+            })
+            .unwrap()
+        };
+        let arity = Arity::ParamCount("n_inputs");
+        assert_eq!(
+            arity.count(&block(serde_json::json!({"n_inputs": 5}))),
+            Some(5)
+        );
+        assert_eq!(
+            arity.count(&block(serde_json::json!({"n_inputs": 0}))),
+            Some(0)
+        );
+        // A negative count is not an arity at all -- reported as unknown so the emitter raises
+        // IndexedRefArity rather than silently emitting an empty `inputs=`.
+        assert_eq!(
+            arity.count(&block(serde_json::json!({"n_inputs": -1}))),
+            None
+        );
+        assert_eq!(arity.count(&block(serde_json::json!({}))), None);
+    }
+
+    #[test]
+    fn per_variant_kind_maps_are_identity_maps_over_the_engines_own_from_name_tables() {
+        // Every one of these families selects its kind= by the function/op name itself, so a
+        // map entry whose two halves differ would be a typo, not a translation.
+        for map in [MATH_FN1, MATH_FN2, MATH_FN3, LOGIC_OPS, FLIP_FLOP_KINDS] {
+            for (from, to) in map {
+                assert_eq!(from, to, "{from} maps to a different kind= string");
+            }
+        }
+        assert_eq!(MATH_FN1.len(), 26);
+        assert_eq!(MATH_FN2.len(), 8);
+        assert_eq!(MATH_FN3.len(), 2);
+        assert_eq!(LOGIC_OPS.len(), 7);
+        assert_eq!(FLIP_FLOP_KINDS.len(), 3);
     }
 
     #[test]
