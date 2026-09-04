@@ -9,6 +9,7 @@ use crate::resolve::{self, ResolveError};
 use crate::template::Template;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Parameter {
@@ -198,6 +199,265 @@ pub fn evaluate_component(
         ports,
         primitives,
     })
+}
+
+/// The component contracts a caller has made available for a particular piece of work, keyed by
+/// the block `type` string a [`crate::document::Block`] carries.
+///
+/// # Why this exists, and why it is this small
+///
+/// [`evaluate_component`] can answer "what ports does this block have, with what kind and
+/// dimension?" — but only when handed the right [`ComponentContract`]. Until this type existed
+/// there was no way for [`crate::document::ModelBuilder::connect`] to *find* that contract, so
+/// `document::port_compat` could only enforce the subset of `port-compat.ts`'s rules that the
+/// document already knows on its own (a `SubcktDef`'s port list, a block's `domain`). That
+/// module's doc records the gap this closes.
+///
+/// It is deliberately a plain map, not a catalogue-loading subsystem: no file/HTTP/YAML source,
+/// no versioning, no lazy resolution. `gsim-py`/`gsim-wasm` are stateless JSON-in/JSON-out
+/// functions, so their callers hand the whole map in per call ([`ContractRegistry`] deserializes
+/// straight from a `{"<block type>": <contract>}` JSON object for exactly that reason), and an
+/// in-process Rust caller registers into a [`crate::document::ModelBuilder`] once. Anything
+/// richer would be an abstraction without a call site.
+///
+/// **A missing entry is never an error.** Every consumer treats "no contract for this type" as
+/// "cannot say", falling back to whatever coarser check it already had. That keeps a registry
+/// optional and additive: a document built with no contracts behaves exactly as it did before
+/// this type existed.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(transparent)]
+pub struct ContractRegistry {
+    /// `BTreeMap` rather than `HashMap` so iteration order is deterministic — a diagnostic that
+    /// lists known types must not reorder between runs.
+    by_type: BTreeMap<String, ComponentContract>,
+}
+
+impl ContractRegistry {
+    pub fn new() -> ContractRegistry {
+        ContractRegistry::default()
+    }
+
+    /// Registers `contract` under the block `type` string documents will use to refer to it.
+    /// Returns the contract previously registered under that name, if any.
+    ///
+    /// The key is passed explicitly rather than taken from `contract.name` because the two are
+    /// not guaranteed equal: a caller may register one contract under a project-local alias, and
+    /// [`register_by_name`](Self::register_by_name) covers the common case where they do match.
+    pub fn register(
+        &mut self,
+        type_name: impl Into<String>,
+        contract: ComponentContract,
+    ) -> Option<ComponentContract> {
+        self.by_type.insert(type_name.into(), contract)
+    }
+
+    /// Registers `contract` under its own `name` — the convention every fixture in
+    /// `crates/gsim-core/tests/fixtures/general_simulator/` already follows (`control.sum.json`
+    /// has `"name": "control.sum"`, which is also the block `type` documents use).
+    pub fn register_by_name(&mut self, contract: ComponentContract) -> Option<ComponentContract> {
+        self.by_type.insert(contract.name.clone(), contract)
+    }
+
+    pub fn get(&self, type_name: &str) -> Option<&ComponentContract> {
+        self.by_type.get(type_name)
+    }
+
+    pub fn contains(&self, type_name: &str) -> bool {
+        self.by_type.contains_key(type_name)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.by_type.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.by_type.len()
+    }
+
+    /// Every registered block type, in sorted order.
+    pub fn types(&self) -> impl Iterator<Item = &str> {
+        self.by_type.keys().map(String::as_str)
+    }
+
+    /// The resolved port list for a block of `type_name` with `params`, or `None` when this
+    /// registry has no contract for that type.
+    ///
+    /// **An evaluation *failure* also yields `None`, on purpose.** A caller asking "what kind is
+    /// this port?" gets "cannot say" from a contract whose `for_each` blew up, exactly as it
+    /// would from an unregistered type — a compatibility check must not convert a malformed
+    /// third-party contract into a confusing error about an unrelated wire. A caller that wants
+    /// the failure itself calls [`evaluate_component`] directly, which reports it.
+    pub fn evaluate_ports(
+        &self,
+        type_name: &str,
+        params: &Map<String, Value>,
+    ) -> Option<Vec<Port>> {
+        let contract = self.get(type_name)?;
+        evaluate_component(contract, params).ok().map(|e| e.ports)
+    }
+
+    /// The single port `port_id` of a block of `type_name` under `params`, or `None` when the
+    /// type is unregistered, its contract fails to evaluate, or it declares no such port.
+    ///
+    /// The last case matters: port *existence* is not validated by
+    /// [`crate::document::ModelBuilder::connect`], and looking a port up here must not start
+    /// making it an error — see `document::port_compat`.
+    pub fn port_of(
+        &self,
+        type_name: &str,
+        params: &Map<String, Value>,
+        port_id: &str,
+    ) -> Option<Port> {
+        self.evaluate_ports(type_name, params)?
+            .into_iter()
+            .find(|p| p.id == port_id)
+    }
+}
+
+impl FromIterator<(String, ComponentContract)> for ContractRegistry {
+    fn from_iter<I: IntoIterator<Item = (String, ComponentContract)>>(iter: I) -> Self {
+        ContractRegistry {
+            by_type: iter.into_iter().collect(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod registry_tests {
+    use super::*;
+    use serde_json::json;
+
+    fn vector_gain() -> ComponentContract {
+        // A gain whose port width follows a `width` parameter -- the smallest contract that
+        // makes `dim` genuinely parameter-dependent rather than a constant.
+        serde_json::from_value(json!({
+            "name": "control.gain",
+            "label": "Gain",
+            "parameters": [{"name": "width", "type": "number", "default": 1}],
+            "ports": [
+                {"id": "in", "side": "left", "kind": "signal", "direction": "in",
+                 "dim": ["${{ params.width }}"]},
+                {"id": "out", "side": "right", "kind": "signal", "direction": "out",
+                 "dim": ["${{ params.width }}"]}
+            ],
+            "geometry": {"bbox": [40, 30], "primitives": []}
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn register_then_look_up_by_block_type() {
+        let mut reg = ContractRegistry::new();
+        assert!(reg.is_empty());
+        assert!(reg.get("control.gain").is_none());
+
+        reg.register_by_name(vector_gain());
+        assert_eq!(reg.len(), 1);
+        assert!(reg.contains("control.gain"));
+        assert_eq!(reg.types().collect::<Vec<_>>(), vec!["control.gain"]);
+        assert_eq!(reg.get("control.gain").unwrap().label, "Gain");
+    }
+
+    #[test]
+    fn registering_under_an_alias_keeps_the_contracts_own_name_out_of_it() {
+        let mut reg = ContractRegistry::new();
+        reg.register("project.my_gain", vector_gain());
+        assert!(reg.contains("project.my_gain"));
+        assert!(!reg.contains("control.gain"));
+        // Re-registering returns the displaced contract rather than silently dropping it.
+        let displaced = reg.register("project.my_gain", vector_gain());
+        assert!(displaced.is_some());
+        assert_eq!(reg.len(), 1);
+    }
+
+    #[test]
+    fn a_ports_dim_is_resolved_against_the_blocks_own_params() {
+        let mut reg = ContractRegistry::new();
+        reg.register_by_name(vector_gain());
+
+        let scalar = reg
+            .port_of("control.gain", &Map::new(), "in")
+            .expect("registered, evaluates, declares 'in'");
+        assert_eq!(scalar.dim, Some(vec![1]));
+        assert_eq!(scalar.kind, "signal");
+
+        let params = json!({"width": 3}).as_object().unwrap().clone();
+        let wide = reg.port_of("control.gain", &params, "in").unwrap();
+        assert_eq!(wide.dim, Some(vec![3]));
+    }
+
+    #[test]
+    fn an_unregistered_type_an_unknown_port_and_a_broken_contract_all_say_cannot_say() {
+        let mut reg = ContractRegistry::new();
+        reg.register_by_name(vector_gain());
+        assert!(reg.port_of("nope.nothing", &Map::new(), "in").is_none());
+        assert!(reg
+            .port_of("control.gain", &Map::new(), "nosuchport")
+            .is_none());
+
+        // A contract whose `for_each` cannot evaluate must degrade to "unknown", not blow up.
+        let broken: ComponentContract = serde_json::from_value(json!({
+            "name": "broken.block",
+            "label": "Broken",
+            "ports": [{"for_each": "${{ params.missing }}", "as": "x",
+                       "emit": {"id": "p", "side": "left", "kind": "signal", "direction": "in"}}],
+            "geometry": {"bbox": [10, 10], "primitives": []}
+        }))
+        .unwrap();
+        reg.register_by_name(broken);
+        assert!(reg.evaluate_ports("broken.block", &Map::new()).is_none());
+    }
+
+    #[test]
+    fn a_registry_deserializes_from_a_plain_type_to_contract_json_object() {
+        // The exact payload shape `gsim-py`/`gsim-wasm` accept per call.
+        let reg: ContractRegistry = serde_json::from_value(json!({
+            "control.gain": vector_gain(),
+        }))
+        .unwrap();
+        assert_eq!(reg.len(), 1);
+        assert_eq!(
+            reg.port_of("control.gain", &Map::new(), "out")
+                .unwrap()
+                .kind,
+            "signal"
+        );
+
+        let empty: ContractRegistry = serde_json::from_str("{}").unwrap();
+        assert!(empty.is_empty());
+    }
+
+    #[test]
+    fn every_shipped_fixture_contract_registers_and_evaluates_under_its_own_name() {
+        // The realistic population path: a caller loads the fixture catalogue wholesale. This
+        // also guards the `name == block type` convention `register_by_name` relies on.
+        let dir = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/general_simulator"
+        );
+        let mut reg = ContractRegistry::new();
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.extension().and_then(|e| e.to_str()) != Some("json") {
+                continue;
+            }
+            let text = std::fs::read_to_string(&path).unwrap();
+            let contract: ComponentContract =
+                serde_json::from_str(&text).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+            reg.register_by_name(contract);
+        }
+        assert_eq!(
+            reg.len(),
+            40,
+            "one fixture's `name` must collide with another's"
+        );
+        for type_name in reg.types().map(str::to_string).collect::<Vec<_>>() {
+            assert!(
+                reg.evaluate_ports(&type_name, &Map::new()).is_some(),
+                "{type_name} does not evaluate with default params"
+            );
+        }
+    }
 }
 
 #[cfg(test)]
