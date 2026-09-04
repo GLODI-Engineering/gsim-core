@@ -13,4 +13,5 @@ a reproducible trap.
 
 ## Index
 
-- [2026-08](2026-08.md) — current
+- [2026-09](2026-09.md) — current
+- [2026-08](2026-08.md)

@@ -1,0 +1,25 @@
+{
+  "name": "converter.phys2sig",
+  "label": "Phys2Sig",
+  "category": "converter",
+  "parameters": [
+    {
+      "name": "node",
+      "type": "string",
+      "default": "",
+      "validate": "${{ (value != '') != (params.branch != '') }}",
+      "error": "exactly one of node or branch must be set (a phys2sig reads either a node voltage or a branch current, never both)"
+    },
+    { "name": "branch", "type": "string", "default": "" }
+  ],
+  "ports": [
+    { "id": "out", "side": "right", "kind": "signal", "direction": "out" }
+  ],
+  "geometry": {
+    "bbox": [50, 30],
+    "primitives": [
+      { "type": "rect", "x": 0, "y": 0, "w": 50, "h": 30 },
+      { "type": "text", "x": 25, "y": 15, "text": "P2S" }
+    ]
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "name": "converter.sig2phys",
+  "label": "Sig2Phys",
+  "category": "converter",
+  "parameters": [
+    {
+      "name": "domain",
+      "type": "enum",
+      "default": "voltage",
+      "validate": "${{ matches(value, '^(voltage|current)$') }}",
+      "error": "domain must be 'voltage' or 'current'"
+    }
+  ],
+  "ports": [
+    { "id": "in", "side": "left", "kind": "signal", "direction": "in" },
+    { "id": "out", "side": "right", "kind": "physical-electrical", "direction": "out" }
+  ],
+  "geometry": {
+    "bbox": [50, 30],
+    "primitives": [
+      { "type": "rect", "x": 0, "y": 0, "w": 50, "h": 30 },
+      { "type": "text", "x": 25, "y": 15, "text": "S2P" }
+    ]
+  }
+}

@@ -16,6 +16,14 @@
 //!   row, outputs = row count of `c`) — a structurally different variadic pattern from Sum.
 //! - `logic.gate` — enum-selector-driven arity (`op == "not"` forces exactly one input
 //!   regardless of `n_operands`), using `if()` inside a `for_each` source.
+//! - `converter.sig2phys` / `converter.phys2sig` — added after `general-mna` renamed
+//!   `Sig2Voltage`/`Sig2Current` -> `Sig2Phys`/`Probe` -> `Phys2Sig` (2026-09-02..04 commits).
+//!   `phys2sig` has a real mutually-exclusive-parameter (`node` XOR `branch`) validation rule
+//!   and, faithfully, **zero input ports** (it reads circuit state directly, never wired) —
+//!   the first fixture with an empty `ports:` list.
+//! - `extensibility.octfunc` / `extensibility.octblock` — the two new Octave-hosted script
+//!   kinds. First fixtures with **two independent variadic port groups** in one component
+//!   (`input_names` and `output_names` each drive their own `for_each`, unrelated in length).
 
 use gsim_core::contract::{evaluate_component, validate_parameters, ComponentContract};
 use serde_json::{json, Map, Value};
@@ -197,6 +205,113 @@ fn logic_gate_arity_depends_on_the_op_enum_not_just_n_operands() {
     assert!(validate_parameters(&c, &params(json!({"op": "xor"}))).is_empty());
     assert_eq!(
         validate_parameters(&c, &params(json!({"op": "maybe"}))).len(),
+        1
+    );
+}
+
+#[test]
+fn sig2phys_bridges_signal_to_a_physical_electrical_port() {
+    let c = load("converter.sig2phys");
+    let evaluated = evaluate_component(&c, &params(json!({"domain": "current"}))).unwrap();
+    assert_eq!(evaluated.ports.len(), 2);
+    assert_eq!(evaluated.ports[0].kind, "signal");
+    assert_eq!(evaluated.ports[1].kind, "physical-electrical");
+
+    assert!(validate_parameters(&c, &params(json!({"domain": "voltage"}))).is_empty());
+    assert_eq!(
+        validate_parameters(&c, &params(json!({"domain": "amps"}))).len(),
+        1
+    );
+}
+
+#[test]
+fn phys2sig_has_zero_input_ports_and_enforces_node_xor_branch() {
+    let c = load("converter.phys2sig");
+    let evaluated = evaluate_component(&c, &params(json!({"node": "vout"}))).unwrap();
+    assert_eq!(evaluated.ports.len(), 1);
+    assert_eq!(
+        evaluated.ports[0].direction,
+        gsim_core::port::PortDirection::Out
+    );
+
+    // Exactly one of node/branch must be set.
+    assert!(validate_parameters(&c, &params(json!({"node": "vout"}))).is_empty());
+    assert!(validate_parameters(&c, &params(json!({"branch": "v1"}))).is_empty());
+    // Neither set (both default to "") -- must fail.
+    assert_eq!(validate_parameters(&c, &params(json!({}))).len(), 1);
+    // Both set -- must also fail.
+    assert_eq!(
+        validate_parameters(&c, &params(json!({"node": "vout", "branch": "v1"}))).len(),
+        1
+    );
+}
+
+#[test]
+fn octfunc_has_two_independently_variadic_port_groups() {
+    let c = load("extensibility.octfunc");
+
+    let default = evaluate_component(&c, &params(json!({}))).unwrap();
+    assert_eq!(
+        default
+            .ports
+            .iter()
+            .map(|p| p.id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["in0", "out0"]
+    );
+
+    // 3 inputs, 1 output -- the two groups vary independently.
+    let evaluated = evaluate_component(
+        &c,
+        &params(json!({"input_names": ["a", "b", "c"], "output_names": ["y"]})),
+    )
+    .unwrap();
+    assert_eq!(
+        evaluated
+            .ports
+            .iter()
+            .map(|p| p.id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["in0", "in1", "in2", "out0"]
+    );
+    assert_eq!(evaluated.ports[1].label.as_deref(), Some("b"));
+
+    // 1 input, 2 outputs -- the reverse skew.
+    let evaluated2 = evaluate_component(
+        &c,
+        &params(json!({"input_names": ["u"], "output_names": ["y1", "y2"]})),
+    )
+    .unwrap();
+    assert_eq!(
+        evaluated2
+            .ports
+            .iter()
+            .map(|p| p.id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["in0", "out0", "out1"]
+    );
+}
+
+#[test]
+fn octblock_shares_octfunc_port_shape_plus_a_validated_xc_count() {
+    let c = load("extensibility.octblock");
+    let evaluated = evaluate_component(
+        &c,
+        &params(json!({"input_names": ["a", "b"], "output_names": ["y"], "xc_count": 2})),
+    )
+    .unwrap();
+    assert_eq!(
+        evaluated
+            .ports
+            .iter()
+            .map(|p| p.id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["in0", "in1", "out0"]
+    );
+
+    assert!(validate_parameters(&c, &params(json!({"xc_count": 0}))).is_empty());
+    assert_eq!(
+        validate_parameters(&c, &params(json!({"xc_count": -1}))).len(),
         1
     );
 }
