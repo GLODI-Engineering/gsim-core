@@ -1,0 +1,22 @@
+{
+  "name": "math.fn1",
+  "label": "Waveform Function (unary)",
+  "category": "math",
+  "parameters": [
+    {
+      "name": "fn",
+      "type": "enum",
+      "default": "sin",
+      "validate": "${{ matches(value, '^(abs|acos|acosh|asin|asinh|atan|atanh|buf|ceil|cos|cosh|exp|floor|int|inv|ln|log10|round|sgn|sin|sinh|sqrt|tan|tanh|u|uramp)$') }}",
+      "error": "fn must be one of the 26 known unary waveform functions"
+    }
+  ],
+  "ports": [
+    { "id": "in", "side": "left", "kind": "signal", "direction": "in" },
+    { "id": "out", "side": "right", "kind": "signal", "direction": "out" }
+  ],
+  "geometry": {
+    "bbox": [50, 30],
+    "primitives": [{ "type": "text", "x": 25, "y": 15, "text": "${{ params.fn }}" }]
+  }
+}

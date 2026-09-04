@@ -1,0 +1,27 @@
+{
+  "name": "control.vco",
+  "label": "VCO",
+  "category": "control",
+  "parameters": [
+    { "name": "f_min", "type": "number", "default": 1.0, "unit": "Hz" },
+    {
+      "name": "f_max",
+      "type": "number",
+      "default": 1000.0,
+      "unit": "Hz",
+      "validate": "${{ value >= params.f_min }}",
+      "error": "f_max must be >= f_min"
+    }
+  ],
+  "ports": [
+    { "id": "in", "side": "left", "kind": "signal", "direction": "in" },
+    { "id": "out", "side": "right", "kind": "signal", "direction": "out" }
+  ],
+  "geometry": {
+    "bbox": [50, 30],
+    "primitives": [
+      { "type": "rect", "x": 0, "y": 0, "w": 50, "h": 30 },
+      { "type": "text", "x": 25, "y": 15, "text": "VCO" }
+    ]
+  }
+}

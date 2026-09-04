@@ -1,0 +1,34 @@
+{
+  "name": "control.discrete_state_space",
+  "label": "Discrete State Space",
+  "category": "control",
+  "parameters": [
+    { "name": "a", "type": "array", "default": [[1]] },
+    { "name": "b", "type": "array", "default": [[0.1]] },
+    { "name": "c", "type": "array", "default": [[1]] },
+    { "name": "d", "type": "array", "default": [[0]] },
+    {
+      "name": "ts",
+      "type": "number",
+      "default": 0.1,
+      "validate": "${{ value > 0 }}",
+      "error": "ts (sample time) is required and must be a positive periodic value -- a discrete block's own recursion has its coefficients baked in at one fixed sample period, unlike kind=cscript's optional/variable ts="
+    }
+  ],
+  "ports": [
+    {
+      "for_each": "${{ range(count(at(params.b, 0))) }}",
+      "as": "i",
+      "emit": { "id": "in${{ i }}", "side": "left", "kind": "signal", "direction": "in" }
+    },
+    {
+      "for_each": "${{ range(count(params.c)) }}",
+      "as": "i",
+      "emit": { "id": "out${{ i }}", "side": "right", "kind": "signal", "direction": "out" }
+    }
+  ],
+  "geometry": {
+    "bbox": [70, "${{ max(30, max(count(at(params.b, 0)), count(params.c)) * 20) }}"],
+    "primitives": [{ "type": "text", "x": 35, "y": 15, "text": "DSS" }]
+  }
+}

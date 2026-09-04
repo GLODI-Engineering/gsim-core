@@ -1,0 +1,22 @@
+{
+  "name": "source.pulsewave",
+  "label": "Pulse Wave Source",
+  "category": "sources",
+  "parameters": [
+    { "name": "v1", "type": "number", "default": 0.0 },
+    { "name": "v2", "type": "number", "default": 1.0 },
+    { "name": "td", "type": "number", "default": 0.0, "unit": "s" },
+    { "name": "tr", "type": "number", "default": 0.0, "unit": "s" },
+    { "name": "tf", "type": "number", "default": 0.0, "unit": "s" },
+    { "name": "pw", "type": "number", "default": 1e30, "unit": "s" },
+    { "name": "per", "type": "number", "default": 1e30, "unit": "s" }
+  ],
+  "ports": [{ "id": "out", "side": "right", "kind": "signal", "direction": "out" }],
+  "geometry": {
+    "bbox": [50, 30],
+    "primitives": [
+      { "type": "rect", "x": 0, "y": 0, "w": 50, "h": 30 },
+      { "type": "text", "x": 25, "y": 15, "text": "PULSE" }
+    ]
+  }
+}

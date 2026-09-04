@@ -1,0 +1,21 @@
+{
+  "name": "source.sinwave",
+  "label": "Sine Wave Source",
+  "category": "sources",
+  "parameters": [
+    { "name": "va", "type": "number", "default": 1.0 },
+    { "name": "freq", "type": "number", "default": 1000.0, "unit": "Hz" },
+    { "name": "v0", "type": "number", "default": 0.0 },
+    { "name": "td", "type": "number", "default": 0.0, "unit": "s" },
+    { "name": "theta", "type": "number", "default": 0.0 },
+    { "name": "phase", "type": "number", "default": 0.0, "unit": "deg" }
+  ],
+  "ports": [{ "id": "out", "side": "right", "kind": "signal", "direction": "out" }],
+  "geometry": {
+    "bbox": [50, 30],
+    "primitives": [
+      { "type": "rect", "x": 0, "y": 0, "w": 50, "h": 30 },
+      { "type": "text", "x": 25, "y": 15, "text": "SIN" }
+    ]
+  }
+}

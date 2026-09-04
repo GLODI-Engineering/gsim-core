@@ -1,0 +1,22 @@
+{
+  "name": "control.transform.clarke_park",
+  "label": "Clarke-Park Transform",
+  "category": "control",
+  "parameters": [],
+  "ports": [
+    { "id": "a", "side": "left", "kind": "signal", "direction": "in", "label": "a" },
+    { "id": "b", "side": "left", "kind": "signal", "direction": "in", "label": "b" },
+    { "id": "c", "side": "left", "kind": "signal", "direction": "in", "label": "c" },
+    { "id": "theta", "side": "left", "kind": "signal", "direction": "in", "label": "theta" },
+    { "id": "d", "side": "right", "kind": "signal", "direction": "out", "label": "d" },
+    { "id": "q", "side": "right", "kind": "signal", "direction": "out", "label": "q" },
+    { "id": "zero", "side": "right", "kind": "signal", "direction": "out", "label": "zero" }
+  ],
+  "geometry": {
+    "bbox": [60, 70],
+    "primitives": [
+      { "type": "rect", "x": 0, "y": 0, "w": 60, "h": 70 },
+      { "type": "text", "x": 30, "y": 35, "text": "Clarke-Park" }
+    ]
+  }
+}

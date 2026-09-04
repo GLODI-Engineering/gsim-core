@@ -1,0 +1,70 @@
+{
+  "name": "machine.pmsm",
+  "label": "PMSM",
+  "category": "machine",
+  "parameters": [
+    {
+      "name": "r_s",
+      "type": "number",
+      "default": 0.5,
+      "unit": "Ohm",
+      "validate": "${{ value >= 0 }}",
+      "error": "r_s (stator resistance) must be non-negative"
+    },
+    {
+      "name": "l_d",
+      "type": "number",
+      "default": 1e-3,
+      "unit": "H",
+      "validate": "${{ value > 0 }}",
+      "error": "l_d (d-axis inductance) must be positive"
+    },
+    {
+      "name": "l_q",
+      "type": "number",
+      "default": 1e-3,
+      "unit": "H",
+      "validate": "${{ value > 0 }}",
+      "error": "l_q (q-axis inductance) must be positive"
+    },
+    { "name": "lambda_pm", "type": "number", "default": 0.05, "unit": "Wb" },
+    {
+      "name": "pole_pairs",
+      "type": "number",
+      "default": 4.0,
+      "validate": "${{ value > 0 }}",
+      "error": "pole_pairs must be positive"
+    },
+    {
+      "name": "inertia",
+      "type": "number",
+      "default": 1e-5,
+      "unit": "kg*m^2",
+      "validate": "${{ value > 0 }}",
+      "error": "inertia must be positive"
+    },
+    {
+      "name": "friction",
+      "type": "number",
+      "default": 1e-6,
+      "validate": "${{ value >= 0 }}",
+      "error": "friction (viscous friction coefficient) must be non-negative"
+    }
+  ],
+  "ports": [
+    { "id": "vd", "side": "left", "kind": "signal", "direction": "in" },
+    { "id": "vq", "side": "left", "kind": "signal", "direction": "in" },
+    { "id": "t_load", "side": "left", "kind": "signal", "direction": "in" },
+    { "id": "id", "side": "right", "kind": "signal", "direction": "out" },
+    { "id": "iq", "side": "right", "kind": "signal", "direction": "out" },
+    { "id": "omega_m", "side": "right", "kind": "signal", "direction": "out" },
+    { "id": "theta_e", "side": "right", "kind": "signal", "direction": "out" }
+  ],
+  "geometry": {
+    "bbox": [70, 80],
+    "primitives": [
+      { "type": "circle", "cx": 35, "cy": 40, "r": 35 },
+      { "type": "text", "x": 35, "y": 40, "text": "PMSM" }
+    ]
+  }
+}

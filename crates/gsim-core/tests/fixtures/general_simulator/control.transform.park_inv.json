@@ -1,0 +1,22 @@
+{
+  "name": "control.transform.park_inv",
+  "label": "Inverse Park Transform",
+  "category": "control",
+  "parameters": [],
+  "ports": [
+    { "id": "d", "side": "left", "kind": "signal", "direction": "in", "label": "d" },
+    { "id": "q", "side": "left", "kind": "signal", "direction": "in", "label": "q" },
+    { "id": "zero", "side": "left", "kind": "signal", "direction": "in", "label": "zero" },
+    { "id": "theta", "side": "left", "kind": "signal", "direction": "in", "label": "theta" },
+    { "id": "alpha", "side": "right", "kind": "signal", "direction": "out", "label": "alpha" },
+    { "id": "beta", "side": "right", "kind": "signal", "direction": "out", "label": "beta" },
+    { "id": "zero_out", "side": "right", "kind": "signal", "direction": "out", "label": "zero" }
+  ],
+  "geometry": {
+    "bbox": [60, 70],
+    "primitives": [
+      { "type": "rect", "x": 0, "y": 0, "w": 60, "h": 70 },
+      { "type": "text", "x": 30, "y": 35, "text": "Park⁻¹" }
+    ]
+  }
+}

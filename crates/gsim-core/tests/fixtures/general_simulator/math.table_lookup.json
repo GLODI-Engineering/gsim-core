@@ -1,0 +1,25 @@
+{
+  "name": "math.table_lookup",
+  "label": "Table Lookup",
+  "category": "math",
+  "parameters": [
+    {
+      "name": "points",
+      "type": "array",
+      "default": [[0, 0], [1, 1]],
+      "validate": "${{ count(value) > 0 }}",
+      "error": "points must be non-empty -- at least one [x,y] breakpoint is required (the real engine's own parser doesn't check this and panics on an empty table at first evaluation, so the contract enforces it up front instead)"
+    }
+  ],
+  "ports": [
+    { "id": "in", "side": "left", "kind": "signal", "direction": "in" },
+    { "id": "out", "side": "right", "kind": "signal", "direction": "out" }
+  ],
+  "geometry": {
+    "bbox": [50, 30],
+    "primitives": [
+      { "type": "rect", "x": 0, "y": 0, "w": 50, "h": 30 },
+      { "type": "text", "x": 25, "y": 15, "text": "TBL" }
+    ]
+  }
+}

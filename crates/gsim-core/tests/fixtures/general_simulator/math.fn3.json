@@ -1,0 +1,24 @@
+{
+  "name": "math.fn3",
+  "label": "Waveform Function (ternary)",
+  "category": "math",
+  "parameters": [
+    {
+      "name": "fn",
+      "type": "enum",
+      "default": "if",
+      "validate": "${{ matches(value, '^(if|limit)$') }}",
+      "error": "fn must be one of the 2 known ternary waveform functions"
+    }
+  ],
+  "ports": [
+    { "id": "in1", "side": "left", "kind": "signal", "direction": "in" },
+    { "id": "in2", "side": "left", "kind": "signal", "direction": "in" },
+    { "id": "in3", "side": "left", "kind": "signal", "direction": "in" },
+    { "id": "out", "side": "right", "kind": "signal", "direction": "out" }
+  ],
+  "geometry": {
+    "bbox": [50, 50],
+    "primitives": [{ "type": "text", "x": 25, "y": 25, "text": "${{ params.fn }}" }]
+  }
+}

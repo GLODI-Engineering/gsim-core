@@ -1,0 +1,26 @@
+{
+  "name": "logic.sr_latch",
+  "label": "SR Latch",
+  "category": "logic",
+  "parameters": [
+    {
+      "name": "priority",
+      "type": "enum",
+      "default": "set",
+      "validate": "${{ matches(value, '^(set|reset)$') }}",
+      "error": "priority must be 'set' or 'reset'"
+    }
+  ],
+  "ports": [
+    { "id": "set", "side": "left", "kind": "signal", "direction": "in" },
+    { "id": "reset", "side": "left", "kind": "signal", "direction": "in" },
+    { "id": "q", "side": "right", "kind": "signal", "direction": "out" }
+  ],
+  "geometry": {
+    "bbox": [50, 40],
+    "primitives": [
+      { "type": "rect", "x": 0, "y": 0, "w": 50, "h": 40 },
+      { "type": "text", "x": 25, "y": 20, "text": "SR" }
+    ]
+  }
+}

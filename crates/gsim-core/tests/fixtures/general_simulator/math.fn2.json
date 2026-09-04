@@ -1,0 +1,23 @@
+{
+  "name": "math.fn2",
+  "label": "Waveform Function (binary)",
+  "category": "math",
+  "parameters": [
+    {
+      "name": "fn",
+      "type": "enum",
+      "default": "max",
+      "validate": "${{ matches(value, '^(atan2|anglewrap|hypot|max|min|pow|pwr|pwrs)$') }}",
+      "error": "fn must be one of the 8 known binary waveform functions"
+    }
+  ],
+  "ports": [
+    { "id": "in1", "side": "left", "kind": "signal", "direction": "in" },
+    { "id": "in2", "side": "left", "kind": "signal", "direction": "in" },
+    { "id": "out", "side": "right", "kind": "signal", "direction": "out" }
+  ],
+  "geometry": {
+    "bbox": [50, 40],
+    "primitives": [{ "type": "text", "x": 25, "y": 20, "text": "${{ params.fn }}" }]
+  }
+}

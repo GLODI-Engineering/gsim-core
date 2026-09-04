@@ -1,0 +1,58 @@
+{
+  "name": "logic.flip_flop",
+  "label": "Flip-Flop",
+  "category": "logic",
+  "parameters": [
+    {
+      "name": "kind",
+      "type": "enum",
+      "default": "dff",
+      "validate": "${{ matches(value, '^(dff|jkff|tff)$') }}",
+      "error": "kind must be one of dff/jkff/tff"
+    },
+    { "name": "reset", "type": "string", "default": "" }
+  ],
+  "ports": [
+    { "id": "clk", "side": "left", "kind": "signal", "direction": "in" },
+    {
+      "when": "${{ params.kind == 'dff' }}",
+      "id": "d",
+      "side": "left",
+      "kind": "signal",
+      "direction": "in"
+    },
+    {
+      "when": "${{ params.kind == 'tff' }}",
+      "id": "t",
+      "side": "left",
+      "kind": "signal",
+      "direction": "in"
+    },
+    {
+      "when": "${{ params.kind == 'jkff' }}",
+      "id": "j",
+      "side": "left",
+      "kind": "signal",
+      "direction": "in"
+    },
+    {
+      "when": "${{ params.kind == 'jkff' }}",
+      "id": "k",
+      "side": "left",
+      "kind": "signal",
+      "direction": "in"
+    },
+    {
+      "when": "${{ params.reset != '' }}",
+      "id": "reset",
+      "side": "left",
+      "kind": "signal",
+      "direction": "in"
+    },
+    { "id": "q", "side": "right", "kind": "signal", "direction": "out" }
+  ],
+  "geometry": {
+    "bbox": [50, 50],
+    "primitives": [{ "type": "text", "x": 25, "y": 25, "text": "${{ params.kind }}" }]
+  }
+}

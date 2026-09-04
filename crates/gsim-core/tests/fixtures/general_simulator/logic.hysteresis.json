@@ -1,0 +1,26 @@
+{
+  "name": "logic.hysteresis",
+  "label": "Hysteresis (Schmitt Trigger)",
+  "category": "logic",
+  "parameters": [
+    { "name": "high", "type": "number", "default": 1.0 },
+    {
+      "name": "low",
+      "type": "number",
+      "default": -1.0,
+      "validate": "${{ value <= params.high }}",
+      "error": "low must be <= high"
+    }
+  ],
+  "ports": [
+    { "id": "in", "side": "left", "kind": "signal", "direction": "in" },
+    { "id": "out", "side": "right", "kind": "signal", "direction": "out" }
+  ],
+  "geometry": {
+    "bbox": [50, 30],
+    "primitives": [
+      { "type": "rect", "x": 0, "y": 0, "w": 50, "h": 30 },
+      { "type": "text", "x": 25, "y": 15, "text": "HYST" }
+    ]
+  }
+}

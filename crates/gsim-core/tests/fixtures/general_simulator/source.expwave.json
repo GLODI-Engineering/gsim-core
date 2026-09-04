@@ -1,0 +1,21 @@
+{
+  "name": "source.expwave",
+  "label": "Exponential Wave Source",
+  "category": "sources",
+  "parameters": [
+    { "name": "v1", "type": "number", "default": 0.0 },
+    { "name": "v2", "type": "number", "default": 1.0 },
+    { "name": "td1", "type": "number", "default": 0.0, "unit": "s" },
+    { "name": "tau1", "type": "number", "default": 1.0, "unit": "s" },
+    { "name": "td2", "type": "number", "default": 1e30, "unit": "s" },
+    { "name": "tau2", "type": "number", "default": 1.0, "unit": "s" }
+  ],
+  "ports": [{ "id": "out", "side": "right", "kind": "signal", "direction": "out" }],
+  "geometry": {
+    "bbox": [50, 30],
+    "primitives": [
+      { "type": "rect", "x": 0, "y": 0, "w": 50, "h": 30 },
+      { "type": "text", "x": 25, "y": 15, "text": "EXP" }
+    ]
+  }
+}

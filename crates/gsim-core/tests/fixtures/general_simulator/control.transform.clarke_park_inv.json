@@ -1,0 +1,22 @@
+{
+  "name": "control.transform.clarke_park_inv",
+  "label": "Inverse Clarke-Park Transform",
+  "category": "control",
+  "parameters": [],
+  "ports": [
+    { "id": "d", "side": "left", "kind": "signal", "direction": "in", "label": "d" },
+    { "id": "q", "side": "left", "kind": "signal", "direction": "in", "label": "q" },
+    { "id": "zero", "side": "left", "kind": "signal", "direction": "in", "label": "zero" },
+    { "id": "theta", "side": "left", "kind": "signal", "direction": "in", "label": "theta" },
+    { "id": "a", "side": "right", "kind": "signal", "direction": "out", "label": "a" },
+    { "id": "b", "side": "right", "kind": "signal", "direction": "out", "label": "b" },
+    { "id": "c", "side": "right", "kind": "signal", "direction": "out", "label": "c" }
+  ],
+  "geometry": {
+    "bbox": [60, 70],
+    "primitives": [
+      { "type": "rect", "x": 0, "y": 0, "w": 60, "h": 70 },
+      { "type": "text", "x": 30, "y": 35, "text": "Clarke-Park⁻¹" }
+    ]
+  }
+}

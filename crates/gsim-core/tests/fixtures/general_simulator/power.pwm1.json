@@ -1,0 +1,43 @@
+{
+  "name": "power.pwm1",
+  "label": "PWM Modulator",
+  "category": "power",
+  "parameters": [
+    {
+      "name": "freq",
+      "type": "number",
+      "default": 10000.0,
+      "unit": "Hz",
+      "validate": "${{ value > 0 }}",
+      "error": "freq (carrier frequency) must be positive"
+    },
+    {
+      "name": "red",
+      "type": "number",
+      "default": 0.0,
+      "unit": "s",
+      "validate": "${{ value >= 0 }}",
+      "error": "red (rising-edge dead time) must be non-negative"
+    },
+    {
+      "name": "fed",
+      "type": "number",
+      "default": 0.0,
+      "unit": "s",
+      "validate": "${{ value >= 0 }}",
+      "error": "fed (falling-edge dead time) must be non-negative"
+    }
+  ],
+  "ports": [
+    { "id": "in", "side": "left", "kind": "signal", "direction": "in", "label": "duty" },
+    { "id": "main", "side": "right", "kind": "signal", "direction": "out" },
+    { "id": "comp", "side": "right", "kind": "signal", "direction": "out", "label": "comp" }
+  ],
+  "geometry": {
+    "bbox": [60, 40],
+    "primitives": [
+      { "type": "rect", "x": 0, "y": 0, "w": 60, "h": 40 },
+      { "type": "text", "x": 30, "y": 20, "text": "PWM" }
+    ]
+  }
+}

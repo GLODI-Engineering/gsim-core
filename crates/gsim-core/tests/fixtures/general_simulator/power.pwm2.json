@@ -1,0 +1,46 @@
+{
+  "name": "power.pwm2",
+  "label": "Phase-Shift PWM Modulator",
+  "category": "power",
+  "parameters": [
+    { "name": "f_min", "type": "number", "default": 1000.0, "unit": "Hz" },
+    {
+      "name": "f_max",
+      "type": "number",
+      "default": 50000.0,
+      "unit": "Hz",
+      "validate": "${{ value >= params.f_min }}",
+      "error": "f_max must be >= f_min"
+    },
+    {
+      "name": "red",
+      "type": "number",
+      "default": 0.0,
+      "unit": "s",
+      "validate": "${{ value >= 0 }}",
+      "error": "red (rising-edge dead time) must be non-negative"
+    },
+    {
+      "name": "fed",
+      "type": "number",
+      "default": 0.0,
+      "unit": "s",
+      "validate": "${{ value >= 0 }}",
+      "error": "fed (falling-edge dead time) must be non-negative"
+    }
+  ],
+  "ports": [
+    { "id": "freq", "side": "left", "kind": "signal", "direction": "in" },
+    { "id": "phase", "side": "left", "kind": "signal", "direction": "in" },
+    { "id": "duty", "side": "left", "kind": "signal", "direction": "in" },
+    { "id": "main", "side": "right", "kind": "signal", "direction": "out" },
+    { "id": "comp", "side": "right", "kind": "signal", "direction": "out", "label": "comp" }
+  ],
+  "geometry": {
+    "bbox": [60, 60],
+    "primitives": [
+      { "type": "rect", "x": 0, "y": 0, "w": 60, "h": 60 },
+      { "type": "text", "x": 30, "y": 30, "text": "PS-PWM" }
+    ]
+  }
+}
