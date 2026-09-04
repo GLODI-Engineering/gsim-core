@@ -27,9 +27,9 @@ impl Paradigm {
     /// boundary is not itself a component of any paradigm, it is a *boundary*. Its real,
     /// per-port paradigm information lives on the referenced
     /// [`super::SubcktDef`]'s `ports[].kind` (which a real subckt genuinely mixes — see that
-    /// module's "Divergence 2" note on the reference-design `sw_leg_fixed` def, whose ports are two
-    /// `physical-electrical` plus three `signal`). Treating the instance block itself as having
-    /// one paradigm would make every such mixed-boundary subckt unwireable.
+    /// module's "Divergence 2" note for a real def whose ports are two `physical-electrical`
+    /// plus three `signal`). Treating the instance block itself as having one paradigm would
+    /// make every such mixed-boundary subckt unwireable.
     pub fn bridges_paradigms(self) -> bool {
         matches!(
             self,

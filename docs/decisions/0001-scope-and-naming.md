@@ -124,8 +124,8 @@ time), two rules were settled to keep wires from silently misbehaving:
 piecewise-linear, with parameters (`g_breakdown`, `v_breakdown`, `g_off`, `v_th`, `g_on`, `Ron` +
 body diode) that are not the same as a real SPICE exponential diode or a BSIM MOSFET model
 targeting ngspice/Xyce. Mid-conversation, these were renamed in `general-simulator` (and
-cascaded into `general-mna`, `spice-lsp`'s grammar doc, and a private, non-public project
-experiments) from "diode"/"mosfet" to "ideal diode"/"ideal switch", specifically to stop
+cascaded into `general-mna`, `spice-lsp`'s grammar doc, and a sibling experiments repo)
+from "diode"/"mosfet" to "ideal diode"/"ideal switch", specifically to stop
 implying they are the same model as a real diode/MOSFET.
 
 Consequence for this repo's taxonomy design: a component targeting `general-simulator`'s ideal

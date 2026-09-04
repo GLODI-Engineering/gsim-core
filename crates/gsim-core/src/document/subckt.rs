@@ -16,11 +16,10 @@
 //! So [`SubcktDef`] carries `blocks: Vec<Block>` + `wires: Vec<Wire>` + `instances:
 //! Vec<SubcktInstance>` instead of a `body: String`.
 //!
-//! This was confirmed viable against a real circuit, not assumed: every element card in
-//! the hand-written reference netlist's
-//! `sw_leg_fixed`/`bidir_sw_fixed` bodies (`ideal_switch`, `pspwm`, `sig2phys`, plain `R`/`C`)
-//! already maps onto an existing GSF v2 fixture or an existing document-model block type.
-//! Nothing in a real subckt body actually needs to be opaque.
+//! This was confirmed viable against a real circuit, not assumed: every element card in a real
+//! `sw_leg_fixed`/`bidir_sw_fixed` pair of subcircuit bodies (`ideal_switch`, `pspwm`,
+//! `sig2phys`, plain `R`/`C`) already maps onto an existing GSF v2 fixture or an existing
+//! document-model block type. Nothing in a real subckt body actually needs to be opaque.
 //!
 //! # Divergence 2 — `signal` is an allowed port kind
 //!
