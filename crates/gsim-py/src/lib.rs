@@ -21,7 +21,7 @@
 //! item's doc comment in `gsim-core` for why.
 
 use gsim_core::compile::{compile as compile_model, CompileError};
-use gsim_core::contract::{self, ComponentContract};
+use gsim_core::contract::{self, ComponentContract, ContractRegistry};
 use gsim_core::document::{
     BuilderError, CompatFailure, ConnectOptions, Endpoint, GsimSchDocument, Model, ModelBuilder,
     NewBlockSpec, NewSubcktInstanceSpec, SubcktDef, SubcktError,
@@ -59,6 +59,7 @@ fn builder_err_to_py(e: BuilderError) -> PyErr {
             CompatFailure::ReservedKind { .. } => "port-reserved-kind",
             CompatFailure::KindMismatch { .. } => "port-kind-mismatch",
             CompatFailure::FanInOnSignal { .. } => "port-fan-in-on-signal",
+            CompatFailure::DimMismatch { .. } => "port-dim-mismatch",
         },
         BuilderError::UnknownBlock(_) => "unknown-block",
         BuilderError::Block(_) => "invalid-block",
@@ -284,22 +285,40 @@ struct ConnectResult {
 ///
 /// Beyond the block-level cross-paradigm boundary, the per-port §8.1/§8.2 rules in
 /// `gsim_core::document::port_compat` also apply, raising with the keyword
-/// `port-reserved-kind`, `port-kind-mismatch` or `port-fan-in-on-signal`. That module documents
-/// exactly which of the frontend's `port-compat.ts` rules this crate can enforce without a
-/// component-contract registry, and which remain open.
+/// `port-reserved-kind`, `port-kind-mismatch`, `port-fan-in-on-signal` or `port-dim-mismatch`.
+///
+/// `contracts_json` is optional and defaults to none. When supplied it is a
+/// `{"<block type>": <ComponentContract>, ...}` object -- the same contract shape
+/// `evaluate_component` takes, one entry per block `type` used in the model. Supplying it lets
+/// the per-port check resolve each endpoint's real `kind` and `dim` from the block's own
+/// `params` instead of approximating from the block's `domain`, which is what makes
+/// `port-kind-mismatch` exact for ordinary components and makes `port-dim-mismatch` possible at
+/// all. **Omitting it changes nothing that used to work**: an unregistered type keeps the
+/// coarser `domain`-based check.
+///
+/// It is passed per call rather than registered once because every function in this module is
+/// stateless JSON-in/JSON-out -- there is no session object to hold a registry, and putting one
+/// in the `Model` would write a caller's component library into the saved document. A Python
+/// caller builds the dict once and passes it to each `connect`.
 #[pyfunction]
+#[pyo3(signature = (model_json, from_json, to_json_, kind, opts_json, contracts_json=None))]
 fn connect(
     model_json: &str,
     from_json: &str,
     to_json_: &str,
     kind: &str,
     opts_json: &str,
+    contracts_json: Option<&str>,
 ) -> PyResult<String> {
     let model: Model = parse_json(model_json, "model")?;
     let from: Endpoint = parse_json(from_json, "from endpoint")?;
     let to: Endpoint = parse_json(to_json_, "to endpoint")?;
     let opts: ConnectOptions = parse_json(opts_json, "connect options")?;
-    let mut builder = ModelBuilder::from_model(model);
+    let contracts: ContractRegistry = match contracts_json {
+        Some(text) => parse_json(text, "contract registry")?,
+        None => ContractRegistry::new(),
+    };
+    let mut builder = ModelBuilder::from_model(model).with_contracts(contracts);
     let wire_id = builder
         .connect(from, to, kind, opts)
         .map_err(builder_err_to_py)?
@@ -465,7 +484,8 @@ mod tests {
         let from = r#"{"block":"src1","port":"out"}"#;
         let to = r#"{"block":"gain1","port":"in"}"#;
         let conn: Value =
-            serde_json::from_str(&connect(&model, from, to, "signal", "{}").unwrap()).unwrap();
+            serde_json::from_str(&connect(&model, from, to, "signal", "{}", None).unwrap())
+                .unwrap();
         let model = conn["model"].to_string();
         assert_eq!(conn["wire_id"], "wire1");
 
@@ -505,9 +525,10 @@ mod tests {
 
         let from = r#"{"block":"r1","port":"n"}"#;
         let to = r#"{"block":"c1","port":"p"}"#;
-        let conn: Value =
-            serde_json::from_str(&connect(&model, from, to, "physical-electrical", "{}").unwrap())
-                .unwrap();
+        let conn: Value = serde_json::from_str(
+            &connect(&model, from, to, "physical-electrical", "{}", None).unwrap(),
+        )
+        .unwrap();
         let model = conn["model"].to_string();
 
         let after_remove: Value =
@@ -552,7 +573,7 @@ mod tests {
 
         let from = r#"{"block":"r1","port":"p"}"#;
         let to = r#"{"block":"ghost","port":"p"}"#;
-        let err = connect(&model, from, to, "physical-electrical", "{}").unwrap_err();
+        let err = connect(&model, from, to, "physical-electrical", "{}", None).unwrap_err();
         Python::attach(|py| {
             let msg = err.value(py).to_string();
             assert!(
@@ -576,7 +597,7 @@ mod tests {
 
         let from = r#"{"block":"r1","port":"p"}"#;
         let to = r#"{"block":"gain1","port":"in"}"#;
-        let err = connect(&model, from, to, "signal", "{}").unwrap_err();
+        let err = connect(&model, from, to, "signal", "{}", None).unwrap_err();
         Python::attach(|py| {
             let msg = err.value(py).to_string();
             // `BuilderError::CrossParadigm`'s `Display` names both paradigms and the reason
@@ -604,7 +625,7 @@ mod tests {
 
         let from = r#"{"block":"r1","port":"p"}"#;
         let to = r#"{"block":"rth","port":"a"}"#;
-        let err = connect(&model, from, to, "physical-electrical", "{}").unwrap_err();
+        let err = connect(&model, from, to, "physical-electrical", "{}", None).unwrap_err();
         Python::attach(|py| {
             let msg = err.value(py).to_string();
             // The stable keyword prefix, then the full underlying message naming both the port
@@ -630,13 +651,28 @@ mod tests {
         }
         let to = r#"{"block":"g1","port":"in"}"#;
         let first: Value = serde_json::from_str(
-            &connect(&model, r#"{"block":"s1","port":"out"}"#, to, "signal", "{}").unwrap(),
+            &connect(
+                &model,
+                r#"{"block":"s1","port":"out"}"#,
+                to,
+                "signal",
+                "{}",
+                None,
+            )
+            .unwrap(),
         )
         .unwrap();
         let model = first["model"].to_string();
 
-        let err =
-            connect(&model, r#"{"block":"s2","port":"out"}"#, to, "signal", "{}").unwrap_err();
+        let err = connect(
+            &model,
+            r#"{"block":"s2","port":"out"}"#,
+            to,
+            "signal",
+            "{}",
+            None,
+        )
+        .unwrap_err();
         Python::attach(|py| {
             let msg = err.value(py).to_string();
             assert!(msg.starts_with("port-fan-in-on-signal: "), "got: {msg}");
@@ -663,12 +699,126 @@ mod tests {
             r#"{"block":"m2b","port":"p"}"#,
             "reserved.physical-magnetic",
             "{}",
+            None,
         )
         .unwrap_err();
         Python::attach(|py| {
             let msg = err.value(py).to_string();
             assert!(msg.starts_with("port-reserved-kind: "), "got: {msg}");
             assert!(msg.contains("reserved.physical-magnetic"), "got: {msg}");
+        });
+    }
+
+    /// A `{"<block type>": <contract>}` payload for `connect`'s optional sixth argument: one
+    /// gain whose port `dim` follows its own `width` parameter.
+    fn gain_registry_json() -> String {
+        r#"{"control.gain": {
+            "name": "control.gain",
+            "label": "Gain",
+            "parameters": [{"name": "width", "type": "number", "default": 1}],
+            "ports": [
+                {"id": "in", "side": "left", "kind": "signal", "direction": "in",
+                 "dim": ["${{ params.width }}"]},
+                {"id": "out", "side": "right", "kind": "signal", "direction": "out",
+                 "dim": ["${{ params.width }}"]}
+            ],
+            "geometry": {"bbox": [40, 30], "primitives": []}
+        }}"#
+        .to_string()
+    }
+
+    /// Two `control.gain` blocks of the given widths, wired `g1.out -> g2.in`, with the registry
+    /// above supplied (or not).
+    fn gain_chain(from_width: i64, to_width: i64, contracts: Option<&str>) -> PyResult<String> {
+        let mut model = new_model("m1", "M", 10).unwrap();
+        for (id, width) in [("g1", from_width), ("g2", to_width)] {
+            let spec = format!(
+                r#"{{"type":"control.gain","paradigm":"signal-flow","domain":"signal","position":[0,0],"rotation":0,"id":"{id}","params":{{"width":{width}}}}}"#
+            );
+            let add: Value = serde_json::from_str(&add_block(&model, &spec).unwrap()).unwrap();
+            model = add["model"].to_string();
+        }
+        connect(
+            &model,
+            r#"{"block":"g1","port":"out"}"#,
+            r#"{"block":"g2","port":"in"}"#,
+            "signal",
+            "{}",
+            contracts,
+        )
+    }
+
+    #[test]
+    fn connect_a_dim_mismatch_raises_port_dim_mismatch_only_when_contracts_are_supplied() {
+        let registry = gain_registry_json();
+
+        let err = gain_chain(3, 1, Some(&registry)).unwrap_err();
+        Python::attach(|py| {
+            let msg = err.value(py).to_string();
+            assert!(msg.starts_with("port-dim-mismatch: "), "got: {msg}");
+            assert!(
+                msg.contains("cannot connect 'g1.out' to 'g2.in'"),
+                "got: {msg}"
+            );
+            assert!(
+                msg.contains("the source produces dim [3], but the destination requires dim [1]"),
+                "got: {msg}"
+            );
+        });
+
+        // Same widths -> accepted, so this is not a checker that rejects everything.
+        gain_chain(3, 3, Some(&registry)).unwrap();
+
+        // And with no registry the mismatch is simply invisible, exactly as before: the document
+        // alone has no idea what dimension either port carries.
+        gain_chain(3, 1, None).unwrap();
+    }
+
+    #[test]
+    fn connect_a_signal_wire_onto_a_contract_declared_physical_port_raises_port_kind_mismatch() {
+        // Neither block-level check can see this: both blocks are `physical-network` with
+        // `domain: "mixed"`. Only the registered contract knows `sen2.p` is conserving.
+        let contracts = r#"{"sensor.voltage": {
+            "name": "sensor.voltage",
+            "label": "Voltage sensor",
+            "ports": [
+                {"id": "p", "side": "left", "kind": "physical-electrical", "direction": "inout"},
+                {"id": "out", "side": "right", "kind": "signal", "direction": "out"}
+            ],
+            "geometry": {"bbox": [40, 30], "primitives": []}
+        }}"#;
+
+        let mut model = new_model("m1", "M", 10).unwrap();
+        for id in ["sen", "sen2"] {
+            let spec = format!(
+                r#"{{"type":"sensor.voltage","paradigm":"physical-network","domain":"mixed","position":[0,0],"rotation":0,"id":"{id}"}}"#
+            );
+            let add: Value = serde_json::from_str(&add_block(&model, &spec).unwrap()).unwrap();
+            model = add["model"].to_string();
+        }
+        let from = r#"{"block":"sen","port":"out"}"#;
+        let to = r#"{"block":"sen2","port":"p"}"#;
+
+        let err = connect(&model, from, to, "signal", "{}", Some(contracts)).unwrap_err();
+        Python::attach(|py| {
+            let msg = err.value(py).to_string();
+            assert!(msg.starts_with("port-kind-mismatch: "), "got: {msg}");
+            assert!(
+                msg.contains("'sen2.p' is declared 'physical-electrical'"),
+                "got: {msg}"
+            );
+        });
+
+        // Without the contract this is still accepted -- the fallback is preserved, not tightened.
+        connect(&model, from, to, "signal", "{}", None).unwrap();
+    }
+
+    #[test]
+    fn connect_with_malformed_contracts_json_raises_value_error_not_panic() {
+        let err = gain_chain(1, 1, Some("not json")).unwrap_err();
+        Python::attach(|py| {
+            let msg = err.value(py).to_string();
+            assert!(msg.contains("invalid contract registry JSON"), "got: {msg}");
         });
     }
 
@@ -815,6 +965,7 @@ mod tests {
                 r#"{"block":"x2","port":"a"}"#,
                 "physical-electrical",
                 "{}",
+                None,
             )
             .unwrap(),
         )
@@ -920,6 +1071,7 @@ mod tests {
                     r#"{"block":"gnd","port":"p"}"#,
                     "physical-electrical",
                     "{}",
+                    None,
                 )
                 .unwrap(),
             )

@@ -25,7 +25,7 @@
 //! constructs a `JsValue`, and therefore the only place host tests must avoid calling directly.
 
 use gsim_core::compile;
-use gsim_core::contract::{self, ComponentContract};
+use gsim_core::contract::{self, ComponentContract, ContractRegistry};
 use gsim_core::document::{
     deserialize_comment, ConnectOptions, Endpoint, GsimSchDocument, Mirror, Model, ModelBuilder,
     NewBlockSpec, NewSubcktInstanceSpec, Paradigm, SubcktDef,
@@ -330,12 +330,17 @@ fn connect_impl(
     to_json: &str,
     kind: &str,
     opts_json: &str,
+    contracts_json: Option<String>,
 ) -> Result<String, String> {
     let model: Model = parse_json(model_json, "model")?;
     let from: EndpointJson = parse_json(from_json, "from endpoint")?;
     let to: EndpointJson = parse_json(to_json, "to endpoint")?;
     let opts: ConnectOptionsJson = parse_json(opts_json, "connect options")?;
-    let mut builder = ModelBuilder::from_model(model);
+    let contracts: ContractRegistry = match &contracts_json {
+        Some(text) => parse_json(text, "contract registry")?,
+        None => ContractRegistry::new(),
+    };
+    let mut builder = ModelBuilder::from_model(model).with_contracts(contracts);
     let wire_id = builder
         .connect(from.into(), to.into(), kind, opts.into())
         .map_err(|e| e.to_string())?
@@ -356,10 +361,19 @@ fn connect_impl(
 ///
 /// A §8.1/§8.2 port-kind rejection additionally embeds the **same reason token
 /// `apps/frontend/src/canvas/port-compat.ts`'s own `canConnect` returns** -- `reserved-kind`,
-/// `kind-mismatch` or `fan-in-on-signal` -- so the canvas's existing reject-flash branching
-/// needs no new vocabulary to handle a rejection that came from this crate instead. See
-/// `gsim_core::document::port_compat` for which of those rules are enforced here and which
-/// still require the frontend's own contract lookup.
+/// `kind-mismatch`, `fan-in-on-signal` or `dim-mismatch` -- so the canvas's existing
+/// reject-flash branching needs no new vocabulary to handle a rejection that came from this
+/// crate instead.
+///
+/// `contractsJson` is optional (pass `undefined`/`null` to omit) and is a
+/// `{"<block type>": <ComponentContract>}` object -- the same contract shape
+/// `evaluateComponent` takes. The frontend already holds exactly this per block type in its own
+/// catalogue, and passing it lets `connect` resolve each endpoint's real `kind` and `dim` from
+/// the block's own `params`, which is what makes `kind-mismatch` exact for ordinary components
+/// and `dim-mismatch` possible at all -- i.e. what makes this the same check `canConnect`
+/// performs, rather than a coarser one. Omitting it changes nothing that used to work: an
+/// unregistered type keeps the block-`domain`-based approximation. See
+/// `gsim_core::document::port_compat` for exactly what each source of truth can decide.
 #[wasm_bindgen]
 pub fn connect(
     model_json: &str,
@@ -367,8 +381,17 @@ pub fn connect(
     to_json: &str,
     kind: &str,
     opts_json: &str,
+    contracts_json: Option<String>,
 ) -> Result<String, JsValue> {
-    connect_impl(model_json, from_json, to_json, kind, opts_json).map_err(js_err)
+    connect_impl(
+        model_json,
+        from_json,
+        to_json,
+        kind,
+        opts_json,
+        contracts_json,
+    )
+    .map_err(js_err)
 }
 
 fn auto_arrange_impl(
@@ -668,7 +691,7 @@ mod tests {
 
         let from = json!({"block": "src1", "port": "out"}).to_string();
         let to = json!({"block": "gain1", "port": "in"}).to_string();
-        let r3 = connect_impl(&model_json, &from, &to, "signal", "{}").unwrap();
+        let r3 = connect_impl(&model_json, &from, &to, "signal", "{}", None).unwrap();
         let r3v: Value = serde_json::from_str(&r3).unwrap();
         assert_eq!(r3v["wire_id"], "wire1");
         let model_json = r3v["model"].to_string();
@@ -735,7 +758,7 @@ mod tests {
         let from = json!({"block": "r1", "port": "p"}).to_string();
         let to = json!({"block": "c1", "port": "p"}).to_string();
         let model_json = serde_json::from_str::<Value>(
-            &connect_impl(&model_json, &from, &to, "physical-electrical", "{}").unwrap(),
+            &connect_impl(&model_json, &from, &to, "physical-electrical", "{}", None).unwrap(),
         )
         .unwrap()["model"]
             .to_string();
@@ -776,7 +799,8 @@ mod tests {
                 .to_string();
         let from = json!({"block": "r1", "port": "p"}).to_string();
         let to = json!({"block": "ghost", "port": "p"}).to_string();
-        let err = connect_impl(&model_json, &from, &to, "physical-electrical", "{}").unwrap_err();
+        let err =
+            connect_impl(&model_json, &from, &to, "physical-electrical", "{}", None).unwrap_err();
         assert!(err.contains("unknown block 'ghost'"));
     }
 
@@ -803,13 +827,70 @@ mod tests {
                 .to_string();
         let from = json!({"block": "r1", "port": "p"}).to_string();
         let to = json!({"block": "gain1", "port": "in"}).to_string();
-        let err = connect_impl(&model_json, &from, &to, "signal", "{}").unwrap_err();
+        let err = connect_impl(&model_json, &from, &to, "signal", "{}", None).unwrap_err();
         assert!(
             err.to_lowercase().contains("cannot connect")
                 && err.contains("PhysicalNetwork")
                 && err.contains("SignalFlow"),
             "expected a clear cross-paradigm message, got: {err}"
         );
+    }
+
+    #[test]
+    fn connect_consults_a_supplied_contract_registry_for_kind_and_dim() {
+        // The payload the frontend already holds per block type: a gain whose port `dim`
+        // follows its own `width` parameter.
+        let contracts = json!({
+            "control.gain": {
+                "name": "control.gain",
+                "label": "Gain",
+                "parameters": [{"name": "width", "type": "number", "default": 1}],
+                "ports": [
+                    {"id": "in", "side": "left", "kind": "signal", "direction": "in",
+                     "dim": ["${{ params.width }}"]},
+                    {"id": "out", "side": "right", "kind": "signal", "direction": "out",
+                     "dim": ["${{ params.width }}"]}
+                ],
+                "geometry": {"bbox": [40, 30], "primitives": []}
+            }
+        })
+        .to_string();
+
+        let mut model_json = new_model("m1", "M", 10);
+        for (id, width) in [("g1", 3), ("g2", 1)] {
+            let spec = json!({
+                "type": "control.gain", "paradigm": "signal-flow", "domain": "signal",
+                "position": [0, 0], "rotation": 0, "id": id, "params": {"width": width}
+            })
+            .to_string();
+            model_json =
+                serde_json::from_str::<Value>(&add_block_impl(&model_json, &spec).unwrap())
+                    .unwrap()["model"]
+                    .to_string();
+        }
+        let from = json!({"block": "g1", "port": "out"}).to_string();
+        let to = json!({"block": "g2", "port": "in"}).to_string();
+
+        let err = connect_impl(
+            &model_json,
+            &from,
+            &to,
+            "signal",
+            "{}",
+            Some(contracts.clone()),
+        )
+        .unwrap_err();
+        // The message carries `canConnect`'s own reason token, so the canvas's existing
+        // reject-flash branching needs no new vocabulary.
+        assert!(err.contains("dim-mismatch"), "got: {err}");
+        assert!(
+            err.contains("the source produces dim [3], but the destination requires dim [1]"),
+            "got: {err}"
+        );
+
+        // Omitting the registry leaves the old behaviour untouched -- the document alone cannot
+        // see a dimension, so the same call succeeds.
+        connect_impl(&model_json, &from, &to, "signal", "{}", None).unwrap();
     }
 
     #[test]
@@ -837,11 +918,12 @@ mod tests {
         let to = json!({"block": "c1", "port": "n"}).to_string();
         let opts = json!({"id": "w1"}).to_string();
         let model_json = serde_json::from_str::<Value>(
-            &connect_impl(&model_json, &from, &to, "physical-electrical", &opts).unwrap(),
+            &connect_impl(&model_json, &from, &to, "physical-electrical", &opts, None).unwrap(),
         )
         .unwrap()["model"]
             .to_string();
-        let err = connect_impl(&model_json, &from, &to, "physical-electrical", &opts).unwrap_err();
+        let err =
+            connect_impl(&model_json, &from, &to, "physical-electrical", &opts, None).unwrap_err();
         assert!(err.contains("duplicate id"));
     }
 
@@ -957,6 +1039,7 @@ mod tests {
                 r#"{"block":"x2","port":"a"}"#,
                 "physical-electrical",
                 "{}",
+                None,
             )
             .unwrap(),
         )
@@ -1059,6 +1142,7 @@ mod tests {
                     r#"{"block":"gnd","port":"p"}"#,
                     "physical-electrical",
                     "{}",
+                    None,
                 )
                 .unwrap(),
             )

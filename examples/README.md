@@ -253,3 +253,33 @@ everything would not pass this script: the *correct* wiring of those same blocks
 acausal nodes both still legal), round-trips through `load_document`, and compiles to a real
 netlist. Only the thermal blocks are dropped before compiling, because `compile::spec::REGISTRY`
 has no `thermal.*` emitter yet — a netlist-target gap, not a connectivity one.
+
+## `dim_mismatch_rejection.py`
+
+The two `port-compat.ts` rules `port_kind_rejection.py` could not reach, because they need
+something the document does not contain: **what ports does this block's *type* declare, and how
+wide is each one?** That lives in a GSF v2 component contract, and
+`gsim_core::contract::ContractRegistry` is now how `connect()` reaches one — surfaced as
+`gsim_py.connect`'s optional sixth argument, a `{"<block type>": <contract>}` map.
+
+A textbook-generic signal chain (a constant, two gains of different widths sharing one
+contract, a signal-to-physical converter) driving a resistor to ground. Two rejections, each
+with its own keyword prefix:
+
+```
+port-dim-mismatch: cannot connect 'C3.out' to 'K1.in' as a 'signal' wire:
+    dim-mismatch -- the source produces dim [3], but the destination requires dim [1]
+port-kind-mismatch: cannot connect 'K1.out' to 'S2P.out' as a 'signal' wire:
+    kind-mismatch -- port 'S2P.out' is declared 'physical-electrical'
+```
+
+Both cases are invisible to every document-only check. The first turns purely on each block's
+own `params` — the two gains share one contract and differ only in `width`, so the dimension
+must be resolved per *block*, not per type. The second is on a **converter**, which genuinely
+has different kinds on its two sides, so its block-wide `domain` names at most one of them and
+the pre-registry check deliberately said nothing about either port.
+
+The script also asserts the mirror image of each: with `contracts=None` both connections are
+accepted exactly as they were before the registry existed, so "the fallback is preserved" is a
+tested claim rather than a sentence. As in `port_kind_rejection.py`, the last section wires the
+same blocks correctly — with the registry active — and compiles them to a real netlist.
