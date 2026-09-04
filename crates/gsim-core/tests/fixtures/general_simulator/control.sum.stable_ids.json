@@ -1,0 +1,35 @@
+{
+  "name": "control.sum.stable_ids",
+  "label": "Sum (stable operand ids)",
+  "category": "control",
+  "parameters": [
+    {
+      "name": "operands",
+      "type": "array",
+      "default": [
+        { "id": "s1", "sign": 1 },
+        { "id": "s2", "sign": 1 }
+      ],
+      "validate": "${{ count(value) >= 1 && count(value) <= 8 }}",
+      "error": "Sum must have between 1 and 8 operands"
+    }
+  ],
+  "ports": [
+    {
+      "for_each": "${{ params.operands }}",
+      "as": "operand",
+      "emit": {
+        "id": "in_${{ operand.id }}",
+        "side": "left",
+        "kind": "signal",
+        "direction": "in",
+        "label": "${{ if(operand.sign < 0, '-', '+') }}"
+      }
+    },
+    { "id": "out", "side": "right", "kind": "signal", "direction": "out" }
+  ],
+  "geometry": {
+    "bbox": [40, "${{ max(30, count(params.operands) * 14) }}"],
+    "primitives": [{ "type": "circle", "cx": 20, "cy": 15, "r": 15 }]
+  }
+}

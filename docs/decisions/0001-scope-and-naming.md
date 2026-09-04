@@ -90,13 +90,33 @@ Rules settled:
 
 Because port count can change while a user is actively editing (not only at component-creation
 time), two rules were settled to keep wires from silently misbehaving:
-- **Generated port ids are index-based and stable** — removing input 2 never renumbers input 3
-  to become input 2; ids are never reassigned to a different logical port.
 - **Removing a port with a live wire attached leaves that wire dangling with an error marker**
   in the consuming frontend (rather than auto-deleting the wire or blocking the parameter edit).
   The frontend's existing `apps/frontend/src/problems/problems-store.ts` already implements this
   exact pattern for a different case (`setCompatWarnings`); the same pattern extends with an
   optional `wireId`/`portId` on `ProblemItem` rather than needing a new subsystem.
+- **Generated port ids must be stable — never reassigned to a different logical port.** The
+  original phrasing here ("index-based and stable") overclaimed: implementing and testing it
+  (`contract::tests::a_bare_string_param_only_gives_positional_not_true_identity_stability`,
+  `gsim-core` commit `b9cd690`) showed a `for_each` over a *bare* array/string param (`signs:
+  "++-"` or `signs: [1, 1, -1]`) only gives stability across **append/remove-at-the-end** —
+  removing an element from the *middle* does shift every later element's derived id, since a
+  bare array element has no identity beyond its position.
+  **Fixed, not just documented as a limitation**: when true stability across interior
+  insert/remove is needed, author the driving parameter as an **array of objects, each carrying
+  its own persistent `id`** (e.g. `operands: [{"id": "s1", "sign": 1}, {"id": "s2", "sign": -1}]`)
+  and have `for_each` bind directly to each object (`as: "operand"`), with `emit` referencing
+  `${{ operand.id }}` instead of a loop index. This needed **no engine change** — dotted field
+  access on a `for_each`-bound value was already general — and is proven end-to-end by the
+  `control.sum.stable_ids` fixture and its
+  `stable_id_pattern_survives_removing_an_interior_operand` test (`gsim-core` commit `f15982c`'s
+  follow-up, 2026-09-04): removing the middle operand leaves every surviving operand's port id
+  unchanged. **This is now the recommended pattern** for any component whose port-generating
+  parameter needs to support interior edits (not just growing/shrinking at the end) — a bare
+  array/string remains fine for append/trim-only editing (e.g. a UI that only offers "+"/"−"
+  buttons at the end of a list). Assigning each new element a persistent id at creation time
+  (e.g. a UUID or an incrementing counter) is the frontend/document-layer's responsibility, not
+  this crate's — `gsim-core` only guarantees that *if* given a stable id, it preserves it.
 
 ## Decision: taxonomy — simulator target can mean a different physical model
 

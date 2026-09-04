@@ -1,0 +1,48 @@
+{
+  "name": "control.counter",
+  "label": "Counter",
+  "category": "logic",
+  "parameters": [
+    {
+      "name": "clk",
+      "type": "string",
+      "default": "",
+      "validate": "${{ value != '' }}",
+      "error": "clk is required"
+    },
+    { "name": "up_down", "type": "string", "default": "" },
+    { "name": "reset", "type": "string", "default": "" },
+    {
+      "name": "modulus",
+      "type": "integer",
+      "default": 0,
+      "validate": "${{ value >= 0 }}",
+      "error": "modulus must be non-negative (0 means unbounded)"
+    }
+  ],
+  "ports": [
+    { "id": "clk", "side": "left", "kind": "signal", "direction": "in" },
+    {
+      "when": "${{ params.up_down != '' }}",
+      "id": "up_down",
+      "side": "left",
+      "kind": "signal",
+      "direction": "in"
+    },
+    {
+      "when": "${{ params.reset != '' }}",
+      "id": "reset",
+      "side": "left",
+      "kind": "signal",
+      "direction": "in"
+    },
+    { "id": "count", "side": "right", "kind": "signal", "direction": "out" }
+  ],
+  "geometry": {
+    "bbox": [50, 40],
+    "primitives": [
+      { "type": "rect", "x": 0, "y": 0, "w": 50, "h": 40 },
+      { "type": "text", "x": 25, "y": 20, "text": "CNT" }
+    ]
+  }
+}

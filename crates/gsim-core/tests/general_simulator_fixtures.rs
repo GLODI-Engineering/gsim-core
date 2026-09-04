@@ -315,3 +315,120 @@ fn octblock_shares_octfunc_port_shape_plus_a_validated_xc_count() {
         1
     );
 }
+
+/// `general-simulator` has five code-integration kinds sharing this exact `inputs=`/`outputs=`
+/// dual-variadic-port shape (`docs/journal/2026-09.md`): `CScript`, `PyFunction`, `PyBlock`,
+/// `OctFunc`, `OctBlock`. `cscript`/`pyblock`/`octblock` additionally carry `xc_count`;
+/// `pyfunc`/`octfunc` are stateless. These three assert the remaining ones are structurally
+/// identical to `extensibility.octfunc`/`extensibility.octblock` (already covered above) --
+/// deliberately not claiming any new engine coverage, just taxonomy completeness.
+#[test]
+fn cscript_pyfunc_pyblock_share_octfunc_octblocks_dual_variadic_shape() {
+    for (name, has_xc) in [
+        ("extensibility.cscript", true),
+        ("extensibility.pyfunc", false),
+        ("extensibility.pyblock", true),
+    ] {
+        let c = load(name);
+        let evaluated = evaluate_component(
+            &c,
+            &params(json!({"input_names": ["a", "b"], "output_names": ["y1", "y2"]})),
+        )
+        .unwrap();
+        assert_eq!(
+            evaluated
+                .ports
+                .iter()
+                .map(|p| p.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["in0", "in1", "out0", "out1"],
+            "{name} port shape"
+        );
+        if has_xc {
+            assert_eq!(
+                validate_parameters(&c, &params(json!({"xc_count": -1}))).len(),
+                1,
+                "{name} should validate xc_count"
+            );
+        }
+    }
+}
+
+#[test]
+fn counter_gains_optional_ports_only_when_their_signal_param_is_set() {
+    let c = load("control.counter");
+
+    let bare = evaluate_component(&c, &params(json!({"clk": "sysclk"}))).unwrap();
+    assert_eq!(
+        bare.ports.iter().map(|p| p.id.as_str()).collect::<Vec<_>>(),
+        vec!["clk", "count"]
+    );
+
+    let full = evaluate_component(
+        &c,
+        &params(json!({"clk": "sysclk", "up_down": "dir", "reset": "rst"})),
+    )
+    .unwrap();
+    assert_eq!(
+        full.ports.iter().map(|p| p.id.as_str()).collect::<Vec<_>>(),
+        vec!["clk", "up_down", "reset", "count"]
+    );
+
+    // clk is required.
+    assert_eq!(validate_parameters(&c, &params(json!({}))).len(), 1);
+    assert!(validate_parameters(&c, &params(json!({"clk": "sysclk"}))).is_empty());
+}
+
+/// Proves the fix for the "position-derived port ids only survive append/remove-at-the-end"
+/// limitation noted in `docs/decisions/0001-scope-and-naming.md`: when the driving parameter is
+/// an array of *objects* that each carry their own persistent `id` (rather than a bare array of
+/// scalars indexed by loop position), `for_each` binds directly to each object and `emit` can
+/// reference `${{ operand.id }}` instead of a loop index -- so removing an element from the
+/// *middle* of the array does not renumber or reassign any surviving port's id. No engine change
+/// was needed for this; it's a recommended authoring pattern the existing DSL already supports
+/// (dotted field access on a `for_each`-bound object was already exercised by
+/// `state_space`/`counter`'s `params.x` lookups -- this just does the same on the loop variable).
+#[test]
+fn stable_id_pattern_survives_removing_an_interior_operand() {
+    let c = load("control.sum.stable_ids");
+
+    let three = evaluate_component(
+        &c,
+        &params(json!({"operands": [
+            {"id": "s1", "sign": 1},
+            {"id": "s2", "sign": 1},
+            {"id": "s3", "sign": -1}
+        ]})),
+    )
+    .unwrap();
+    assert_eq!(
+        three
+            .ports
+            .iter()
+            .map(|p| p.id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["in_s1", "in_s2", "in_s3", "out"]
+    );
+
+    // Remove s2 -- the MIDDLE element -- not the tail.
+    let after_removal = evaluate_component(
+        &c,
+        &params(json!({"operands": [
+            {"id": "s1", "sign": 1},
+            {"id": "s3", "sign": -1}
+        ]})),
+    )
+    .unwrap();
+    // s1 and s3 keep their exact original port ids -- this is the property position-based
+    // for_each (see contract::tests::a_bare_string_param_only_gives_positional_not_true_identity_stability)
+    // cannot provide.
+    assert_eq!(
+        after_removal
+            .ports
+            .iter()
+            .map(|p| p.id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["in_s1", "in_s3", "out"]
+    );
+    assert_eq!(after_removal.ports[1].label.as_deref(), Some("-")); // s3's own sign, unchanged
+}

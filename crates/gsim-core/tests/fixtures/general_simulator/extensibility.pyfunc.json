@@ -1,0 +1,42 @@
+{
+  "name": "extensibility.pyfunc",
+  "label": "Python Function",
+  "category": "extensibility",
+  "parameters": [
+    { "name": "path", "type": "string", "default": "" },
+    { "name": "function", "type": "string", "default": "" },
+    { "name": "input_names", "type": "array", "default": ["u"] },
+    { "name": "output_names", "type": "array", "default": ["y"] }
+  ],
+  "ports": [
+    {
+      "for_each": "${{ range(count(params.input_names)) }}",
+      "as": "i",
+      "emit": {
+        "id": "in${{ i }}",
+        "side": "left",
+        "kind": "signal",
+        "direction": "in",
+        "label": "${{ at(params.input_names, i) }}"
+      }
+    },
+    {
+      "for_each": "${{ range(count(params.output_names)) }}",
+      "as": "i",
+      "emit": {
+        "id": "out${{ i }}",
+        "side": "right",
+        "kind": "signal",
+        "direction": "out",
+        "label": "${{ at(params.output_names, i) }}"
+      }
+    }
+  ],
+  "geometry": {
+    "bbox": [
+      70,
+      "${{ max(30, max(count(params.input_names), count(params.output_names)) * 16) }}"
+    ],
+    "primitives": [{ "type": "text", "x": 35, "y": 15, "text": "py" }]
+  }
+}
