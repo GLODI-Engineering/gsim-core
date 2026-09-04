@@ -24,6 +24,38 @@
 //! - `extensibility.octfunc` / `extensibility.octblock` — the two new Octave-hosted script
 //!   kinds. First fixtures with **two independent variadic port groups** in one component
 //!   (`input_names` and `output_names` each drive their own `for_each`, unrelated in length).
+//! - `control.discrete_state_space` / `control.discrete_transfer_function` — confirmed
+//!   structurally identical to `control.state_space`/`control.transfer_function` (same
+//!   matrix-dimension / non-port-affecting-array patterns), plus one new required-and-positive
+//!   `ts` (sample time) parameter each -- no new engine pattern, added for taxonomy
+//!   completeness.
+//! - `power.pwm1` / `power.pwm2` — fixed-port power-electronics blocks with real validated
+//!   numeric bounds (`freq > 0`, dead times `>= 0`, and `pspwm`'s `f_min <= f_max`).
+//! - `source.sinwave` / `.pulsewave` / `.expwave` / `.sffmwave` — the four real
+//!   `general-simulator` waveform-source kinds (confirmed as four distinct `kind=` values in
+//!   the component reference, not one kind with a `type=` selector), each with zero input
+//!   ports (they read `t` directly, like `converter.phys2sig` reads circuit state directly).
+//! - `math.table_lookup` — a `points=` array parameter; the real engine sorts by `x` rather
+//!   than rejecting unsorted input (so only non-empty is a real validation rule -- there is no
+//!   `all`/fold builtin in the closed expression grammar to check per-entry shape generically,
+//!   a known, deliberate gap, same category as the pre-existing nested-array-equality one).
+//! - `math.fn1` / `math.fn2` / `math.fn3` — the `MathFn1`/`MathFn2`/`MathFn3` waveform-
+//!   arithmetic families, one enum-selected `fn=` parameter each plus fixed 1/2/3 input ports.
+//! - `logic.flip_flop` — `FlipFlopKind` (dff/jkff/tff) enum-gated data-input ports via the
+//!   `when` idiom (`control.counter`'s pattern), not the `if()`-in-`for_each`-source pattern,
+//!   since each kind needs different port *ids*, not just a different count.
+//! - `logic.sr_latch` — fixed `set`/`reset`/`q` ports plus a `priority` enum selector.
+//! - `logic.hysteresis` — `low <= high` cross-parameter validation, fixed 1-in/1-out ports.
+//! - `control.vco` — `f_min <= f_max` cross-parameter validation, fixed 1-in/1-out ports.
+//! - `machine.pmsm` — the most parameter-heavy fixture: 7 independently validated scalar
+//!   parameters (`r_s >= 0`, `l_d > 0`, `l_q > 0`, `pole_pairs > 0`, `inertia > 0`,
+//!   `friction >= 0`), fixed 3-in/4-out ports.
+//! - `control.transform.clarke` / `.clarke_inv` / `.park` / `.park_inv` / `.clarke_park` /
+//!   `.clarke_park_inv` — the 6-member Clarke/Park family as 6 separate static components (per
+//!   the 2026-08-29 audit's recommendation, confirmed against `CoordinateTransform`'s real
+//!   `input_count()`/`output_names()`), each with real port labels, not generic `in0`/`out0`.
+//!   `park`/`park_inv` use a `zero`/`zero_out` id pair where the real input and output both
+//!   conventionally carry a `zero` label (port ids must be unique; labels don't).
 
 use gsim_core::contract::{evaluate_component, validate_parameters, ComponentContract};
 use serde_json::{json, Map, Value};
@@ -431,4 +463,354 @@ fn stable_id_pattern_survives_removing_an_interior_operand() {
         vec!["in_s1", "in_s3", "out"]
     );
     assert_eq!(after_removal.ports[1].label.as_deref(), Some("-")); // s3's own sign, unchanged
+}
+
+#[test]
+fn discrete_state_space_matches_state_space_plus_a_required_positive_ts() {
+    let c = load("control.discrete_state_space");
+
+    let evaluated = evaluate_component(
+        &c,
+        &params(json!({
+            "a": [[1, 0], [0, 1]],
+            "b": [[0.1, 0], [0, 0.1]],
+            "c": [[1, 0], [0, 1], [1, 1]],
+            "d": [[0, 0], [0, 0], [0, 0]],
+            "ts": 0.05
+        })),
+    )
+    .unwrap();
+    let ids: Vec<&str> = evaluated.ports.iter().map(|p| p.id.as_str()).collect();
+    assert_eq!(ids, vec!["in0", "in1", "out0", "out1", "out2"]);
+
+    assert!(validate_parameters(&c, &params(json!({"ts": 0.1}))).is_empty());
+    // ts=0 (and, by construction, any non-positive ts) must fail -- "a discrete block's own
+    // sample period is not optional."
+    assert_eq!(
+        validate_parameters(&c, &params(json!({"ts": 0.0}))).len(),
+        1
+    );
+}
+
+#[test]
+fn discrete_transfer_function_matches_transfer_function_plus_a_required_positive_ts() {
+    let c = load("control.discrete_transfer_function");
+
+    let evaluated = evaluate_component(
+        &c,
+        &params(json!({"num": [0.1], "den": [1, -1], "ts": 0.1})),
+    )
+    .unwrap();
+    assert_eq!(evaluated.ports.len(), 2);
+
+    assert!(validate_parameters(&c, &params(json!({}))).is_empty());
+    assert_eq!(
+        validate_parameters(&c, &params(json!({"ts": -1.0}))).len(),
+        1
+    );
+    // Same den[0]==0 rule as the continuous version.
+    assert_eq!(
+        validate_parameters(&c, &params(json!({"den": [0, 1]}))).len(),
+        1
+    );
+}
+
+#[test]
+fn pwm1_has_fixed_ports_and_validates_freq_and_dead_times() {
+    let c = load("power.pwm1");
+    let evaluated = evaluate_component(&c, &params(json!({}))).unwrap();
+    assert_eq!(
+        evaluated
+            .ports
+            .iter()
+            .map(|p| p.id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["in", "main", "comp"]
+    );
+
+    assert!(validate_parameters(&c, &params(json!({"freq": 20000.0}))).is_empty());
+    assert_eq!(
+        validate_parameters(&c, &params(json!({"freq": 0.0}))).len(),
+        1
+    );
+    assert_eq!(
+        validate_parameters(&c, &params(json!({"red": -1e-6}))).len(),
+        1
+    );
+}
+
+#[test]
+fn pwm2_has_a_frequency_phase_duty_input_triple_and_validates_f_min_le_f_max() {
+    let c = load("power.pwm2");
+    let evaluated = evaluate_component(&c, &params(json!({}))).unwrap();
+    assert_eq!(
+        evaluated
+            .ports
+            .iter()
+            .map(|p| p.id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["freq", "phase", "duty", "main", "comp"]
+    );
+
+    assert!(
+        validate_parameters(&c, &params(json!({"f_min": 1000.0, "f_max": 50000.0}))).is_empty()
+    );
+    assert_eq!(
+        validate_parameters(&c, &params(json!({"f_min": 5000.0, "f_max": 1000.0}))).len(),
+        1
+    );
+}
+
+#[test]
+fn waveform_sources_are_zero_input_signal_references_with_their_real_parameter_sets() {
+    let cases: &[(&str, Value)] = &[
+        ("source.sinwave", json!({"va": 10.0, "freq": 1000.0})),
+        ("source.pulsewave", json!({"v1": 0.0, "v2": 10.0})),
+        ("source.expwave", json!({"v1": 0.0, "v2": 1.0})),
+        (
+            "source.sffmwave",
+            json!({"va": 1.0, "fc": 1000.0, "fs": 100.0}),
+        ),
+    ];
+    for (name, args) in cases {
+        let c = load(name);
+        let evaluated = evaluate_component(&c, &params(args.clone())).unwrap();
+        assert_eq!(
+            evaluated
+                .ports
+                .iter()
+                .map(|p| p.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["out"],
+            "{name} must have exactly one zero-input output port"
+        );
+        assert!(
+            validate_parameters(&c, &params(args.clone())).is_empty(),
+            "{name} defaults plus its own required fields should validate"
+        );
+    }
+}
+
+#[test]
+fn table_lookup_validates_only_non_emptiness_since_the_real_engine_sorts_rather_than_rejects() {
+    let c = load("math.table_lookup");
+    let evaluated = evaluate_component(
+        &c,
+        &params(json!({"points": [[0, 0], [1, 10], [2, 10], [3, 0]]})),
+    )
+    .unwrap();
+    assert_eq!(
+        evaluated
+            .ports
+            .iter()
+            .map(|p| p.id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["in", "out"]
+    );
+
+    assert!(validate_parameters(&c, &params(json!({"points": [[0, 0]]}))).is_empty());
+    assert_eq!(
+        validate_parameters(&c, &params(json!({"points": []}))).len(),
+        1
+    );
+}
+
+#[test]
+fn math_fn_families_have_the_right_arity_and_enum_membership_per_family() {
+    let cases: &[(&str, &[&str], &str, &str)] = &[
+        ("math.fn1", &["in", "out"], "sin", "cosx"),
+        ("math.fn2", &["in1", "in2", "out"], "hypot", "nope"),
+        ("math.fn3", &["in1", "in2", "in3", "out"], "limit", "nope"),
+    ];
+    for (name, expected_ports, good_fn, bad_fn) in cases {
+        let c = load(name);
+        let evaluated = evaluate_component(&c, &params(json!({"fn": good_fn}))).unwrap();
+        assert_eq!(
+            evaluated
+                .ports
+                .iter()
+                .map(|p| p.id.as_str())
+                .collect::<Vec<_>>(),
+            expected_ports.to_vec(),
+            "{name} port shape"
+        );
+        assert!(validate_parameters(&c, &params(json!({"fn": good_fn}))).is_empty());
+        assert_eq!(
+            validate_parameters(&c, &params(json!({"fn": bad_fn}))).len(),
+            1,
+            "{name} should reject an unknown fn name"
+        );
+    }
+}
+
+#[test]
+fn flip_flop_gains_kind_specific_data_ports_via_when_not_for_each() {
+    let c = load("logic.flip_flop");
+
+    let dff = evaluate_component(&c, &params(json!({"kind": "dff"}))).unwrap();
+    assert_eq!(
+        dff.ports.iter().map(|p| p.id.as_str()).collect::<Vec<_>>(),
+        vec!["clk", "d", "q"]
+    );
+
+    let tff = evaluate_component(&c, &params(json!({"kind": "tff"}))).unwrap();
+    assert_eq!(
+        tff.ports.iter().map(|p| p.id.as_str()).collect::<Vec<_>>(),
+        vec!["clk", "t", "q"]
+    );
+
+    // jkff needs both j and k -- neither d nor t.
+    let jkff = evaluate_component(&c, &params(json!({"kind": "jkff"}))).unwrap();
+    assert_eq!(
+        jkff.ports.iter().map(|p| p.id.as_str()).collect::<Vec<_>>(),
+        vec!["clk", "j", "k", "q"]
+    );
+
+    // reset is optional and orthogonal to kind.
+    let dff_reset =
+        evaluate_component(&c, &params(json!({"kind": "dff", "reset": "rst"}))).unwrap();
+    assert_eq!(
+        dff_reset
+            .ports
+            .iter()
+            .map(|p| p.id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["clk", "d", "reset", "q"]
+    );
+
+    assert_eq!(
+        validate_parameters(&c, &params(json!({"kind": "srff"}))).len(),
+        1
+    );
+}
+
+#[test]
+fn sr_latch_has_fixed_ports_and_a_priority_enum() {
+    let c = load("logic.sr_latch");
+    let evaluated = evaluate_component(&c, &params(json!({}))).unwrap();
+    assert_eq!(
+        evaluated
+            .ports
+            .iter()
+            .map(|p| p.id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["set", "reset", "q"]
+    );
+
+    assert!(validate_parameters(&c, &params(json!({"priority": "reset"}))).is_empty());
+    assert_eq!(
+        validate_parameters(&c, &params(json!({"priority": "first"}))).len(),
+        1
+    );
+}
+
+#[test]
+fn hysteresis_validates_low_le_high() {
+    let c = load("logic.hysteresis");
+    let evaluated = evaluate_component(&c, &params(json!({}))).unwrap();
+    assert_eq!(evaluated.ports.len(), 2);
+
+    assert!(validate_parameters(&c, &params(json!({"high": 1.0, "low": -1.0}))).is_empty());
+    assert_eq!(
+        validate_parameters(&c, &params(json!({"high": -1.0, "low": 1.0}))).len(),
+        1
+    );
+}
+
+#[test]
+fn vco_validates_f_min_le_f_max() {
+    let c = load("control.vco");
+    let evaluated = evaluate_component(&c, &params(json!({}))).unwrap();
+    assert_eq!(evaluated.ports.len(), 2);
+
+    assert!(validate_parameters(&c, &params(json!({"f_min": 1.0, "f_max": 1000.0}))).is_empty());
+    assert_eq!(
+        validate_parameters(&c, &params(json!({"f_min": 1000.0, "f_max": 1.0}))).len(),
+        1
+    );
+}
+
+#[test]
+fn pmsm_has_the_real_3_in_4_out_port_shape_and_validates_every_scalar_independently() {
+    let c = load("machine.pmsm");
+    let evaluated = evaluate_component(&c, &params(json!({}))).unwrap();
+    assert_eq!(
+        evaluated
+            .ports
+            .iter()
+            .map(|p| p.id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["vd", "vq", "t_load", "id", "iq", "omega_m", "theta_e"]
+    );
+
+    assert!(validate_parameters(&c, &params(json!({}))).is_empty());
+    for (bad_param, bad_value) in [
+        ("r_s", json!(-0.1)),
+        ("l_d", json!(0.0)),
+        ("l_q", json!(0.0)),
+        ("pole_pairs", json!(0.0)),
+        ("inertia", json!(0.0)),
+        ("friction", json!(-1e-6)),
+    ] {
+        let failures = validate_parameters(&c, &params(json!({bad_param: bad_value})));
+        assert_eq!(
+            failures.len(),
+            1,
+            "{bad_param}={bad_value} should fail exactly one validation rule"
+        );
+        assert_eq!(failures[0].parameter, bad_param);
+    }
+}
+
+/// The 6-member Clarke/Park family, confirmed against `CoordinateTransform::input_count()`/
+/// `output_names()` in `general-simulator`'s own source rather than guessed: each is a pure,
+/// parameter-free static component whose *port count and labels* differ by variant (3-in/3-out
+/// for `clarke`/`clarke_inv`, 4-in/3-out for the other four).
+#[test]
+fn clarke_park_family_has_real_per_variant_port_labels_not_generic_ones() {
+    let clarke = load("control.transform.clarke");
+    let e = evaluate_component(&clarke, &params(json!({}))).unwrap();
+    assert_eq!(
+        e.ports.iter().map(|p| p.id.as_str()).collect::<Vec<_>>(),
+        vec!["a", "b", "c", "alpha", "beta", "zero"]
+    );
+
+    let clarke_inv = load("control.transform.clarke_inv");
+    let e = evaluate_component(&clarke_inv, &params(json!({}))).unwrap();
+    assert_eq!(
+        e.ports.iter().map(|p| p.id.as_str()).collect::<Vec<_>>(),
+        vec!["alpha", "beta", "zero", "a", "b", "c"]
+    );
+
+    let park = load("control.transform.park");
+    let e = evaluate_component(&park, &params(json!({}))).unwrap();
+    assert_eq!(
+        e.ports.iter().map(|p| p.id.as_str()).collect::<Vec<_>>(),
+        vec!["alpha", "beta", "zero", "theta", "d", "q", "zero_out"]
+    );
+    // Both the input and output "zero" carry the same real label despite the id split needed
+    // for uniqueness.
+    assert_eq!(e.ports[2].label.as_deref(), Some("zero"));
+    assert_eq!(e.ports[6].label.as_deref(), Some("zero"));
+
+    let park_inv = load("control.transform.park_inv");
+    let e = evaluate_component(&park_inv, &params(json!({}))).unwrap();
+    assert_eq!(
+        e.ports.iter().map(|p| p.id.as_str()).collect::<Vec<_>>(),
+        vec!["d", "q", "zero", "theta", "alpha", "beta", "zero_out"]
+    );
+
+    let clarke_park = load("control.transform.clarke_park");
+    let e = evaluate_component(&clarke_park, &params(json!({}))).unwrap();
+    assert_eq!(
+        e.ports.iter().map(|p| p.id.as_str()).collect::<Vec<_>>(),
+        vec!["a", "b", "c", "theta", "d", "q", "zero"]
+    );
+
+    let clarke_park_inv = load("control.transform.clarke_park_inv");
+    let e = evaluate_component(&clarke_park_inv, &params(json!({}))).unwrap();
+    assert_eq!(
+        e.ports.iter().map(|p| p.id.as_str()).collect::<Vec<_>>(),
+        vec!["d", "q", "zero", "theta", "a", "b", "c"]
+    );
 }
