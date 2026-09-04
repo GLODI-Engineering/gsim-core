@@ -27,8 +27,8 @@
 use gsim_core::compile;
 use gsim_core::contract::{self, ComponentContract};
 use gsim_core::document::{
-    ConnectOptions, Endpoint, GsimSchDocument, Mirror, Model, ModelBuilder, NewBlockSpec,
-    NewSubcktInstanceSpec, Paradigm, SubcktDef,
+    deserialize_comment, ConnectOptions, Endpoint, GsimSchDocument, Mirror, Model, ModelBuilder,
+    NewBlockSpec, NewSubcktInstanceSpec, Paradigm, SubcktDef,
 };
 use gsim_core::layout::{self, Axis, LayoutInput, Rect};
 use serde::Deserialize;
@@ -127,6 +127,10 @@ struct NewBlockSpecJson {
     ic: Map<String, Value>,
     #[serde(default)]
     label: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_comment")]
+    comment_before: Vec<String>,
+    #[serde(default, deserialize_with = "deserialize_comment")]
+    comment_after: Vec<String>,
     #[serde(default)]
     id: Option<String>,
 }
@@ -144,6 +148,8 @@ impl From<NewBlockSpecJson> for NewBlockSpec {
             params: spec.params,
             ic: spec.ic,
             label: spec.label,
+            comment_before: spec.comment_before,
+            comment_after: spec.comment_after,
             id: spec.id,
         }
     }
@@ -217,7 +223,7 @@ fn instantiate_subckt_impl(model_json: &str, spec_json: &str) -> Result<String, 
 ///
 /// **Shared JSON contract** (identical to `gsim-py`'s `instantiate_subckt`): `spec_json` is
 /// `{"def_ref", "position": [x, y], "rotation"?, "domain"?, "fidelity"?, "mirror"?, "params"?,
-/// "label"?, "id"?}`. Returns `{"model": <updated Model JSON>, "block_id": "<assigned id>"}`,
+/// "label"?, "comment_before"?, "comment_after"?, "id"?}`. Returns `{"model": <updated Model JSON>, "block_id": "<assigned id>"}`,
 /// the same shape `addBlock` returns. The created block's wireable ports are exactly the
 /// referenced def's `ports[].id` list — wire them with ordinary `connect` calls.
 #[wasm_bindgen(js_name = instantiateSubckt)]

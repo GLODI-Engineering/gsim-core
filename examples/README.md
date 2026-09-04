@@ -160,3 +160,31 @@ general-simulator floating_reference_bridge.cir --mode transient --tfinal 1e-3 -
 exit 0, 1000 steps
 V(TOP) = 12.000000 V, V(MID) = 6.000000 V (exactly the 100 Ω / 4x400 Ω divider)
 ```
+
+## `annotated_rc_comments.py`
+
+**Per-block authoring comments**, from `gsim_py` through to the emitted `.cir` text. A block
+carries two independent optional slots, `comment_before` and `comment_after` (a list of lines,
+or a single string that may contain newlines), and the compiler renders each as full-line `*`
+SPICE comments immediately above/below that block's own card(s). The script asserts placement
+*positionally* — the line directly above and below the card — across both emitter sub-grammars,
+since they are separate code paths: `R1`/`C1` are element cards, `K1` is a `kind=` block card.
+
+```
+* series element of the RC low-pass
+* 1 kohm with C1 -> f_c = 159 Hz
+R1 n_R1_p1 n_C1_p1 1000
+* (tolerance is not modeled here)
+C1 n_C1_p1 0 1e-6
+* storage element -- ic defaults to 0 V
+* loop gain
+* re-tuned after the step test
+K1 kind=gain k=2.5 in=U1
+```
+
+`K1`'s two comment lines were authored as one Python string containing `\n`: an embedded
+newline must become a second `*` line, never raw text on a line the lexer would read as a card.
+The script also checks the exact total `*` line count, so a comment can neither leak onto an
+uncommented block nor be silently dropped. (The circuit is a trivial RC low-pass — the comments
+are the subject, so `general-simulator` is only run, if present, to confirm the extra lines are
+inert to the parser.)

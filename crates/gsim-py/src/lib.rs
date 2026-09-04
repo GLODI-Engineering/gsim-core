@@ -125,7 +125,10 @@ struct AddBlockResult {
 }
 
 /// `spec_json` matches `NewBlockSpec`'s JSON shape (`type`, `paradigm`, `domain`, `fidelity?`,
-/// `position`, `rotation`, `mirror?`, `params?`, `ic?`, `label?`, `id?`). Returns
+/// `position`, `rotation`, `mirror?`, `params?`, `ic?`, `label?`, `comment_before?`,
+/// `comment_after?`, `id?`). `comment_before`/`comment_after` are lists of comment lines (a
+/// single string containing newlines is split too) emitted as `*`-prefixed SPICE comment lines
+/// immediately above/below this block's card(s) by `compile`. Returns
 /// `{"model": <updated Model JSON>, "block_id": "<assigned id>"}`. Raises with the real
 /// `BuilderError`/`BlockError` message (duplicate id, invalid id/type pattern, invalid rotation)
 /// on failure.
@@ -172,7 +175,8 @@ fn add_subckt_def(model_json: &str, def_json: &str) -> PyResult<String> {
 ///
 /// **Shared JSON contract** (identical in `gsim-wasm`'s `instantiateSubckt`): `spec_json`
 /// matches `NewSubcktInstanceSpec` — `{"def_ref", "position": [x, y], "rotation"?, "domain"?,
-/// "fidelity"?, "mirror"?, "params"?, "label"?, "id"?}`. Returns
+/// "fidelity"?, "mirror"?, "params"?, "label"?, "comment_before"?, "comment_after"?, "id"?}`.
+/// Returns
 /// `{"model": <updated Model JSON>, "block_id": "<assigned id>"}`, the same shape `add_block`
 /// returns. The created block's wireable ports are exactly the referenced def's `ports[].id`
 /// list — wire them with ordinary `connect` calls. Raises `unknown-subckt-def: ...` if

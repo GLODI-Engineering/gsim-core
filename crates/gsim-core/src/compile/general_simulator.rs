@@ -78,8 +78,50 @@ impl NetlistTarget for GeneralSimulatorTarget {
     }
 }
 
+/// A block's authored comment rendered as full-line `*` comments — the one comment form
+/// `general-mna`'s lexer accepts in every dialect (a line whose first character is `*`), and the
+/// same form this emitter's own header uses.
+///
+/// Each vec entry is one comment line, and an entry that itself contains newlines is split
+/// further, because an embedded `\n` inside a single emitted line would put un-commented text
+/// on the next line and break the line-oriented lexer.
+fn comment_lines(comment: &[String]) -> Vec<String> {
+    comment
+        .iter()
+        .flat_map(|entry| entry.split('\n'))
+        .map(|line| {
+            let line = line.trim_end();
+            if line.is_empty() {
+                "*".to_string()
+            } else {
+                format!("* {line}")
+            }
+        })
+        .collect()
+}
+
+/// Wraps one emitted card in its block's `comment_before`/`comment_after` lines, returning a
+/// single (possibly multi-line) string so the comments stay glued to their card no matter how
+/// the caller reorders or groups cards afterwards.
+///
+/// A block that emits *both* an element card and a `kind=` card (an ideal switch, say) gets the
+/// comment on each of them: the two cards are emitted into separate groups and are not adjacent
+/// in the output, so annotating only one would leave the other unexplained.
+fn with_comments(block: &Block, card: String) -> String {
+    if block.comment_before.is_empty() && block.comment_after.is_empty() {
+        return card;
+    }
+    let mut out = comment_lines(&block.comment_before);
+    out.push(card);
+    out.extend(comment_lines(&block.comment_after));
+    out.join("\n")
+}
+
 /// Emits every ordinary (non-subckt-instance) block in one scope: element cards first, then
 /// `kind=` block cards, so the electrical topology reads before the block graph that drives it.
+///
+/// Each pushed entry is one block's card *plus* its comment lines, so an entry may span several
+/// output lines — `lines.join("\n")` at the end flattens them identically either way.
 fn emit_scope(scope: &Scope<'_>, lines: &mut Vec<String>) -> Result<(), CompileError> {
     let mut elements = Vec::new();
     let mut blocks = Vec::new();
@@ -97,10 +139,10 @@ fn emit_scope(scope: &Scope<'_>, lines: &mut Vec<String>) -> Result<(), CompileE
             continue;
         }
         if spec.device_letter.is_some() {
-            elements.push(emit_element(scope, block, spec)?);
+            elements.push(with_comments(block, emit_element(scope, block, spec)?));
         }
         if spec.kind.is_some() {
-            blocks.push(emit_block_card(scope, block, spec)?);
+            blocks.push(with_comments(block, emit_block_card(scope, block, spec)?));
         }
     }
     lines.extend(elements);
@@ -345,7 +387,10 @@ fn emit_x_card(
         tokens.push(token);
     }
     tokens.push(def.name.clone());
-    Ok(tokens.join(" "))
+    // A subckt instance is a block too, so `instantiate_subckt`'s comment slots reach its X card
+    // the same way `add_block`'s reach an element card. `emit_nested_instance` is deliberately
+    // left out: a `SubcktInstance` is not a `Block` and carries no comment fields.
+    Ok(with_comments(block, tokens.join(" ")))
 }
 
 #[cfg(test)]
@@ -1310,6 +1355,257 @@ mod tests {
         let body = body.split(".ends OUTER").next().unwrap();
         assert!(body.contains("Xi p mid INNER"), "{body}");
         assert!(body.contains("Xj mid q INNER"), "{body}");
+    }
+
+    /// Like [`add`], but through the real `add_block` path with both comment slots filled.
+    fn add_commented(
+        b: &mut ModelBuilder,
+        id: &str,
+        t: &str,
+        paradigm: Paradigm,
+        params: serde_json::Value,
+        before: &[&str],
+        after: &[&str],
+    ) {
+        b.add_block(NewBlockSpec {
+            r#type: t.to_string(),
+            paradigm,
+            domain: "electrical".to_string(),
+            id: Some(id.to_string()),
+            params: params.as_object().cloned().unwrap_or_default(),
+            comment_before: before.iter().map(|s| (*s).to_string()).collect(),
+            comment_after: after.iter().map(|s| (*s).to_string()).collect(),
+            ..Default::default()
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn a_block_comment_becomes_star_lines_directly_above_and_below_its_element_card() {
+        let mut b = ModelBuilder::new("m", "M", 10);
+        add_commented(
+            &mut b,
+            "R1",
+            "passive.resistor",
+            Paradigm::PhysicalNetwork,
+            json!({"R": 1000.0}),
+            &["upper divider leg", "sized for 5 mA bias"],
+            &["measured 1k02 on the bench"],
+        );
+        add(
+            &mut b,
+            "R2",
+            "passive.resistor",
+            Paradigm::PhysicalNetwork,
+            json!({"R": 2000.0}),
+        );
+        add(
+            &mut b,
+            "gnd",
+            "routing.ground",
+            Paradigm::PhysicalNetwork,
+            json!({}),
+        );
+        elec(&mut b, "R1", "p1", "R2", "p1");
+        elec(&mut b, "R1", "p2", "gnd", "p");
+        elec(&mut b, "R2", "p2", "gnd", "p");
+
+        let out = compile(&b.into_model(), "general-simulator").unwrap();
+        assert!(
+            out.netlist.contains(
+                "* upper divider leg\n\
+                 * sized for 5 mA bias\n\
+                 R1 n_R1_p1 0 1000\n\
+                 * measured 1k02 on the bench\n"
+            ),
+            "{}",
+            out.netlist
+        );
+        // The uncommented sibling is untouched -- no stray comment leaks onto it.
+        assert!(
+            out.netlist.contains("\nR2 n_R1_p1 0 2000\n"),
+            "{}",
+            out.netlist
+        );
+    }
+
+    #[test]
+    fn a_comment_wraps_a_kind_card_too_and_an_embedded_newline_becomes_its_own_star_line() {
+        let mut b = ModelBuilder::new("m", "M", 10);
+        add_commented(
+            &mut b,
+            "MOD",
+            "source.const",
+            Paradigm::SignalFlow,
+            json!({"value": 1.0}),
+            &[],
+            &["setpoint held constant"],
+        );
+        // One entry carrying its own newline must still emit two commented lines: an embedded
+        // "\n" in a single emitted line would put raw text where the lexer expects a card.
+        add_commented(
+            &mut b,
+            "G1",
+            "control.gain",
+            Paradigm::SignalFlow,
+            json!({"k": 2.0}),
+            &["loop gain\nretuned after the step test"],
+            &[],
+        );
+        sig(&mut b, "MOD", "out", "G1", "in");
+
+        let out = compile(&b.into_model(), "general-simulator").unwrap();
+        assert!(
+            out.netlist.contains(
+                "* loop gain\n\
+                 * retuned after the step test\n\
+                 G1 kind=gain k=2 in=MOD\n"
+            ),
+            "{}",
+            out.netlist
+        );
+        assert!(
+            out.netlist
+                .contains("MOD kind=const value=1\n* setpoint held constant\n"),
+            "{}",
+            out.netlist
+        );
+        // Every emitted comment line starts with '*' -- nothing bare slipped through.
+        for line in out.netlist.lines() {
+            assert!(
+                !line.contains("retuned after") || line.starts_with('*'),
+                "{}",
+                out.netlist
+            );
+        }
+    }
+
+    /// A block that emits *both* sub-grammars gets the comment on each card, since the element
+    /// card and the `kind=` card are emitted into separate groups and are not adjacent.
+    #[test]
+    fn a_dual_card_block_carries_its_comment_on_both_of_its_cards() {
+        let mut b = ModelBuilder::new("m", "M", 10);
+        add_commented(
+            &mut b,
+            "DEV",
+            "passive.switch.ideal",
+            Paradigm::PhysicalNetwork,
+            json!({"r_on": 0.04, "g_breakdown": 0.0, "v_breakdown": -1e6,
+                   "g_off": 1e-6, "v_th": 0.6, "g_on": 100.0}),
+            &["high-side device"],
+            &["end of device"],
+        );
+        add(
+            &mut b,
+            "GATE",
+            "converter.sig2phys",
+            Paradigm::Converter,
+            json!({"domain": "voltage"}),
+        );
+        add(
+            &mut b,
+            "MOD",
+            "source.const",
+            Paradigm::SignalFlow,
+            json!({"value": 1.0}),
+        );
+        add(
+            &mut b,
+            "gnd",
+            "routing.ground",
+            Paradigm::PhysicalNetwork,
+            json!({}),
+        );
+        elec(&mut b, "GATE", "out", "DEV", "g");
+        elec(&mut b, "DEV", "d", "gnd", "p");
+        elec(&mut b, "DEV", "s", "gnd", "p");
+        sig(&mut b, "MOD", "out", "GATE", "in");
+
+        let out = compile(&b.into_model(), "general-simulator").unwrap();
+        assert!(
+            out.netlist.contains(
+                "* high-side device\n\
+                 DEV 0 0 idealswitchmodel\n\
+                 * end of device\n"
+            ),
+            "{}",
+            out.netlist
+        );
+        assert!(
+            out.netlist
+                .contains("* high-side device\nDEV kind=ideal_switch"),
+            "{}",
+            out.netlist
+        );
+        assert_eq!(
+            out.netlist.matches("* high-side device").count(),
+            2,
+            "{}",
+            out.netlist
+        );
+    }
+
+    #[test]
+    fn comments_reach_subckt_def_bodies_and_x_cards() {
+        let mut b = ModelBuilder::new("m", "M", 10);
+        let mut def = SubcktDef::new("leaf", "LEAF").unwrap().with_ports([
+            SubcktPort::new("a", "physical-electrical").unwrap(),
+            SubcktPort::new("b", "physical-electrical").unwrap(),
+        ]);
+        {
+            let mut body = ModelBuilder::new("__leaf", "leaf", 10);
+            add(
+                &mut body,
+                "leaf",
+                "spice-subckt.boundary",
+                Paradigm::SpiceSubckt,
+                json!({}),
+            );
+            add_commented(
+                &mut body,
+                "Rin",
+                "passive.resistor",
+                Paradigm::PhysicalNetwork,
+                json!({"R": 1000.0}),
+                &["inside the def"],
+                &["after the def body card"],
+            );
+            elec(&mut body, "leaf", "a", "Rin", "p1");
+            elec(&mut body, "Rin", "p2", "leaf", "b");
+            let m = body.into_model();
+            def.blocks = m.blocks;
+            def.wires = m.wires;
+        }
+        b.add_subckt_def(def).unwrap();
+        b.instantiate_subckt(NewSubcktInstanceSpec {
+            comment_before: vec!["the one leaf instance".to_string()],
+            comment_after: vec!["end of leaf".to_string()],
+            ..NewSubcktInstanceSpec::new("leaf", (0, 0)).with_id("X1")
+        })
+        .unwrap();
+        add(
+            &mut b,
+            "gnd",
+            "routing.ground",
+            Paradigm::PhysicalNetwork,
+            json!({}),
+        );
+        elec(&mut b, "X1", "a", "gnd", "p");
+        elec(&mut b, "X1", "b", "gnd", "p");
+
+        let out = compile(&b.into_model(), "general-simulator").unwrap();
+        assert!(
+            out.netlist
+                .contains("* inside the def\nRin a b 1000\n* after the def body card\n"),
+            "{}",
+            out.netlist
+        );
+        assert!(
+            out.netlist
+                .contains("* the one leaf instance\nX1 0 0 LEAF\n* end of leaf\n"),
+            "{}",
+            out.netlist
+        );
     }
 
     #[test]
