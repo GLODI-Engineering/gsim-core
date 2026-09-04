@@ -23,8 +23,8 @@
 use gsim_core::compile::{compile as compile_model, CompileError};
 use gsim_core::contract::{self, ComponentContract};
 use gsim_core::document::{
-    BuilderError, ConnectOptions, Endpoint, GsimSchDocument, Model, ModelBuilder, NewBlockSpec,
-    NewSubcktInstanceSpec, SubcktDef, SubcktError,
+    BuilderError, CompatFailure, ConnectOptions, Endpoint, GsimSchDocument, Model, ModelBuilder,
+    NewBlockSpec, NewSubcktInstanceSpec, SubcktDef, SubcktError,
 };
 use gsim_core::layout::{self, Axis, LayoutInput, Rect};
 use pyo3::exceptions::PyValueError;
@@ -51,6 +51,15 @@ fn builder_err_to_py(e: BuilderError) -> PyErr {
         BuilderError::DuplicateId(_) => "duplicate",
         BuilderError::DanglingWire { .. } => "dangling",
         BuilderError::CrossParadigm { .. } => "cross-paradigm",
+        // One keyword per `port-compat.ts` reason rather than a single "port-incompatible":
+        // the three cases need different fixes (drop a v3-reserved kind / correct the wire kind
+        // / insert a routing.merge), so a caller branching on them is the expected use. Same
+        // sub-matching precedent as `Subckt(CyclicDefReference)` below.
+        BuilderError::PortIncompatible(inc) => match &inc.failure {
+            CompatFailure::ReservedKind { .. } => "port-reserved-kind",
+            CompatFailure::KindMismatch { .. } => "port-kind-mismatch",
+            CompatFailure::FanInOnSignal { .. } => "port-fan-in-on-signal",
+        },
         BuilderError::UnknownBlock(_) => "unknown-block",
         BuilderError::Block(_) => "invalid-block",
         BuilderError::UnknownSubcktDef(_) => "unknown-subckt-def",
@@ -272,6 +281,12 @@ struct ConnectResult {
 /// with the real `BuilderError` message on failure -- the message text always names the specific
 /// case ("dangling", "cross-paradigm", "duplicate") rather than a generic "connect failed", since
 /// `BuilderError`'s `Display` impl already does this and this wrapper does not paper over it.
+///
+/// Beyond the block-level cross-paradigm boundary, the per-port §8.1/§8.2 rules in
+/// `gsim_core::document::port_compat` also apply, raising with the keyword
+/// `port-reserved-kind`, `port-kind-mismatch` or `port-fan-in-on-signal`. That module documents
+/// exactly which of the frontend's `port-compat.ts` rules this crate can enforce without a
+/// component-contract registry, and which remain open.
 #[pyfunction]
 fn connect(
     model_json: &str,
@@ -574,6 +589,86 @@ mod tests {
                 ),
                 "got: {msg}"
             );
+        });
+    }
+
+    #[test]
+    fn connect_two_different_physical_domains_raises_port_kind_mismatch() {
+        let model = new_model("m1", "M", 10).unwrap();
+        let spec1 = r#"{"type":"passive.resistor","paradigm":"physical-network","domain":"electrical","position":[0,0],"rotation":0,"id":"r1"}"#;
+        let add1: Value = serde_json::from_str(&add_block(&model, spec1).unwrap()).unwrap();
+        let model = add1["model"].to_string();
+        let spec2 = r#"{"type":"thermal.resistance","paradigm":"physical-network","domain":"thermal","position":[0,0],"rotation":0,"id":"rth"}"#;
+        let add2: Value = serde_json::from_str(&add_block(&model, spec2).unwrap()).unwrap();
+        let model = add2["model"].to_string();
+
+        let from = r#"{"block":"r1","port":"p"}"#;
+        let to = r#"{"block":"rth","port":"a"}"#;
+        let err = connect(&model, from, to, "physical-electrical", "{}").unwrap_err();
+        Python::attach(|py| {
+            let msg = err.value(py).to_string();
+            // The stable keyword prefix, then the full underlying message naming both the port
+            // and the kind it actually declares -- the wrapper adds, never replaces.
+            assert!(msg.starts_with("port-kind-mismatch: "), "got: {msg}");
+            assert!(msg.contains("'rth.a' is declared 'thermal'"), "got: {msg}");
+            assert!(
+                msg.contains("as a 'physical-electrical' wire"),
+                "got: {msg}"
+            );
+        });
+    }
+
+    #[test]
+    fn connect_fanning_in_on_a_signal_port_raises_port_fan_in_on_signal() {
+        let mut model = new_model("m1", "M", 10).unwrap();
+        for id in ["s1", "s2", "g1"] {
+            let spec = format!(
+                r#"{{"type":"control.gain","paradigm":"signal-flow","domain":"control","position":[0,0],"rotation":0,"id":"{id}"}}"#
+            );
+            let add: Value = serde_json::from_str(&add_block(&model, &spec).unwrap()).unwrap();
+            model = add["model"].to_string();
+        }
+        let to = r#"{"block":"g1","port":"in"}"#;
+        let first: Value = serde_json::from_str(
+            &connect(&model, r#"{"block":"s1","port":"out"}"#, to, "signal", "{}").unwrap(),
+        )
+        .unwrap();
+        let model = first["model"].to_string();
+
+        let err =
+            connect(&model, r#"{"block":"s2","port":"out"}"#, to, "signal", "{}").unwrap_err();
+        Python::attach(|py| {
+            let msg = err.value(py).to_string();
+            assert!(msg.starts_with("port-fan-in-on-signal: "), "got: {msg}");
+            assert!(
+                msg.contains("causal port 'g1.in' is already driven"),
+                "got: {msg}"
+            );
+        });
+    }
+
+    #[test]
+    fn connect_a_reserved_kind_raises_port_reserved_kind() {
+        let mut model = new_model("m1", "M", 10).unwrap();
+        for id in ["m1b", "m2b"] {
+            let spec = format!(
+                r#"{{"type":"magnetic.core","paradigm":"physical-network","domain":"mixed","position":[0,0],"rotation":0,"id":"{id}"}}"#
+            );
+            let add: Value = serde_json::from_str(&add_block(&model, &spec).unwrap()).unwrap();
+            model = add["model"].to_string();
+        }
+        let err = connect(
+            &model,
+            r#"{"block":"m1b","port":"p"}"#,
+            r#"{"block":"m2b","port":"p"}"#,
+            "reserved.physical-magnetic",
+            "{}",
+        )
+        .unwrap_err();
+        Python::attach(|py| {
+            let msg = err.value(py).to_string();
+            assert!(msg.starts_with("port-reserved-kind: "), "got: {msg}");
+            assert!(msg.contains("reserved.physical-magnetic"), "got: {msg}");
         });
     }
 

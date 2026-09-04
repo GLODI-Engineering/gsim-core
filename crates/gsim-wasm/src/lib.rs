@@ -349,9 +349,17 @@ fn connect_impl(
 /// Returns `{"model": <updated Model JSON>, "wire_id": "<assigned id>"}`.
 ///
 /// The thrown `Error`'s message clearly states which failure case occurred (cross-paradigm /
-/// dangling endpoint / duplicate id) -- see `gsim_core::document::BuilderError`'s `Display` impl
-/// -- so the frontend can distinguish a cross-paradigm attempt (which needs immediate red-X
-/// feedback per `docs/specs/gsim-sch-format.md` §8.3) from every other failure.
+/// dangling endpoint / duplicate id / port incompatibility) -- see
+/// `gsim_core::document::BuilderError`'s `Display` impl -- so the frontend can distinguish a
+/// cross-paradigm attempt (which needs immediate red-X feedback per
+/// `docs/specs/gsim-sch-format.md` §8.3) from every other failure.
+///
+/// A §8.1/§8.2 port-kind rejection additionally embeds the **same reason token
+/// `apps/frontend/src/canvas/port-compat.ts`'s own `canConnect` returns** -- `reserved-kind`,
+/// `kind-mismatch` or `fan-in-on-signal` -- so the canvas's existing reject-flash branching
+/// needs no new vocabulary to handle a rejection that came from this crate instead. See
+/// `gsim_core::document::port_compat` for which of those rules are enforced here and which
+/// still require the frontend's own contract lookup.
 #[wasm_bindgen]
 pub fn connect(
     model_json: &str,
