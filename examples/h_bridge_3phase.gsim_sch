@@ -1,0 +1,283 @@
+{
+  "schema_version": 2,
+  "model": {
+    "id": "h_bridge_3phase",
+    "name": "3-Phase Ideal-Switch Bridge",
+    "grid": 10,
+    "params": [],
+    "blocks": [
+      {
+        "id": "lega_high",
+        "type": "passive.switch.ideal",
+        "paradigm": "physical-network",
+        "domain": "electrical",
+        "fidelity": "ideal",
+        "position": [
+          0,
+          0
+        ],
+        "rotation": 0,
+        "mirror": "none",
+        "params": {
+          "g_breakdown": 0.0,
+          "g_off": 1e-9,
+          "g_on": 5.0,
+          "r_on": 0.1,
+          "v_breakdown": -100.0,
+          "v_th": 0.6
+        },
+        "ic": {}
+      },
+      {
+        "id": "lega_low",
+        "type": "passive.switch.ideal",
+        "paradigm": "physical-network",
+        "domain": "electrical",
+        "fidelity": "ideal",
+        "position": [
+          0,
+          100
+        ],
+        "rotation": 0,
+        "mirror": "none",
+        "params": {
+          "g_breakdown": 0.0,
+          "g_off": 1e-9,
+          "g_on": 5.0,
+          "r_on": 0.1,
+          "v_breakdown": -100.0,
+          "v_th": 0.6
+        },
+        "ic": {}
+      },
+      {
+        "id": "legb_high",
+        "type": "passive.switch.ideal",
+        "paradigm": "physical-network",
+        "domain": "electrical",
+        "fidelity": "ideal",
+        "position": [
+          150,
+          0
+        ],
+        "rotation": 0,
+        "mirror": "none",
+        "params": {
+          "g_breakdown": 0.0,
+          "g_off": 1e-9,
+          "g_on": 5.0,
+          "r_on": 0.1,
+          "v_breakdown": -100.0,
+          "v_th": 0.6
+        },
+        "ic": {}
+      },
+      {
+        "id": "legb_low",
+        "type": "passive.switch.ideal",
+        "paradigm": "physical-network",
+        "domain": "electrical",
+        "fidelity": "ideal",
+        "position": [
+          150,
+          100
+        ],
+        "rotation": 0,
+        "mirror": "none",
+        "params": {
+          "g_breakdown": 0.0,
+          "g_off": 1e-9,
+          "g_on": 5.0,
+          "r_on": 0.1,
+          "v_breakdown": -100.0,
+          "v_th": 0.6
+        },
+        "ic": {}
+      },
+      {
+        "id": "legc_high",
+        "type": "passive.switch.ideal",
+        "paradigm": "physical-network",
+        "domain": "electrical",
+        "fidelity": "ideal",
+        "position": [
+          300,
+          0
+        ],
+        "rotation": 0,
+        "mirror": "none",
+        "params": {
+          "g_breakdown": 0.0,
+          "g_off": 1e-9,
+          "g_on": 5.0,
+          "r_on": 0.1,
+          "v_breakdown": -100.0,
+          "v_th": 0.6
+        },
+        "ic": {}
+      },
+      {
+        "id": "legc_low",
+        "type": "passive.switch.ideal",
+        "paradigm": "physical-network",
+        "domain": "electrical",
+        "fidelity": "ideal",
+        "position": [
+          300,
+          100
+        ],
+        "rotation": 0,
+        "mirror": "none",
+        "params": {
+          "g_breakdown": 0.0,
+          "g_off": 1e-9,
+          "g_on": 5.0,
+          "r_on": 0.1,
+          "v_breakdown": -100.0,
+          "v_th": 0.6
+        },
+        "ic": {}
+      }
+    ],
+    "wires": [
+      {
+        "id": "wire1",
+        "from": {
+          "block": "lega_high",
+          "port": "s"
+        },
+        "to": {
+          "block": "lega_low",
+          "port": "d"
+        },
+        "kind": "physical-electrical",
+        "waypoints": [],
+        "pinned": false
+      },
+      {
+        "id": "wire2",
+        "from": {
+          "block": "legb_high",
+          "port": "s"
+        },
+        "to": {
+          "block": "legb_low",
+          "port": "d"
+        },
+        "kind": "physical-electrical",
+        "waypoints": [],
+        "pinned": false
+      },
+      {
+        "id": "wire3",
+        "from": {
+          "block": "legc_high",
+          "port": "s"
+        },
+        "to": {
+          "block": "legc_low",
+          "port": "d"
+        },
+        "kind": "physical-electrical",
+        "waypoints": [],
+        "pinned": false
+      },
+      {
+        "id": "wire4",
+        "from": {
+          "block": "lega_high",
+          "port": "d"
+        },
+        "to": {
+          "block": "legb_high",
+          "port": "d"
+        },
+        "kind": "physical-electrical",
+        "waypoints": [
+          [
+            20,
+            -30
+          ],
+          [
+            170,
+            -30
+          ]
+        ],
+        "pinned": false
+      },
+      {
+        "id": "wire5",
+        "from": {
+          "block": "legb_high",
+          "port": "d"
+        },
+        "to": {
+          "block": "legc_high",
+          "port": "d"
+        },
+        "kind": "physical-electrical",
+        "waypoints": [
+          [
+            170,
+            -30
+          ],
+          [
+            320,
+            -30
+          ]
+        ],
+        "pinned": false
+      },
+      {
+        "id": "wire6",
+        "from": {
+          "block": "lega_low",
+          "port": "s"
+        },
+        "to": {
+          "block": "legb_low",
+          "port": "s"
+        },
+        "kind": "physical-electrical",
+        "waypoints": [
+          [
+            20,
+            190
+          ],
+          [
+            170,
+            190
+          ]
+        ],
+        "pinned": false
+      },
+      {
+        "id": "wire7",
+        "from": {
+          "block": "legb_low",
+          "port": "s"
+        },
+        "to": {
+          "block": "legc_low",
+          "port": "s"
+        },
+        "kind": "physical-electrical",
+        "waypoints": [
+          [
+            170,
+            190
+          ],
+          [
+            320,
+            190
+          ]
+        ],
+        "pinned": false
+      }
+    ],
+    "lines": [],
+    "nets": [],
+    "simulation": {},
+    "metadata": {}
+  }
+}

@@ -25,8 +25,8 @@
     { "name": "g_on", "type": "number", "default": 5.0, "unit": "S" }
   ],
   "ports": [
-    { "id": "d", "side": "top", "kind": "electrical", "direction": "inout", "label": "D" },
-    { "id": "s", "side": "bottom", "kind": "electrical", "direction": "inout", "label": "S" },
+    { "id": "d", "side": "top", "kind": "physical-electrical", "direction": "inout", "label": "D" },
+    { "id": "s", "side": "bottom", "kind": "physical-electrical", "direction": "inout", "label": "S" },
     { "id": "g", "side": "left", "kind": "signal", "direction": "in", "label": "gate" }
   ],
   "geometry": {

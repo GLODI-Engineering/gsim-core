@@ -17,8 +17,8 @@
     { "name": "g_on", "type": "number", "default": 5.0, "unit": "S" }
   ],
   "ports": [
-    { "id": "a", "side": "left", "kind": "electrical", "direction": "inout", "label": "A" },
-    { "id": "k", "side": "right", "kind": "electrical", "direction": "inout", "label": "K" }
+    { "id": "a", "side": "left", "kind": "physical-electrical", "direction": "inout", "label": "A" },
+    { "id": "k", "side": "right", "kind": "physical-electrical", "direction": "inout", "label": "K" }
   ],
   "geometry": {
     "bbox": [40, 20],
