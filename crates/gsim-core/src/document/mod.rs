@@ -6,7 +6,10 @@
 //! already drew (not a new gap introduced here):
 //! - Subsystem/hierarchy block authoring (`SubsystemModel` exists in the schema; no builder
 //!   method creates one yet, same as `gsim_model`).
-//! - `spice-subckt` body parsing (kept as opaque text, same as `gsim_model`'s `SubcktDef.body`).
+//! - Parsing raw `.SUBCKT` *text* into a [`SubcktDef`] (there is no SPICE text reader here).
+//!   Note the def itself is **not** opaque any more — unlike `gsim_model`'s `SubcktDef.body`,
+//!   [`subckt`]'s def has a structured `blocks`/`wires`/`instances` body; see that module's doc
+//!   for why that divergence was necessary.
 //! - `lines` (annotations), `nets` (named nets), `simulation` (analysis directives) — round-
 //!   tripped as opaque JSON, not modeled in detail.
 //! - Autolayout (a separate Phase 1 deliverable, not started).
@@ -20,10 +23,17 @@ mod block;
 mod builder;
 mod model;
 mod paradigm;
+mod subckt;
 mod wire;
 
 pub use block::{Block, BlockError, Mirror, NewBlock};
-pub use builder::{BuilderError, ConnectOptions, ModelBuilder, NewBlockSpec};
+pub use builder::{
+    BuilderError, ConnectOptions, ModelBuilder, NewBlockSpec, NewSubcktInstanceSpec,
+    SUBCKT_INSTANCE_TYPE,
+};
 pub use model::{DocumentLoadError, GsimSchDocument, Model, ModelParam, WrongSchemaVersion};
 pub use paradigm::Paradigm;
+pub use subckt::{
+    check_no_cyclic_defs, SubcktDef, SubcktError, SubcktInstance, SubcktPort, SUBCKT_PORT_KINDS,
+};
 pub use wire::{Endpoint, Wire};

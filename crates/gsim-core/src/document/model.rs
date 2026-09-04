@@ -5,6 +5,7 @@
 //! calls this "out of scope for the connectivity/builder work"), not a gap unique to this crate.
 
 use super::block::Block;
+use super::subckt::SubcktDef;
 use super::wire::Wire;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -39,6 +40,11 @@ pub struct Model {
     pub blocks: Vec<Block>,
     #[serde(default)]
     pub wires: Vec<Wire>,
+    /// Reusable SPICE `.SUBCKT` definitions — see [`super::subckt`]. Defaults to empty, matching
+    /// the forward-compatible field style every other optional field here already uses, so a
+    /// document written before this field existed still loads unchanged.
+    #[serde(default)]
+    pub subckt_defs: Vec<SubcktDef>,
     #[serde(default)]
     pub lines: Vec<Value>,
     #[serde(default)]
@@ -58,6 +64,7 @@ impl Model {
             params: Vec::new(),
             blocks: Vec::new(),
             wires: Vec::new(),
+            subckt_defs: Vec::new(),
             lines: Vec::new(),
             nets: Vec::new(),
             simulation: Map::new(),

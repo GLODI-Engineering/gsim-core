@@ -22,10 +22,22 @@ impl Paradigm {
     /// a `signal` wire and a `physical-electrical` wire cannot connect directly, only through a
     /// `converter.*` block; `routing`/`hierarchy`/`annotation` blocks are paradigm-agnostic
     /// passthroughs by construction (a junction, a subsystem boundary, a text label).
+    ///
+    /// `spice-subckt` is in this set for exactly the same reason `hierarchy` is: a `.SUBCKT`
+    /// boundary is not itself a component of any paradigm, it is a *boundary*. Its real,
+    /// per-port paradigm information lives on the referenced
+    /// [`super::SubcktDef`]'s `ports[].kind` (which a real subckt genuinely mixes — see that
+    /// module's "Divergence 2" note on the reference-design `sw_leg_fixed` def, whose ports are two
+    /// `physical-electrical` plus three `signal`). Treating the instance block itself as having
+    /// one paradigm would make every such mixed-boundary subckt unwireable.
     pub fn bridges_paradigms(self) -> bool {
         matches!(
             self,
-            Paradigm::Converter | Paradigm::Routing | Paradigm::Hierarchy | Paradigm::Annotation
+            Paradigm::Converter
+                | Paradigm::Routing
+                | Paradigm::Hierarchy
+                | Paradigm::Annotation
+                | Paradigm::SpiceSubckt
         )
     }
 }

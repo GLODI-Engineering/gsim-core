@@ -73,6 +73,15 @@ pub struct Block {
     pub ic: Map<String, Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
+    /// `Some(def_id)` exactly when `paradigm == Paradigm::SpiceSubckt`: names which
+    /// [`super::SubcktDef`] this block instantiates. A subckt-instance block's own wireable
+    /// ports are exactly that def's `ports[].id` list.
+    ///
+    /// Populated by [`super::ModelBuilder::instantiate_subckt`], which is also where the
+    /// `def_id`-actually-exists check lives — `Block::new` has no access to the document's def
+    /// list, and `connect()` deliberately does not validate port existence against a catalogue.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subckt_ref: Option<String>,
 }
 
 pub struct NewBlock {
@@ -87,6 +96,7 @@ pub struct NewBlock {
     pub params: Map<String, Value>,
     pub ic: Map<String, Value>,
     pub label: Option<String>,
+    pub subckt_ref: Option<String>,
 }
 
 impl Block {
@@ -115,6 +125,7 @@ impl Block {
             params: spec.params,
             ic: spec.ic,
             label: spec.label,
+            subckt_ref: spec.subckt_ref,
         })
     }
 }
@@ -136,6 +147,7 @@ mod tests {
             params: Map::new(),
             ic: Map::new(),
             label: None,
+            subckt_ref: None,
         }
     }
 

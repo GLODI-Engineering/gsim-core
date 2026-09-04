@@ -26,7 +26,8 @@
 
 use gsim_core::contract::{self, ComponentContract};
 use gsim_core::document::{
-    ConnectOptions, Endpoint, GsimSchDocument, Mirror, Model, ModelBuilder, NewBlockSpec, Paradigm,
+    ConnectOptions, Endpoint, GsimSchDocument, Mirror, Model, ModelBuilder, NewBlockSpec,
+    NewSubcktInstanceSpec, Paradigm, SubcktDef,
 };
 use gsim_core::layout::{self, Axis, LayoutInput, Rect};
 use serde::Deserialize;
@@ -161,6 +162,50 @@ fn add_block_impl(model_json: &str, spec_json: &str) -> Result<String, String> {
 #[wasm_bindgen(js_name = addBlock)]
 pub fn add_block(model_json: &str, spec_json: &str) -> Result<String, JsValue> {
     add_block_impl(model_json, spec_json).map_err(js_err)
+}
+
+fn add_subckt_def_impl(model_json: &str, def_json: &str) -> Result<String, String> {
+    let model: Model = parse_json(model_json, "model")?;
+    let def: SubcktDef = parse_json(def_json, "subckt def")?;
+    let mut builder = ModelBuilder::from_model(model);
+    let def_id = builder.add_subckt_def(def).map_err(|e| e.to_string())?;
+    respond_json(&serde_json::json!({"model": builder.into_model(), "def_id": def_id}))
+}
+
+/// Adds a reusable SPICE `.SUBCKT` definition to `model_json`.
+///
+/// **Shared JSON contract** (identical to `gsim-py`'s `add_subckt_def`): `def_json` is a
+/// `SubcktDef` — `{"id", "name", "ports": [{"id", "kind"}], "params"?, "blocks"?, "wires"?,
+/// "instances"?: [{"id", "def_ref", "connections"?, "params"?}]}`. Returns
+/// `{"model": <updated Model JSON>, "def_id": "<id>"}`, mirroring `addBlock`'s
+/// `{"model", "block_id"}` shape. Throws with the real error message on an invalid id/port
+/// kind, a duplicate def id, or a cyclic `def_ref` graph (the thrown message names the actual
+/// cycle, e.g. `"Cyclic SubcktDef reference: a -> b -> a"`).
+#[wasm_bindgen(js_name = addSubcktDef)]
+pub fn add_subckt_def(model_json: &str, def_json: &str) -> Result<String, JsValue> {
+    add_subckt_def_impl(model_json, def_json).map_err(js_err)
+}
+
+fn instantiate_subckt_impl(model_json: &str, spec_json: &str) -> Result<String, String> {
+    let model: Model = parse_json(model_json, "model")?;
+    let spec: NewSubcktInstanceSpec = parse_json(spec_json, "subckt instance spec")?;
+    let mut builder = ModelBuilder::from_model(model);
+    let block_id = builder
+        .instantiate_subckt(spec)
+        .map_err(|e| e.to_string())?;
+    respond_json(&serde_json::json!({"model": builder.into_model(), "block_id": block_id}))
+}
+
+/// Instantiates an existing `SubcktDef` as a top-level `spice-subckt` block.
+///
+/// **Shared JSON contract** (identical to `gsim-py`'s `instantiate_subckt`): `spec_json` is
+/// `{"def_ref", "position": [x, y], "rotation"?, "domain"?, "fidelity"?, "mirror"?, "params"?,
+/// "label"?, "id"?}`. Returns `{"model": <updated Model JSON>, "block_id": "<assigned id>"}`,
+/// the same shape `addBlock` returns. The created block's wireable ports are exactly the
+/// referenced def's `ports[].id` list — wire them with ordinary `connect` calls.
+#[wasm_bindgen(js_name = instantiateSubckt)]
+pub fn instantiate_subckt(model_json: &str, spec_json: &str) -> Result<String, JsValue> {
+    instantiate_subckt_impl(model_json, spec_json).map_err(js_err)
 }
 
 fn remove_block_impl(model_json: &str, block_id: &str) -> Result<String, String> {
@@ -850,5 +895,112 @@ mod tests {
         // Empty bbox map -- src1 is missing, must default to (0,0) rather than error.
         let result = auto_arrange_impl(&model_json, "{}", 20, 10);
         assert!(result.is_ok());
+    }
+
+    // -- subckt ------------------------------------------------------------
+
+    const LEAF_DEF: &str = r#"{"id":"leaf","name":"LEAF","ports":[
+        {"id":"a","kind":"physical-electrical"},
+        {"id":"b","kind":"physical-electrical"}]}"#;
+
+    #[test]
+    fn add_subckt_def_then_instantiate_twice_and_wire_both() {
+        let model = new_model("m1", "M", 10);
+        let added: Value = serde_json::from_str(&add_subckt_def_impl(&model, LEAF_DEF).unwrap())
+            .expect("valid JSON");
+        assert_eq!(added["def_id"], "leaf");
+        let mut model = added["model"].to_string();
+
+        for id in ["x1", "x2"] {
+            let spec = format!(r#"{{"def_ref":"leaf","position":[0,0],"id":"{id}"}}"#);
+            let r: Value =
+                serde_json::from_str(&instantiate_subckt_impl(&model, &spec).unwrap()).unwrap();
+            assert_eq!(r["block_id"], id);
+            model = r["model"].to_string();
+        }
+
+        let r: Value = serde_json::from_str(
+            &connect_impl(
+                &model,
+                r#"{"block":"x1","port":"b"}"#,
+                r#"{"block":"x2","port":"a"}"#,
+                "physical-electrical",
+                "{}",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        let model = r["model"].to_string();
+
+        let doc = save_document_impl(&model).unwrap();
+        let reloaded: Value = serde_json::from_str(&load_document_impl(&doc).unwrap()).unwrap();
+        assert_eq!(reloaded["schema_version"], 2);
+        assert_eq!(
+            reloaded["model"]["subckt_defs"].as_array().unwrap().len(),
+            1
+        );
+        assert_eq!(reloaded["model"]["blocks"].as_array().unwrap().len(), 2);
+        assert_eq!(reloaded["model"]["blocks"][0]["subckt_ref"], "leaf");
+        assert_eq!(reloaded["model"]["blocks"][0]["paradigm"], "spice-subckt");
+        assert_eq!(
+            reloaded["model"]["blocks"][0]["type"],
+            "spice-subckt.instance"
+        );
+    }
+
+    #[test]
+    fn add_subckt_def_rejects_a_duplicate_id() {
+        let model = new_model("m1", "M", 10);
+        let added: Value =
+            serde_json::from_str(&add_subckt_def_impl(&model, LEAF_DEF).unwrap()).unwrap();
+        let model = added["model"].to_string();
+        let err = add_subckt_def_impl(&model, LEAF_DEF).unwrap_err();
+        assert!(err.contains("duplicate id 'leaf'"), "got: {err}");
+    }
+
+    #[test]
+    fn add_subckt_def_cycle_error_names_the_actual_cycle() {
+        let model = new_model("m1", "M", 10);
+        let a = r#"{"id":"a","name":"A","instances":[{"id":"X1","def_ref":"b"}]}"#;
+        let added: Value = serde_json::from_str(&add_subckt_def_impl(&model, a).unwrap()).unwrap();
+        let model = added["model"].to_string();
+        let b = r#"{"id":"b","name":"B","instances":[{"id":"X1","def_ref":"a"}]}"#;
+        let err = add_subckt_def_impl(&model, b).unwrap_err();
+        assert!(err.starts_with("Cyclic SubcktDef reference:"), "got: {err}");
+        assert!(
+            err.contains("a -> b -> a") || err.contains("b -> a -> b"),
+            "the message must name the actual cycle, got: {err}"
+        );
+    }
+
+    #[test]
+    fn add_subckt_def_self_reference_rejected() {
+        let model = new_model("m1", "M", 10);
+        let d = r#"{"id":"loopy","name":"L","instances":[{"id":"X1","def_ref":"loopy"}]}"#;
+        let err = add_subckt_def_impl(&model, d).unwrap_err();
+        assert!(err.contains("loopy -> loopy"), "got: {err}");
+    }
+
+    #[test]
+    fn add_subckt_def_rejects_a_bad_port_kind() {
+        let model = new_model("m1", "M", 10);
+        let d = r#"{"id":"d1","name":"D","ports":[{"id":"bus","kind":"physical-signal"}]}"#;
+        let err = add_subckt_def_impl(&model, d).unwrap_err();
+        assert!(err.contains("physical-signal"), "got: {err}");
+    }
+
+    #[test]
+    fn instantiate_subckt_rejects_an_unknown_def_ref() {
+        let model = new_model("m1", "M", 10);
+        let err =
+            instantiate_subckt_impl(&model, r#"{"def_ref":"ghost","position":[0,0]}"#).unwrap_err();
+        assert!(err.contains("no SubcktDef with id 'ghost'"), "got: {err}");
+    }
+
+    #[test]
+    fn subckt_functions_reject_bad_json_without_panicking() {
+        let model = new_model("m1", "M", 10);
+        assert!(add_subckt_def_impl(&model, "{not json").is_err());
+        assert!(instantiate_subckt_impl(&model, "{not json").is_err());
     }
 }

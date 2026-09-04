@@ -9,22 +9,44 @@
 use super::block::{Block, BlockError, Mirror, NewBlock};
 use super::model::Model;
 use super::paradigm::Paradigm;
+use super::subckt::{check_no_cyclic_defs, SubcktDef, SubcktError};
 use super::wire::{Endpoint, Wire};
 use serde::Deserialize;
 use serde_json::{Map, Value};
 
+/// Every `spice-subckt` instance block gets this `type`, matching the reference
+/// implementation's own `gsim_model.builder.instantiate_subckt`.
+pub const SUBCKT_INSTANCE_TYPE: &str = "spice-subckt.instance";
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum BuilderError {
     DuplicateId(String),
-    DanglingWire { block: String },
-    CrossParadigm { from: Paradigm, to: Paradigm },
+    DanglingWire {
+        block: String,
+    },
+    CrossParadigm {
+        from: Paradigm,
+        to: Paradigm,
+    },
     UnknownBlock(String),
     Block(BlockError),
+    /// `instantiate_subckt` (or a `SubcktInstance`) named a `def_ref` with no matching
+    /// [`SubcktDef`] in the model — the reference implementation's `UnknownSubcktDefError`.
+    UnknownSubcktDef(String),
+    /// An invalid def id / port kind, or a cyclic `def_ref` graph — see [`SubcktError`], whose
+    /// `Display` names the actual cycle (`"a -> b -> a"`).
+    Subckt(SubcktError),
 }
 
 impl From<BlockError> for BuilderError {
     fn from(e: BlockError) -> Self {
         BuilderError::Block(e)
+    }
+}
+
+impl From<SubcktError> for BuilderError {
+    fn from(e: SubcktError) -> Self {
+        BuilderError::Subckt(e)
     }
 }
 
@@ -41,6 +63,8 @@ impl std::fmt::Display for BuilderError {
             ),
             BuilderError::UnknownBlock(id) => write!(f, "no block with id '{id}'"),
             BuilderError::Block(e) => write!(f, "{e}"),
+            BuilderError::UnknownSubcktDef(id) => write!(f, "no SubcktDef with id '{id}'"),
+            BuilderError::Subckt(e) => write!(f, "{e}"),
         }
     }
 }
@@ -89,6 +113,66 @@ impl Default for NewBlockSpec {
             label: None,
             id: None,
         }
+    }
+}
+
+/// A subckt instance's `domain` when the caller doesn't name one: the def's own port kinds
+/// decide it. A def whose ports are all one physical domain gets that domain's short name; a
+/// def mixing domains (or mixing `signal` with a physical kind, as every real gate-driven
+/// switch subckt does) gets `"mixed"`, since no single domain is truthful for it.
+fn default_subckt_domain(def: &SubcktDef) -> String {
+    let mut kinds: Vec<&str> = def.ports.iter().map(|p| p.kind.as_str()).collect();
+    kinds.sort_unstable();
+    kinds.dedup();
+    match kinds.as_slice() {
+        [one] => one.strip_prefix("physical-").unwrap_or(one).to_string(),
+        _ => "mixed".to_string(),
+    }
+}
+
+/// The `instantiate_subckt` input, mirroring [`NewBlockSpec`]'s shape/ergonomics exactly, minus
+/// the fields a subckt instance doesn't get to choose (`type` and `paradigm` are fixed to
+/// [`SUBCKT_INSTANCE_TYPE`]/[`Paradigm::SpiceSubckt`]; `ic` is meaningless on a boundary block —
+/// initial conditions belong to the real components inside the def's body).
+#[derive(Deserialize)]
+pub struct NewSubcktInstanceSpec {
+    pub def_ref: String,
+    pub position: (i64, i64),
+    #[serde(default)]
+    pub rotation: i64,
+    /// Defaults from the referenced def's own port kinds — see [`default_subckt_domain`].
+    #[serde(default)]
+    pub domain: Option<String>,
+    #[serde(default)]
+    pub fidelity: Option<String>,
+    #[serde(default)]
+    pub mirror: Mirror,
+    #[serde(default)]
+    pub params: Map<String, Value>,
+    #[serde(default)]
+    pub label: Option<String>,
+    #[serde(default)]
+    pub id: Option<String>,
+}
+
+impl NewSubcktInstanceSpec {
+    pub fn new(def_ref: impl Into<String>, position: (i64, i64)) -> NewSubcktInstanceSpec {
+        NewSubcktInstanceSpec {
+            def_ref: def_ref.into(),
+            position,
+            rotation: 0,
+            domain: None,
+            fidelity: None,
+            mirror: Mirror::None,
+            params: Map::new(),
+            label: None,
+            id: None,
+        }
+    }
+
+    pub fn with_id(mut self, id: impl Into<String>) -> Self {
+        self.id = Some(id.into());
+        self
     }
 }
 
@@ -193,6 +277,88 @@ impl ModelBuilder {
             params: spec.params,
             ic: spec.ic,
             label: spec.label,
+            // `add_block` never creates a subckt instance -- `instantiate_subckt` is the only
+            // path that sets this, so the "Some(def_id) exactly when paradigm == SpiceSubckt"
+            // invariant has exactly one place to be established.
+            subckt_ref: None,
+        })?;
+        self.model.blocks.push(block);
+        Ok(id)
+    }
+
+    // -- subckt defs / instances --------------------------------------------
+
+    pub fn get_subckt_def(&self, id: &str) -> Option<&SubcktDef> {
+        self.model.subckt_defs.iter().find(|d| d.id == id)
+    }
+
+    /// Appends a reusable [`SubcktDef`], re-validating the *whole* def list's `def_ref` graph
+    /// afterwards.
+    ///
+    /// **Fail before mutating state**, matching the Python reference's own stated philosophy and
+    /// this crate's [`BuilderError::CrossParadigm`] precedent: the id pattern, port kinds and
+    /// id-uniqueness are checked before the push, and if the cycle check (which can only run
+    /// against the *complete* updated list) then fails, the push is rolled back — the model is
+    /// never left in a construction-failed-but-mutated state.
+    pub fn add_subckt_def(&mut self, def: SubcktDef) -> Result<String, BuilderError> {
+        // Re-validate rather than trusting the caller: a `SubcktDef` can also be built by
+        // struct literal or `serde` deserialization, both of which bypass `SubcktDef::new`.
+        let checked = SubcktDef::new(&def.id, &def.name)?;
+        for port in &def.ports {
+            super::subckt::SubcktPort::new(&port.id, &port.kind)?;
+        }
+        let id = checked.id;
+        if self.get_subckt_def(&id).is_some() {
+            return Err(BuilderError::DuplicateId(id));
+        }
+        self.model.subckt_defs.push(def);
+        if let Err(e) = check_no_cyclic_defs(&self.model.subckt_defs) {
+            self.model.subckt_defs.pop();
+            return Err(BuilderError::Subckt(e));
+        }
+        Ok(id)
+    }
+
+    /// Creates a top-level `spice-subckt` [`Block`] instantiating an existing [`SubcktDef`].
+    ///
+    /// The resulting block's wireable ports are exactly the referenced def's `ports[].id` list;
+    /// ordinary [`ModelBuilder::connect`] calls wire them, unchanged. (`connect()` still does
+    /// not look ports up against any catalogue — that property is deliberately preserved; the
+    /// def-existence check lives here instead, where the def list is actually in hand.)
+    pub fn instantiate_subckt(
+        &mut self,
+        spec: NewSubcktInstanceSpec,
+    ) -> Result<String, BuilderError> {
+        let def = self
+            .get_subckt_def(&spec.def_ref)
+            .ok_or_else(|| BuilderError::UnknownSubcktDef(spec.def_ref.clone()))?;
+        let domain = spec
+            .domain
+            .clone()
+            .unwrap_or_else(|| default_subckt_domain(def));
+
+        let id = match spec.id {
+            Some(id) => {
+                if self.has_block_id(&id) {
+                    return Err(BuilderError::DuplicateId(id));
+                }
+                id
+            }
+            None => self.auto_block_id(),
+        };
+        let block = Block::new(NewBlock {
+            id: id.clone(),
+            r#type: SUBCKT_INSTANCE_TYPE.to_string(),
+            paradigm: Paradigm::SpiceSubckt,
+            domain,
+            fidelity: spec.fidelity,
+            position: spec.position,
+            rotation: spec.rotation,
+            mirror: spec.mirror,
+            params: spec.params,
+            ic: Map::new(),
+            label: spec.label,
+            subckt_ref: Some(spec.def_ref),
         })?;
         self.model.blocks.push(block);
         Ok(id)
@@ -340,6 +506,7 @@ impl ModelBuilder {
 
 #[cfg(test)]
 mod tests {
+    use super::super::subckt::{SubcktInstance, SubcktPort};
     use super::*;
 
     fn block(builder: &mut ModelBuilder, id: &str, paradigm: Paradigm, r#type: &str) {
@@ -509,5 +676,190 @@ mod tests {
         let scope_x = b.get_block("scope1").unwrap().position.0;
         assert!(src_x < gain_x);
         assert!(gain_x < scope_x);
+    }
+
+    // -- subckt ------------------------------------------------------------
+
+    fn two_pin_def(id: &str) -> SubcktDef {
+        SubcktDef::new(id, id.to_uppercase()).unwrap().with_ports([
+            SubcktPort::new("a", "physical-electrical").unwrap(),
+            SubcktPort::new("b", "physical-electrical").unwrap(),
+        ])
+    }
+
+    #[test]
+    fn add_subckt_def_rejects_a_duplicate_id() {
+        let mut b = ModelBuilder::new("m", "M", 10);
+        assert_eq!(b.add_subckt_def(two_pin_def("leaf")).unwrap(), "leaf");
+        let err = b.add_subckt_def(two_pin_def("leaf")).unwrap_err();
+        assert_eq!(err, BuilderError::DuplicateId("leaf".to_string()));
+        assert_eq!(b.model().subckt_defs.len(), 1);
+    }
+
+    #[test]
+    fn add_subckt_def_rejects_an_invalid_id_or_port_kind() {
+        let mut b = ModelBuilder::new("m", "M", 10);
+        let mut bad_id = two_pin_def("ok");
+        bad_id.id = "1bad".to_string();
+        assert!(matches!(
+            b.add_subckt_def(bad_id),
+            Err(BuilderError::Subckt(SubcktError::InvalidDefId(_)))
+        ));
+        // A def built by struct literal / deserialization bypasses SubcktPort::new, so the
+        // builder must re-check rather than trust it.
+        let mut bad_kind = two_pin_def("ok");
+        bad_kind.ports[0].kind = "physical-signal".to_string();
+        assert!(matches!(
+            b.add_subckt_def(bad_kind),
+            Err(BuilderError::Subckt(SubcktError::InvalidPortKind { .. }))
+        ));
+        assert!(b.model().subckt_defs.is_empty());
+    }
+
+    #[test]
+    fn add_subckt_def_rejects_a_cycle_and_rolls_back_the_push() {
+        let mut b = ModelBuilder::new("m", "M", 10);
+        b.add_subckt_def(two_pin_def("a").with_instances([SubcktInstance::new("X1", "b_def")]))
+            .unwrap();
+        let err = b
+            .add_subckt_def(
+                SubcktDef::new("b_def", "B")
+                    .unwrap()
+                    .with_instances([SubcktInstance::new("X1", "a")]),
+            )
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("Cyclic SubcktDef reference:")
+                && err.to_string().contains("->"),
+            "error should name the cycle: {err}"
+        );
+        // Fail-before-mutating: the rejected def must not be left in the model.
+        assert_eq!(b.model().subckt_defs.len(), 1);
+        assert_eq!(b.model().subckt_defs[0].id, "a");
+    }
+
+    #[test]
+    fn add_subckt_def_rejects_a_self_reference() {
+        let mut b = ModelBuilder::new("m", "M", 10);
+        let err = b
+            .add_subckt_def(
+                two_pin_def("loopy").with_instances([SubcktInstance::new("X1", "loopy")]),
+            )
+            .unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "Cyclic SubcktDef reference: loopy -> loopy"
+        );
+        assert!(b.model().subckt_defs.is_empty());
+    }
+
+    #[test]
+    fn instantiate_subckt_rejects_an_unknown_def_ref() {
+        let mut b = ModelBuilder::new("m", "M", 10);
+        let err = b
+            .instantiate_subckt(NewSubcktInstanceSpec::new("ghost", (0, 0)))
+            .unwrap_err();
+        assert_eq!(err, BuilderError::UnknownSubcktDef("ghost".to_string()));
+        assert!(b.model().blocks.is_empty());
+    }
+
+    #[test]
+    fn instantiate_subckt_sets_paradigm_type_and_ref() {
+        let mut b = ModelBuilder::new("m", "M", 10);
+        b.add_subckt_def(two_pin_def("leaf")).unwrap();
+        let id = b
+            .instantiate_subckt(NewSubcktInstanceSpec::new("leaf", (10, 20)).with_id("x1"))
+            .unwrap();
+        let block = b.get_block(&id).unwrap();
+        assert_eq!(block.r#type, SUBCKT_INSTANCE_TYPE);
+        assert_eq!(block.paradigm, Paradigm::SpiceSubckt);
+        assert_eq!(block.subckt_ref.as_deref(), Some("leaf"));
+        // All ports physical-electrical -> domain collapses to "electrical".
+        assert_eq!(block.domain, "electrical");
+        assert_eq!(block.position, (10, 20));
+    }
+
+    #[test]
+    fn a_mixed_port_kind_def_instantiates_with_domain_mixed() {
+        let mut b = ModelBuilder::new("m", "M", 10);
+        b.add_subckt_def(
+            SubcktDef::new("sw_leg", "sw_leg_fixed")
+                .unwrap()
+                .with_ports([
+                    SubcktPort::new("d", "physical-electrical").unwrap(),
+                    SubcktPort::new("ctrl_duty", "signal").unwrap(),
+                ]),
+        )
+        .unwrap();
+        let id = b
+            .instantiate_subckt(NewSubcktInstanceSpec::new("sw_leg", (0, 0)))
+            .unwrap();
+        assert_eq!(b.get_block(&id).unwrap().domain, "mixed");
+    }
+
+    #[test]
+    fn instantiate_twice_wire_both_and_round_trip_through_json() {
+        let mut b = ModelBuilder::new("m", "Two Instances", 10);
+        b.add_subckt_def(two_pin_def("leaf")).unwrap();
+        b.instantiate_subckt(NewSubcktInstanceSpec::new("leaf", (0, 0)).with_id("x1"))
+            .unwrap();
+        b.instantiate_subckt(NewSubcktInstanceSpec::new("leaf", (100, 0)).with_id("x2"))
+            .unwrap();
+        block(&mut b, "r1", Paradigm::PhysicalNetwork, "passive.resistor");
+
+        // The instances' wireable ports are exactly the def's own port ids, wired by ordinary
+        // connect() calls -- no catalogue lookup involved.
+        b.connect(
+            Endpoint::new("x1", "b"),
+            Endpoint::new("x2", "a"),
+            "physical-electrical",
+            ConnectOptions::default(),
+        )
+        .unwrap();
+        b.connect(
+            Endpoint::new("x2", "b"),
+            Endpoint::new("r1", "p1"),
+            "physical-electrical",
+            ConnectOptions::default(),
+        )
+        .unwrap();
+
+        let doc = super::super::GsimSchDocument::new(b.into_model());
+        let text = doc.to_json_pretty().unwrap();
+        let back = super::super::GsimSchDocument::from_json(&text).unwrap();
+        assert_eq!(back.model.subckt_defs.len(), 1);
+        assert_eq!(back.model.blocks.len(), 3);
+        assert_eq!(back.model.wires.len(), 2);
+        let x1 = back.model.blocks.iter().find(|b| b.id == "x1").unwrap();
+        assert_eq!(x1.subckt_ref.as_deref(), Some("leaf"));
+        assert_eq!(x1.paradigm, Paradigm::SpiceSubckt);
+    }
+
+    #[test]
+    fn a_subckt_instance_connects_to_a_signal_flow_block_too() {
+        // A subckt boundary bridges paradigms (see Paradigm::bridges_paradigms) -- the real
+        // sw_leg_fixed def takes signal-kind ctrl_* nets from top-level `kind=const` blocks
+        // while its d/s ports are electrical, so this must be legal.
+        let mut b = ModelBuilder::new("m", "M", 10);
+        b.add_subckt_def(two_pin_def("leaf")).unwrap();
+        b.instantiate_subckt(NewSubcktInstanceSpec::new("leaf", (0, 0)).with_id("x1"))
+            .unwrap();
+        block(&mut b, "c1", Paradigm::SignalFlow, "source.const");
+        assert!(b
+            .connect(
+                Endpoint::new("c1", "out"),
+                Endpoint::new("x1", "a"),
+                "signal",
+                ConnectOptions::default(),
+            )
+            .is_ok());
+    }
+
+    #[test]
+    fn a_model_without_subckt_defs_still_loads() {
+        // Forward-compatibility: documents written before this field existed must round-trip.
+        let text = r#"{"schema_version":2,"model":{"id":"m","name":"M","blocks":[],"wires":[]}}"#;
+        let doc = super::super::GsimSchDocument::from_json(text).unwrap();
+        assert!(doc.model.subckt_defs.is_empty());
     }
 }
