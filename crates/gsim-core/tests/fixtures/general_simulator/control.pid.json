@@ -12,6 +12,14 @@
       "default": 100.0,
       "validate": "${{ value > 0 }}",
       "error": "n (derivative filter coefficient) must be positive"
+    },
+    { "name": "clamp_lo", "type": "number", "default": -1e30 },
+    {
+      "name": "clamp_hi",
+      "type": "number",
+      "default": 1e30,
+      "validate": "${{ value >= params.clamp_lo }}",
+      "error": "clamp_hi must be at least clamp_lo"
     }
   ],
   "ports": [
