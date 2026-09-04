@@ -96,10 +96,10 @@ pub struct NewBlockSpec {
     pub label: Option<String>,
     /// Comment lines emitted above this block's card(s) by a [`crate::compile::NetlistTarget`] —
     /// see [`Block::comment_before`]. One entry per line; a single multi-line string works too.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "super::block::deserialize_comment")]
     pub comment_before: Vec<String>,
     /// Comment lines emitted below this block's card(s) — see [`Block::comment_after`].
-    #[serde(default)]
+    #[serde(default, deserialize_with = "super::block::deserialize_comment")]
     pub comment_after: Vec<String>,
     #[serde(default)]
     pub id: Option<String>,
@@ -161,10 +161,10 @@ pub struct NewSubcktInstanceSpec {
     #[serde(default)]
     pub label: Option<String>,
     /// Comment lines emitted above this instance's `X` card — see [`Block::comment_before`].
-    #[serde(default)]
+    #[serde(default, deserialize_with = "super::block::deserialize_comment")]
     pub comment_before: Vec<String>,
     /// Comment lines emitted below this instance's `X` card — see [`Block::comment_after`].
-    #[serde(default)]
+    #[serde(default, deserialize_with = "super::block::deserialize_comment")]
     pub comment_after: Vec<String>,
     #[serde(default)]
     pub id: Option<String>,

@@ -26,7 +26,7 @@ mod paradigm;
 mod subckt;
 mod wire;
 
-pub use block::{Block, BlockError, Mirror, NewBlock};
+pub use block::{deserialize_comment, Block, BlockError, Mirror, NewBlock};
 pub use builder::{
     BuilderError, ConnectOptions, ModelBuilder, NewBlockSpec, NewSubcktInstanceSpec,
     SUBCKT_INSTANCE_TYPE,

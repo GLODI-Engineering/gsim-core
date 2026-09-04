@@ -27,8 +27,8 @@
 use gsim_core::compile;
 use gsim_core::contract::{self, ComponentContract};
 use gsim_core::document::{
-    ConnectOptions, Endpoint, GsimSchDocument, Mirror, Model, ModelBuilder, NewBlockSpec,
-    NewSubcktInstanceSpec, Paradigm, SubcktDef,
+    deserialize_comment, ConnectOptions, Endpoint, GsimSchDocument, Mirror, Model, ModelBuilder,
+    NewBlockSpec, NewSubcktInstanceSpec, Paradigm, SubcktDef,
 };
 use gsim_core::layout::{self, Axis, LayoutInput, Rect};
 use serde::Deserialize;
@@ -127,9 +127,9 @@ struct NewBlockSpecJson {
     ic: Map<String, Value>,
     #[serde(default)]
     label: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_comment")]
     comment_before: Vec<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_comment")]
     comment_after: Vec<String>,
     #[serde(default)]
     id: Option<String>,

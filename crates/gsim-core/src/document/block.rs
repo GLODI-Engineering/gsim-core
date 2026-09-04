@@ -33,6 +33,30 @@ fn type_pattern() -> &'static Regex {
     RE.get_or_init(|| Regex::new(r"^[a-z][a-z0-9_-]*(\.[a-z][a-z0-9_-]*)+$").unwrap())
 }
 
+/// Deserializes a comment slot ([`Block::comment_before`]/[`Block::comment_after`]) from either
+/// a JSON array of lines or a single JSON string.
+///
+/// Authoring a comment as one string — `"loop gain\nretuned after the step test"` — is the
+/// natural spelling in every binding, so the JSON contract accepts it rather than forcing callers
+/// to pre-split. It is stored (and re-serialized) as the array form; a stored entry that still
+/// contains newlines is split at emit time, so both spellings produce the same netlist.
+pub fn deserialize_comment<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum OneOrMany {
+        One(String),
+        Many(Vec<String>),
+    }
+    Ok(match Option::<OneOrMany>::deserialize(deserializer)? {
+        None => Vec::new(),
+        Some(OneOrMany::One(line)) => vec![line],
+        Some(OneOrMany::Many(lines)) => lines,
+    })
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum BlockError {
     InvalidId(String),
@@ -79,11 +103,19 @@ pub struct Block {
     /// single multi-line string is also accepted); empty vec — the default — means no comment.
     /// Purely an annotation: it never affects nets, params or validation, and it round-trips
     /// through `.gsim_sch` JSON like any other optional field.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(
+        default,
+        deserialize_with = "deserialize_comment",
+        skip_serializing_if = "Vec::is_empty"
+    )]
     pub comment_before: Vec<String>,
     /// Free-text authoring comment emitted *below* this block's card(s) — see
     /// [`Block::comment_before`]. An independent slot: a block may carry either, both or neither.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(
+        default,
+        deserialize_with = "deserialize_comment",
+        skip_serializing_if = "Vec::is_empty"
+    )]
     pub comment_after: Vec<String>,
     /// `Some(def_id)` exactly when `paradigm == Paradigm::SpiceSubckt`: names which
     /// [`super::SubcktDef`] this block instantiates. A subckt-instance block's own wireable
@@ -189,6 +221,28 @@ mod tests {
             Block::new(s),
             Err(BlockError::InvalidRotation(45))
         ));
+    }
+
+    #[test]
+    fn a_comment_slot_accepts_either_a_string_or_a_list_and_defaults_to_empty() {
+        let base = r#"{"id":"R1","type":"passive.resistor","paradigm":"physical-network",
+                       "domain":"electrical","position":[0,0]"#;
+        let plain: Block = serde_json::from_str(&format!("{base}}}")).unwrap();
+        assert!(plain.comment_before.is_empty() && plain.comment_after.is_empty());
+
+        let one: Block =
+            serde_json::from_str(&format!(r#"{base},"comment_before":"a\nb"}}"#)).unwrap();
+        assert_eq!(one.comment_before, vec!["a\nb".to_string()]);
+
+        let many: Block =
+            serde_json::from_str(&format!(r#"{base},"comment_after":["a","b"]}}"#)).unwrap();
+        assert_eq!(many.comment_after, vec!["a".to_string(), "b".to_string()]);
+
+        // Empty slots stay out of the serialized document entirely.
+        let json = serde_json::to_string(&plain).unwrap();
+        assert!(!json.contains("comment_"), "{json}");
+        let json = serde_json::to_string(&many).unwrap();
+        assert!(json.contains(r#""comment_after":["a","b"]"#), "{json}");
     }
 
     #[test]
