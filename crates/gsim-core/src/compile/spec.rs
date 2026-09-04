@@ -13,7 +13,7 @@
 //!    another block's name**, never a net.
 //!
 //! A [`TypeSpec`] can declare either, or **both**: an ideal switch really is emitted as a pair
-//! in the real reference circuit netlist —
+//! by a real switching-converter netlist —
 //! `DEV d s idealswitchmodel` (the element card, supplying the nodes) plus
 //! `DEV kind=ideal_switch r_on=... gate=block ctrl=GATE` (the fields card).
 //!
@@ -382,7 +382,18 @@ const DQ_ZERO_OUT: &[&str] = &["d", "q", "zero_out"];
 
 /// Every type the compiler knows how to emit.
 ///
-/// Seeded with exactly the set the real multi-leg power-electronics reference circuit needs (that circuit
+/// # `in=` versus `inputs=`
+///
+/// These are **not** interchangeable in `general-mna`. Its `build_kind` reads one or the other
+/// per family, from `fields` directly: `gain`/`vco`/`saturation`/`hysteresis`/`pwm`/`tf`/
+/// `discretetf`/`sig2phys` take a single `in=<signal>`; `pspwm`/`pmsm`/the six coordinate
+/// transforms/`product` take a comma-joined `inputs=`; `statespace`/`discretestatespace`/the
+/// script-hosted families accept `inputs=` with `in=` as the one-input special case. Getting
+/// this wrong produces `device '<name>' missing field 'in'` at load time, not a silent
+/// mis-simulation -- but it is still a netlist that never runs, so each entry below names its
+/// source arm.
+///
+/// Seeded with exactly the set a switching-converter acceptance circuit needs (that circuit
 /// compiling and running is the acceptance bar), then extended across the existing
 /// `tests/fixtures/general_simulator/*.json` families whose netlist shape is unambiguous from
 /// `general-mna`'s own dispatch. Families needing shapes not yet exercised by a real circuit
@@ -637,9 +648,11 @@ pub const REGISTRY: &[TypeSpec] = &[
                     param: "fed",
                     required: false,
                 },
-                FieldSpec::Refs {
-                    field: "inputs",
-                    ports: &["duty"],
+                // `kind=pwm` reads a *single* `in=` duty signal (only `pspwm` takes a
+                // three-entry `inputs=` list), and the GSF v2 fixture's input pin is `in`.
+                FieldSpec::Ref {
+                    field: "in",
+                    port: "in",
                 },
                 FieldSpec::Outputs { field: "outputs" },
             ],
@@ -652,14 +665,10 @@ pub const REGISTRY: &[TypeSpec] = &[
         kind: Some(KindSpec {
             kind: KindName::Fixed("gain"),
             fields: &[
-                FieldSpec::Param {
-                    field: "k",
-                    param: "k",
-                    required: true,
-                },
-                FieldSpec::Refs {
-                    field: "inputs",
-                    ports: &["in"],
+                req("k", "k"),
+                FieldSpec::Ref {
+                    field: "in",
+                    port: "in",
                 },
             ],
         }),
@@ -670,19 +679,13 @@ pub const REGISTRY: &[TypeSpec] = &[
         kind: Some(KindSpec {
             kind: KindName::Fixed("saturation"),
             fields: &[
-                FieldSpec::Param {
-                    field: "lower",
-                    param: "lower",
-                    required: true,
-                },
-                FieldSpec::Param {
-                    field: "upper",
-                    param: "upper",
-                    required: true,
-                },
-                FieldSpec::Refs {
-                    field: "inputs",
-                    ports: &["in"],
+                // A single *symmetric* bound (`|y| <= limit`), not a lower/upper pair --
+                // `BlockKind::Saturation`'s netlist form is
+                // `NAME kind=saturation in=<signal> limit=<f64>`.
+                req("limit", "limit"),
+                FieldSpec::Ref {
+                    field: "in",
+                    port: "in",
                 },
             ],
         }),
@@ -693,19 +696,11 @@ pub const REGISTRY: &[TypeSpec] = &[
         kind: Some(KindSpec {
             kind: KindName::Fixed("vco"),
             fields: &[
-                FieldSpec::Param {
-                    field: "f_min",
-                    param: "f_min",
-                    required: true,
-                },
-                FieldSpec::Param {
-                    field: "f_max",
-                    param: "f_max",
-                    required: true,
-                },
-                FieldSpec::Refs {
-                    field: "inputs",
-                    ports: &["in"],
+                req("f_min", "f_min"),
+                req("f_max", "f_max"),
+                FieldSpec::Ref {
+                    field: "in",
+                    port: "in",
                 },
             ],
         }),
@@ -716,19 +711,11 @@ pub const REGISTRY: &[TypeSpec] = &[
         kind: Some(KindSpec {
             kind: KindName::Fixed("hysteresis"),
             fields: &[
-                FieldSpec::Param {
-                    field: "low",
-                    param: "low",
-                    required: true,
-                },
-                FieldSpec::Param {
-                    field: "high",
-                    param: "high",
-                    required: true,
-                },
-                FieldSpec::Refs {
-                    field: "inputs",
-                    ports: &["in"],
+                req("low", "low"),
+                req("high", "high"),
+                FieldSpec::Ref {
+                    field: "in",
+                    port: "in",
                 },
             ],
         }),
@@ -965,7 +952,7 @@ mod tests {
         assert_eq!(element_name("Rsnub", 'R'), "Rsnub");
         assert_eq!(element_name("rsnub", 'R'), "rsnub");
         assert_eq!(element_name("snub", 'R'), "Rsnub");
-        // The real reference circuit's switch instances are named DEV/DEVA/DEVB -- already 'D'.
+        // A switch instance conventionally named DEV/DEVA/DEVB already starts with 'D'.
         assert_eq!(element_name("DEV", 'D'), "DEV");
         assert_eq!(element_name("sw1", 'D'), "Dsw1");
     }

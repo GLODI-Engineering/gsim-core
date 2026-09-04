@@ -103,3 +103,91 @@ the hand-written reference netlist (only net *names* differ — `n_Vdc_p` where
 the hand-written file says `VDCP`), and running both through `general-simulator`
 (`--mode transient --tfinal 3e-4 --dt 2e-8`) agrees to ~1e-11 absolute on ~30 A currents:
 floating-point noise from a different MNA node ordering, not a modelling difference.
+
+## `buck_state_space_pi.py`
+
+The acceptance case for the **linear-dynamics** registry families
+(`control.state_space`, `control.transfer_function`), plus three already-registered
+signal-flow families whose netlist spelling had never actually been *run*
+(`control.saturation`, `power.pwm1`, `converter.phys2sig`).
+
+A 24 V / 12 V / 5 Ω buck converter at 100 kHz, regulated by a **MIMO state-space PI
+compensator**: rather than needing a summing block the compiler has no entry for, the
+compensator takes `[ref, measurement]` as two inputs and forms the error itself —
+`a=[[0]] b=[[ki,-ki]] c=[[1]] d=[[kp,-kp]]` *is* a PI controller with the integrator as
+its one state. That also makes it a real test of the `inputs=` list whose length comes
+from `b`'s own column count. The measurement path runs through a `kind=tf` single-pole
+filter, so both linear families are in one loop.
+
+```
+general-simulator buck_state_space_pi.cir --mode transient --tfinal 2e-2 --dt 5e-8
+exit 0, 400000 steps, 14 columns
+V(VOUT) settled 12.1516 V against a 12 V reference; duty 0.4979 (open-loop ideal 0.5)
+```
+
+The script asserts the settled output, so a netlist that parses but does not close the
+loop fails rather than passing quietly.
+
+```bash
+GSIM_SIMULATOR=/path/to/general-simulator python3 examples/buck_state_space_pi.py
+```
+
+## `pyblock_buck_control.py`
+
+The same power stage with its controller written in **Python** — the acceptance case for
+the script-hosted families (`extensibility.pyfunc`, `extensibility.pyblock`). A
+`kind=pyfunc` feedforward computes `d = Vref/Vin` and a headroom output; a stateful
+`kind=pyblock` slew-rate limits it into a soft start; a `control.gain` consumes the
+pyfunc's **second** output by its generated name, so a wrong second-output name is a hard
+`MissingSymbol` rather than a silent no-op. `inputs=REF,VINM` order is load-bearing:
+reversed, the duty would be `Vin/Vref = 2`, clamped to 0.95.
+
+Needs a simulator built with the optional Python support
+(`cargo build --release -p general-simulator-cli --features python`); the plain binary
+answers `PythonSupportNotCompiledIn`.
+
+```
+exit 0, 200000 steps, 15 columns
+V(VOUT) 11.9820 V; SLEW (slew-limited duty) 0.5000; HEAD (FF_headroom) 12.0000 V
+```
+
+`cscript`/`octfunc`/`octblock` share this field shape and are registered, but are covered
+by unit tests only — `cscript` needs a compiled `.so` and the Octave pair needs a linked
+Octave, neither of which this example can produce portably.
+
+```bash
+GSIM_SIMULATOR=/path/to/general-simulator python3 examples/pyblock_buck_control.py
+```
+
+## `nested_subckt_ladder.py`
+
+A `.subckt` that instantiates another `.subckt` — the nesting case the Phase 2 emitter
+left unimplemented. A four-section RC delay line built as two levels of reuse: `SECTION`
+(R + C), `STAGE` (two `SECTION` instances and **nothing else** — a body made purely of
+nested `X` cards), and two `STAGE` instances at the top level. That empty-of-ordinary-
+blocks body is exactly the shape the old emitter dropped silently, writing `.SUBCKT` and
+`.ENDS` with nothing between them.
+
+```
+general-simulator nested_subckt_ladder.cir --mode transient --tfinal 0.2 --dt 1e-5
+exit 0, 20000 steps
+V(VOUT) settled 3.57143 V == 5 * 10k/14k, the exact divider through all four sections
+```
+
+An open `STAGE` would leave `V(VOUT)` at 0, so the assertion is real.
+
+## `floating_reference_bridge.py`
+
+`docs/specs/gsim-sch-format.md` §9's **reference-net fallback**, run for real rather than
+unit-tested. This circuit declares no `routing.ground` and no `is_reference` net at all;
+its return rail is the net with the most endpoints (6, against 5 / 3 / 2), so the
+heuristic must pick it — and it must, because an MNA system with no reference row is
+singular and cannot be solved at all.
+
+```
+compile note: "<top level>: no reference net declared ... the largest net was selected as
+node 0, per docs/specs/gsim-sch-format.md §9"
+general-simulator floating_reference_bridge.cir --mode transient --tfinal 1e-3 --dt 1e-6
+exit 0, 1000 steps
+V(TOP) = 12.000000 V, V(MID) = 6.000000 V (exactly the 100 Ω / 4x400 Ω divider)
+```

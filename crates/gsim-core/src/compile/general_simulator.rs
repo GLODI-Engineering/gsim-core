@@ -1,8 +1,7 @@
 //! [`GeneralSimulatorTarget`] — emits `general-simulator`'s dual-grammar netlist.
 //!
-//! Every syntax detail here was matched against a real, working netlist
-//! (the hand-written reference netlist)
-//! and against `general-mna`'s own parser, not written from the spec alone.
+//! Every syntax detail here was matched against `general-mna`'s own parser and against real,
+//! working netlists run through `general-simulator`, not written from the spec alone.
 
 use super::spec::{self, ElementTail, FieldSpec, KindName, TypeSpec};
 use super::{CompileContext, CompileError, CompileOutput, NetlistTarget, Scope};
@@ -1232,7 +1231,7 @@ mod tests {
         sig(&mut b, "P2", "out1", "G1", "in");
         let out = compile(&b.into_model(), "general-simulator").unwrap();
         assert!(
-            out.netlist.contains("G1 kind=gain k=2 inputs=P2_b"),
+            out.netlist.contains("G1 kind=gain k=2 in=P2_b"),
             "{}",
             out.netlist
         );
