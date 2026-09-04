@@ -62,7 +62,10 @@ pub struct EvaluatedSymbol {
     pub primitives: Vec<Primitive>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+/// Serializable so bindings (`gsim-py`, `gsim-wasm`) can return `validate_parameters`'s result
+/// straight as JSON (`{"parameter": ..., "message": ...}` per failure) instead of hand-rolling an
+/// equivalent shadow struct per binding.
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ValidationFailure {
     pub parameter: String,
     pub message: String,
