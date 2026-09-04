@@ -188,3 +188,37 @@ The script also checks the exact total `*` line count, so a comment can neither 
 uncommented block nor be silently dropped. (The circuit is a trivial RC low-pass — the comments
 are the subject, so `general-simulator` is only run, if present, to confirm the extra lines are
 inert to the parser.)
+
+## `tagged_gate_goto_from.py`
+
+`docs/specs/gsim-sch-format.md` §10's **Goto/From implicit connections**, lowered away
+completely by the compiler. A `routing.goto` broadcasts whatever drives its `in` port under a
+string tag; a `routing.from` has no wire input at all and resolves to the Goto sharing that
+tag, behaving exactly as if wired straight to that Goto's own driver. Neither is a device, so
+neither may reach the netlist.
+
+A single-switch 24 V chopper whose gate command is broadcast under the tag `GATE_CMD` and
+picked up by **two** Froms — one feeding the `converter.sig2phys` gate driver, one feeding a
+monitor gain — with no wire anywhere between `KGATE` and either consumer:
+
+```
+DSW kind=ideal_switch r_on=0.01 ... gate=block ctrl=GATE
+CMD kind=const value=1
+KGATE kind=gain k=1 in=CMD
+GATE kind=sig2phys domain=voltage in=KGATE     <- reached only through the tag
+MON kind=gain k=2 in=KGATE                     <- same tag, second consumer
+```
+
+The strongest assertion is the **twin**: the same circuit rebuilt with real wires and no
+routing blocks compiles to a *byte-identical* netlist, so a Goto/From pair is provably nothing
+but a drawing convenience. §10.3's two hard errors are asserted too — a From matching no Goto
+(`unresolved-from-tag`) and a tag broadcast by two Gotos (`ambiguous-from-tag`).
+
+```
+general-simulator tagged_gate_goto_from.cir --mode transient --tfinal 1e-3 --dt 1e-6
+exit 0, 1000 steps
+V(SW) = 23.976024 V (the closed-switch 0.01 Ω / 10 Ω divider, exactly)
+```
+
+A gate reference that failed to reach the real driver would leave the switch open and V(SW)
+pinned at 0, so the run is a real end-to-end proof that the tag carried a live signal.
