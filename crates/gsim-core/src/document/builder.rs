@@ -9,6 +9,7 @@
 use super::block::{Block, BlockError, Mirror, NewBlock};
 use super::model::Model;
 use super::paradigm::Paradigm;
+use super::port_compat::{self, PortIncompat};
 use super::subckt::{check_no_cyclic_defs, SubcktDef, SubcktError};
 use super::wire::{Endpoint, Wire};
 use serde::Deserialize;
@@ -28,6 +29,11 @@ pub enum BuilderError {
         from: Paradigm,
         to: Paradigm,
     },
+    /// The finer-grained §8.1/§8.2 port-kind rule, below [`BuilderError::CrossParadigm`]'s
+    /// block-level paradigm boundary — see [`super::port_compat`], which also documents exactly
+    /// which of `port-compat.ts`'s rules this covers and which still need a contract registry.
+    /// Boxed to keep `BuilderError` small — see [`PortIncompat`].
+    PortIncompatible(Box<PortIncompat>),
     UnknownBlock(String),
     Block(BlockError),
     /// `instantiate_subckt` (or a `SubcktInstance`) named a `def_ref` with no matching
@@ -61,6 +67,7 @@ impl std::fmt::Display for BuilderError {
                 f,
                 "cannot connect a {from:?} block directly to a {to:?} block -- route through a converter/routing/hierarchy/annotation block"
             ),
+            BuilderError::PortIncompatible(inc) => write!(f, "{inc}"),
             BuilderError::UnknownBlock(id) => write!(f, "no block with id '{id}'"),
             BuilderError::Block(e) => write!(f, "{e}"),
             BuilderError::UnknownSubcktDef(id) => write!(f, "no SubcktDef with id '{id}'"),
@@ -466,11 +473,15 @@ impl ModelBuilder {
         }
     }
 
-    /// Validates both endpoints exist and that the two blocks' paradigms are connectable (same
-    /// paradigm, or one side bridges — see [`Paradigm::bridges_paradigms`]), then appends a
-    /// wire whose `kind` matches what the caller asserts the ports to be (there is no catalogue
-    /// lookup in this phase to verify that assertion against the blocks' actual port
-    /// definitions — see the crate-level Phase 1 scope note).
+    /// Validates both endpoints exist, that the two blocks' paradigms are connectable (same
+    /// paradigm, or one side bridges — see [`Paradigm::bridges_paradigms`]), and then the finer
+    /// per-port rules in [`super::port_compat`], before appending the wire.
+    ///
+    /// `kind` is still the caller's assertion of what the two ports are (§8.4). There is no
+    /// component-contract registry in this crate for `connect()` to verify that assertion in
+    /// full — [`super::port_compat`]'s module doc records exactly which of the frontend's
+    /// `port-compat.ts` rules are therefore enforced here and which remain open, and why
+    /// plumbing a catalogue into this builder was rejected rather than merely skipped.
     pub fn connect(
         &mut self,
         from: Endpoint,
@@ -499,6 +510,18 @@ impl ModelBuilder {
             });
         }
 
+        let kind = kind.into();
+        if let Err(failure) =
+            port_compat::check(&self.model, from_block, to_block, &from, &to, &kind)
+        {
+            return Err(BuilderError::PortIncompatible(Box::new(PortIncompat {
+                from,
+                to,
+                kind,
+                failure,
+            })));
+        }
+
         let id = match opts.id {
             Some(id) => {
                 if self.has_wire_id(&id) {
@@ -513,7 +536,7 @@ impl ModelBuilder {
             id: id.clone(),
             from,
             to,
-            kind: kind.into(),
+            kind,
             waypoints: opts.waypoints,
             pinned: opts.pinned,
             net: opts.net,
@@ -858,22 +881,51 @@ mod tests {
 
     #[test]
     fn a_subckt_instance_connects_to_a_signal_flow_block_too() {
-        // A subckt boundary bridges paradigms (see Paradigm::bridges_paradigms) -- the real
-        // sw_leg_fixed def takes signal-kind ctrl_* nets from top-level `kind=const` blocks
-        // while its d/s ports are electrical, so this must be legal.
+        // A subckt boundary bridges paradigms (see Paradigm::bridges_paradigms) -- a gate-driven
+        // switch def takes signal-kind ctrl_* nets from top-level `kind=const` blocks while its
+        // d/s ports are electrical, so this must be legal *on the signal-kind port*.
+        //
+        // The def is now mixed-kind rather than `two_pin_def`: this test used to wire a `signal`
+        // wire onto a port the def declares `physical-electrical`, which contradicted its own
+        // comment and is exactly what port_compat's SubcktDef-backed kind check now rejects.
         let mut b = ModelBuilder::new("m", "M", 10);
-        b.add_subckt_def(two_pin_def("leaf")).unwrap();
+        b.add_subckt_def(SubcktDef::new("leaf", "LEAF").unwrap().with_ports([
+            SubcktPort::new("d", "physical-electrical").unwrap(),
+            SubcktPort::new("ctrl", "signal").unwrap(),
+        ]))
+        .unwrap();
         b.instantiate_subckt(NewSubcktInstanceSpec::new("leaf", (0, 0)).with_id("x1"))
             .unwrap();
         block(&mut b, "c1", Paradigm::SignalFlow, "source.const");
-        assert!(b
+        b.connect(
+            Endpoint::new("c1", "out"),
+            Endpoint::new("x1", "ctrl"),
+            "signal",
+            ConnectOptions::default(),
+        )
+        .unwrap();
+
+        // ...and the same wire onto the def's *electrical* port is now refused, naming the port
+        // and the kind it actually declares.
+        block(&mut b, "c2", Paradigm::SignalFlow, "source.const");
+        let err = b
             .connect(
-                Endpoint::new("c1", "out"),
-                Endpoint::new("x1", "a"),
+                Endpoint::new("c2", "out"),
+                Endpoint::new("x1", "d"),
                 "signal",
                 ConnectOptions::default(),
             )
-            .is_ok());
+            .unwrap_err();
+        assert!(matches!(
+            &err,
+            BuilderError::PortIncompatible(inc) if inc.failure.reason() == "kind-mismatch"
+        ));
+        assert!(
+            err.to_string()
+                .contains("'x1.d' is declared 'physical-electrical'")
+                && err.to_string().contains("as a 'signal' wire"),
+            "{err}"
+        );
     }
 
     #[test]
