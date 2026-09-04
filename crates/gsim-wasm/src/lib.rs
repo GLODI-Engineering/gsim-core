@@ -24,6 +24,7 @@
 //! `Result`'s `Err` into a thrown `JsValue` via [`js_err`] -- the only place in this file that
 //! constructs a `JsValue`, and therefore the only place host tests must avoid calling directly.
 
+use gsim_core::compile;
 use gsim_core::contract::{self, ComponentContract};
 use gsim_core::document::{
     ConnectOptions, Endpoint, GsimSchDocument, Mirror, Model, ModelBuilder, NewBlockSpec,
@@ -162,6 +163,22 @@ fn add_block_impl(model_json: &str, spec_json: &str) -> Result<String, String> {
 #[wasm_bindgen(js_name = addBlock)]
 pub fn add_block(model_json: &str, spec_json: &str) -> Result<String, JsValue> {
     add_block_impl(model_json, spec_json).map_err(js_err)
+}
+
+fn compile_impl(model_json: &str, target: &str) -> Result<String, String> {
+    let model: Model = parse_json(model_json, "model")?;
+    let out = compile::compile(&model, target).map_err(|e| e.to_string())?;
+    respond_json(&serde_json::json!({"netlist": out.netlist, "notes": out.notes}))
+}
+
+/// Compiles a `Model` into netlist text for `target` (currently only `"general-simulator"`).
+///
+/// **Shared JSON contract** (identical to `gsim-py`'s `compile`): returns
+/// `{"netlist": "<text>", "notes": [...]}`; throws a real JS `Error` carrying the compiler's
+/// own message on failure.
+#[wasm_bindgen(js_name = compile)]
+pub fn compile(model_json: &str, target: &str) -> Result<String, JsValue> {
+    compile_impl(model_json, target).map_err(js_err)
 }
 
 fn add_subckt_def_impl(model_json: &str, def_json: &str) -> Result<String, String> {
@@ -1002,5 +1019,53 @@ mod tests {
         let model = new_model("m1", "M", 10);
         assert!(add_subckt_def_impl(&model, "{not json").is_err());
         assert!(instantiate_subckt_impl(&model, "{not json").is_err());
+    }
+
+    #[test]
+    fn compile_emits_a_netlist() {
+        let model = new_model("m1", "M", 10);
+        let step = |m: &str, s: &str| -> String {
+            serde_json::from_str::<Value>(&add_block_impl(m, s).unwrap()).unwrap()["model"]
+                .to_string()
+        };
+        let model = step(
+            &model,
+            r#"{"type":"passive.resistor","paradigm":"physical-network","domain":"electrical","position":[0,0],"rotation":0,"id":"R1","params":{"R":1000}}"#,
+        );
+        let model = step(
+            &model,
+            r#"{"type":"routing.ground","paradigm":"physical-network","domain":"electrical","position":[0,0],"rotation":0,"id":"gnd"}"#,
+        );
+        let mut model = model;
+        for port in ["p1", "p2"] {
+            model = serde_json::from_str::<Value>(
+                &connect_impl(
+                    &model,
+                    &format!(r#"{{"block":"R1","port":"{port}"}}"#),
+                    r#"{"block":"gnd","port":"p"}"#,
+                    "physical-electrical",
+                    "{}",
+                )
+                .unwrap(),
+            )
+            .unwrap()["model"]
+                .to_string();
+        }
+        let out: Value =
+            serde_json::from_str(&compile_impl(&model, "general-simulator").unwrap()).unwrap();
+        assert!(
+            out["netlist"].as_str().unwrap().contains("R1 0 0 1000"),
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn compile_rejects_an_unknown_target() {
+        let model = new_model("m1", "M", 10);
+        let err = compile_impl(&model, "ngspice").unwrap_err();
+        assert!(
+            err.contains("unknown netlist target 'ngspice'"),
+            "got: {err}"
+        );
     }
 }

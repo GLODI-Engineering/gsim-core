@@ -20,6 +20,7 @@
 //! on `contract::ValidationFailure`, and `Serialize`/`Deserialize` on `layout::Rect` — see each
 //! item's doc comment in `gsim-core` for why.
 
+use gsim_core::compile::{compile as compile_model, CompileError};
 use gsim_core::contract::{self, ComponentContract};
 use gsim_core::document::{
     BuilderError, ConnectOptions, Endpoint, GsimSchDocument, Model, ModelBuilder, NewBlockSpec,
@@ -55,6 +56,21 @@ fn builder_err_to_py(e: BuilderError) -> PyErr {
         BuilderError::UnknownSubcktDef(_) => "unknown-subckt-def",
         BuilderError::Subckt(SubcktError::CyclicDefReference { .. }) => "cyclic-subckt-def",
         BuilderError::Subckt(_) => "invalid-subckt",
+    };
+    PyErr::new::<PyValueError, _>(format!("{keyword}: {e}"))
+}
+
+/// Same stable-keyword-prefix idea as [`builder_err_to_py`], for the compiler's errors.
+fn compile_err_to_py(e: CompileError) -> PyErr {
+    let keyword = match &e {
+        CompileError::UnknownType { .. } => "unknown-type",
+        CompileError::UnknownTarget(_) => "unknown-target",
+        CompileError::FloatingPort { .. } => "floating-port",
+        CompileError::UnconnectedRef { .. } => "unconnected-ref",
+        CompileError::MissingParam { .. } => "missing-param",
+        CompileError::UnknownSubcktDef { .. } => "unknown-subckt-def",
+        CompileError::UnconnectedSubcktPort { .. } => "unconnected-subckt-port",
+        CompileError::UnknownVariant { .. } => "unknown-variant",
     };
     PyErr::new::<PyValueError, _>(format!("{keyword}: {e}"))
 }
@@ -170,6 +186,30 @@ fn instantiate_subckt(model_json: &str, spec_json: &str) -> PyResult<String> {
     to_json(&AddBlockResult {
         model: builder.into_model(),
         block_id,
+    })
+}
+
+#[derive(Serialize)]
+struct CompileResult {
+    netlist: String,
+    notes: Vec<String>,
+}
+
+/// Compiles a `Model` into netlist text for `target` (currently only `"general-simulator"`).
+///
+/// **Shared JSON contract** (identical in `gsim-wasm`'s `compile`): returns
+/// `{"netlist": "<text>", "notes": ["<info-level compiler decision>", ...]}`. Raises a
+/// `ValueError` whose message is keyword-prefixed the same way the builder errors are
+/// (`unknown-type:`, `unknown-target:`, `floating-port:`, `unconnected-ref:`,
+/// `missing-param:`, `unknown-subckt-def:`, `unconnected-subckt-port:`, `unknown-variant:`),
+/// with the real underlying message following unmodified.
+#[pyfunction]
+fn compile(model_json: &str, target: &str) -> PyResult<String> {
+    let model: Model = parse_json(model_json, "model")?;
+    let out = compile_model(&model, target).map_err(compile_err_to_py)?;
+    to_json(&CompileResult {
+        netlist: out.netlist,
+        notes: out.notes,
     })
 }
 
@@ -362,6 +402,7 @@ fn gsim_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(validate_parameters, m)?)?;
     m.add_function(wrap_pyfunction!(new_model, m)?)?;
     m.add_function(wrap_pyfunction!(add_block, m)?)?;
+    m.add_function(wrap_pyfunction!(compile, m)?)?;
     m.add_function(wrap_pyfunction!(add_subckt_def, m)?)?;
     m.add_function(wrap_pyfunction!(instantiate_subckt, m)?)?;
     m.add_function(wrap_pyfunction!(remove_block, m)?)?;
@@ -746,5 +787,68 @@ mod tests {
         let model = new_model("m1", "M", 10).unwrap();
         assert!(instantiate_subckt(&model, "{not json").is_err());
         assert!(add_subckt_def(&model, "{not json").is_err());
+    }
+
+    #[test]
+    fn compile_emits_a_netlist_and_reports_notes() {
+        let model = new_model("m1", "M", 10).unwrap();
+        let r = |m: &str, s: &str| -> String {
+            let v: Value = serde_json::from_str(&add_block(m, s).unwrap()).unwrap();
+            serde_json::to_string(&v["model"]).unwrap()
+        };
+        let model = r(
+            &model,
+            r#"{"type":"passive.resistor","paradigm":"physical-network","domain":"electrical","position":[0,0],"rotation":0,"id":"R1","params":{"R":1000}}"#,
+        );
+        let model = r(
+            &model,
+            r#"{"type":"routing.ground","paradigm":"physical-network","domain":"electrical","position":[0,0],"rotation":0,"id":"gnd"}"#,
+        );
+        let mut model = model;
+        for port in ["p1", "p2"] {
+            let v: Value = serde_json::from_str(
+                &connect(
+                    &model,
+                    &format!(r#"{{"block":"R1","port":"{port}"}}"#),
+                    r#"{"block":"gnd","port":"p"}"#,
+                    "physical-electrical",
+                    "{}",
+                )
+                .unwrap(),
+            )
+            .unwrap();
+            model = serde_json::to_string(&v["model"]).unwrap();
+        }
+        let out: Value =
+            serde_json::from_str(&compile(&model, "general-simulator").unwrap()).unwrap();
+        assert!(
+            out["netlist"].as_str().unwrap().contains("R1 0 0 1000"),
+            "{out}"
+        );
+        assert!(out["notes"].is_array());
+    }
+
+    #[test]
+    fn compile_unknown_target_raises_keyword_prefixed() {
+        let model = new_model("m1", "M", 10).unwrap();
+        let msg = err_msg(compile(&model, "ngspice").unwrap_err());
+        assert!(msg.starts_with("unknown-target:"), "got: {msg}");
+    }
+
+    #[test]
+    fn compile_unknown_type_raises_keyword_prefixed() {
+        let model = new_model("m1", "M", 10).unwrap();
+        let v: Value = serde_json::from_str(
+            &add_block(
+                &model,
+                r#"{"type":"made.up.type","paradigm":"physical-network","domain":"electrical","position":[0,0],"rotation":0,"id":"z1"}"#,
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        let model = serde_json::to_string(&v["model"]).unwrap();
+        let msg = err_msg(compile(&model, "general-simulator").unwrap_err());
+        assert!(msg.starts_with("unknown-type:"), "got: {msg}");
+        assert!(msg.contains("made.up.type"), "got: {msg}");
     }
 }

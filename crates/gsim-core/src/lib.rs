@@ -18,6 +18,7 @@
 //! No `eval`/dynamic code execution of any kind belongs in this crate — see the module doc on
 //! [`expr`].
 
+pub mod compile;
 pub mod contract;
 pub mod document;
 pub mod expr;
