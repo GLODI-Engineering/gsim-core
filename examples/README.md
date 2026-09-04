@@ -71,3 +71,35 @@ python3 -m venv .venv && source .venv/bin/activate
 maturin develop
 cd ../.. && python3 the acceptance-test script
 ```
+
+## `h_bridge_3phase_driven.py`
+
+The **flat (non-subckt) compiler path**, end to end. `h_bridge_3phase.gsim_sch` on its own is
+deliberately not a runnable circuit — it is a library *stamp*, an incomplete fragment whose 11
+boundary attachment points a caller is expected to wire; compiling it standalone correctly
+fails with `unconnected-ref: port 'lega_high.g' must reference another block's output`.
+
+This script completes that same stamp into a real 3-phase inverter (DC link, ground, one
+phase-shift PWM modulator per leg, a gate-drive converter per switch, star-connected R-L
+load), compiles it with `gsim_py.compile`, and runs the result through `general-simulator`.
+
+Beyond the flat path it proves **per-output naming** for real: each leg's high-side switch is
+gated by its modulator's *first* output (aliasing the modulator's own name) and its low-side
+switch by the *second* (`MOD_a_comp`), so a wrong second-output name would cause a
+shoot-through or a dead leg rather than a silent no-op.
+
+```bash
+GSIM_SIMULATOR=/path/to/general-simulator python3 examples/h_bridge_3phase_driven.py
+```
+
+Writes `h_bridge_3phase_driven.cir`. With no simulator on `PATH` (or `GSIM_SIMULATOR` unset)
+it compiles and asserts, but does not run.
+
+## the compiled netlist
+
+The compiler's output for the acceptance-test document, checked in as the reference artifact
+for the acceptance test. Structurally line-for-line equivalent to the hand-written
+the hand-written reference netlist (only net *names* differ — `n_Vdc_p` where
+the hand-written file says `VDCP`), and running both through `general-simulator`
+(`--mode transient --tfinal 3e-4 --dt 2e-8`) agrees to ~1e-11 absolute on ~30 A currents:
+floating-point noise from a different MNA node ordering, not a modelling difference.
