@@ -31,7 +31,9 @@ pub use builder::{
     BuilderError, ConnectOptions, ModelBuilder, NewBlockSpec, NewSubcktInstanceSpec,
     SUBCKT_INSTANCE_TYPE,
 };
-pub use model::{DocumentLoadError, GsimSchDocument, Model, ModelParam, WrongSchemaVersion};
+pub use model::{
+    DocumentLoadError, GsimSchDocument, Model, ModelParam, ModelRole, WrongSchemaVersion,
+};
 pub use paradigm::Paradigm;
 pub use subckt::{
     check_no_cyclic_defs, SubcktDef, SubcktError, SubcktInstance, SubcktPort, SUBCKT_BOUNDARY_TYPE,

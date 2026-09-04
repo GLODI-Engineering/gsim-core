@@ -14,6 +14,21 @@ fn default_grid() -> i64 {
     10
 }
 
+/// `.gsim_sch` §4.1: a hint, not a constraint. `"library"` means the document carries reusable
+/// content (a stamp, `subckt_defs`, or both) rather than being a directly-simulatable top-level
+/// schematic — nothing here validates that a stamp actually has dangling ports, nor lets a
+/// schematic omit them. Absent on `Model::role` means `Schematic`, matching every other
+/// forward-compatible field in this struct (`subckt_defs` included) — an invalid string value is
+/// rejected by `serde`'s own enum deserialization, the same practical effect as
+/// `general-simulator-gui`'s `gsim_sch_loader.py::_check_role`, achieved by typing rather than a
+/// hand-written check.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ModelRole {
+    Schematic,
+    Library,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelParam {
     pub name: String,
@@ -45,6 +60,11 @@ pub struct Model {
     /// document written before this field existed still loads unchanged.
     #[serde(default)]
     pub subckt_defs: Vec<SubcktDef>,
+    /// `None` means `Schematic` (§4.1) — and, on write, `None` stays absent from the emitted
+    /// JSON (`skip_serializing_if`), not materialized to `"schematic"`, so the byte-exact
+    /// roundtrip guarantee holds for every document written before this field existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub role: Option<ModelRole>,
     #[serde(default)]
     pub lines: Vec<Value>,
     #[serde(default)]
@@ -65,6 +85,7 @@ impl Model {
             blocks: Vec::new(),
             wires: Vec::new(),
             subckt_defs: Vec::new(),
+            role: None,
             lines: Vec::new(),
             nets: Vec::new(),
             simulation: Map::new(),
@@ -167,5 +188,29 @@ mod tests {
         let reloaded = GsimSchDocument::from_json(&text).unwrap();
         assert_eq!(reloaded.model.id, "m");
         assert_eq!(reloaded.schema_version, 2);
+    }
+
+    #[test]
+    fn role_defaults_to_absent_and_is_never_materialized_on_write() {
+        let doc = GsimSchDocument::new(Model::new("m", "My Model", 10));
+        assert_eq!(doc.model.role, None);
+        let text = doc.to_json_pretty().unwrap();
+        assert!(!text.contains("\"role\""));
+        let reloaded = GsimSchDocument::from_json(&text).unwrap();
+        assert_eq!(reloaded.model.role, None);
+    }
+
+    #[test]
+    fn role_round_trips_when_set_and_rejects_an_unknown_value() {
+        let mut model = Model::new("m", "My Model", 10);
+        model.role = Some(ModelRole::Library);
+        let doc = GsimSchDocument::new(model);
+        let text = doc.to_json_pretty().unwrap();
+        assert!(text.contains("\"role\": \"library\""));
+        let reloaded = GsimSchDocument::from_json(&text).unwrap();
+        assert_eq!(reloaded.model.role, Some(ModelRole::Library));
+
+        let bad = r#"{"schema_version":2,"model":{"id":"m","name":"M","blocks":[],"wires":[],"role":"gallery"}}"#;
+        assert!(GsimSchDocument::from_json(bad).is_err());
     }
 }
