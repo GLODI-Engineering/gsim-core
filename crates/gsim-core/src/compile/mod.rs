@@ -19,6 +19,7 @@
 //! implementation, thin bindings" rule.
 
 pub mod nets;
+pub mod routing;
 pub mod spec;
 
 mod general_simulator;
@@ -86,6 +87,33 @@ pub enum CompileError {
         expected: usize,
         connected: usize,
     },
+    /// A `routing.from` whose tag matches no `routing.goto` in its scope
+    /// (`docs/specs/gsim-sch-format.md` §10.3 — a hard error, never a silently dangling input).
+    UnresolvedFromTag {
+        block: String,
+        tag: String,
+    },
+    /// A `routing.from` whose tag matches more than one `routing.goto` — §10.3's second hard
+    /// error. There is no "nearest wins" tiebreak to fall back on without a subsystem hierarchy;
+    /// see [`routing`]'s module doc.
+    AmbiguousFromTag {
+        block: String,
+        tag: String,
+        candidates: Vec<String>,
+    },
+    /// A `routing.from` whose matched `routing.goto` is itself (transitively) driven by that
+    /// same `From` — an implicit connection that closes a loop with no block in it.
+    CyclicFromTag {
+        block: String,
+        tag: String,
+    },
+    /// A `routing.goto`/`routing.from` on a port-kind §10.2 forbids — the acausal conserving
+    /// kinds, which must use named nets (§9) instead.
+    RoutingKindUnsupported {
+        block: String,
+        type_name: String,
+        kind: String,
+    },
 }
 
 impl std::fmt::Display for CompileError {
@@ -141,6 +169,32 @@ impl std::fmt::Display for CompileError {
             } => write!(
                 f,
                 "block '{block}' needs {expected} driver(s) for its '{field}=' list but only {connected} of its indexed ports are wired -- a positional list cannot have a hole"
+            ),
+            CompileError::UnresolvedFromTag { block, tag } => write!(
+                f,
+                "Unresolved From tag \"{tag}\" on block '{block}': no routing.goto in this scope broadcasts it on the same port-kind"
+            ),
+            CompileError::AmbiguousFromTag {
+                block,
+                tag,
+                candidates,
+            } => write!(
+                f,
+                "Ambiguous From tag \"{tag}\" on block '{block}': {} routing.goto blocks broadcast it ({})",
+                candidates.len(),
+                candidates.join(", ")
+            ),
+            CompileError::CyclicFromTag { block, tag } => write!(
+                f,
+                "From tag \"{tag}\" on block '{block}' resolves to a routing.goto that this same From drives -- an implicit connection cannot close a loop with no block in it"
+            ),
+            CompileError::RoutingKindUnsupported {
+                block,
+                type_name,
+                kind,
+            } => write!(
+                f,
+                "block '{block}' is a '{type_name}' on port-kind '{kind}', which cannot be routed by tag -- acausal kinds must be connected through a named net instead (docs/specs/gsim-sch-format.md §10.2)"
             ),
         }
     }
@@ -221,6 +275,12 @@ pub struct Scope<'a> {
     pub outputs: Outputs,
     /// The def whose body this is, if any.
     pub def: Option<&'a SubcktDef>,
+    /// Goto/From lowering, already resolved: `routing.from` block id -> the endpoint that
+    /// *really* drives it (the far end of its matched `routing.goto`'s own `in` wire, chased
+    /// through any further `From` hops). Consulted by [`Scope::ref_name`] so a reference landing
+    /// on a `From` is rewritten to the real upstream source, leaving neither routing block with
+    /// any netlist footprint. See [`routing`].
+    pub from_source: BTreeMap<String, Endpoint>,
 }
 
 impl Scope<'_> {
@@ -261,6 +321,11 @@ impl Scope<'_> {
                 block: block.to_string(),
                 port: port.to_string(),
             })?;
+        // Goto/From lowering (§10): a reference that lands on a `routing.from` means the real
+        // driver behind that From's matched `routing.goto`. `from_source` is already fully
+        // chased, so one substitution is enough and every case below -- def boundary,
+        // vector-output rejection, output naming -- then sees the real source endpoint.
+        let peer = self.from_source.get(&peer.block).unwrap_or(peer);
         if let Some(def) = self.def {
             if peer.block == def.id {
                 return Ok(peer.port.clone());
@@ -369,13 +434,55 @@ fn build_scope<'a>(
             });
         }
     }
-    Ok(Scope {
+    let mut scope = Scope {
         blocks,
         wires,
         nets,
         outputs,
         def,
-    })
+        from_source: BTreeMap::new(),
+    };
+    // Goto/From lowering runs here — after `outputs` (the chase uses `peer_of`, whose
+    // driver-preference consults it) and before any target ever calls `ref_name`. Doing it as
+    // part of scope construction, rather than inside the emitter, means every `field=` shape
+    // (`in=`, `inputs=`, `ctrl=`, `gate=`, an `X` card's positional connections) picks up the
+    // substitution for free, and an unresolved tag fails compilation even if nothing reads it.
+    scope.from_source = resolve_from_sources(&scope)?;
+    Ok(scope)
+}
+
+/// Resolves each `routing.from` in a scope to the endpoint that really drives it.
+///
+/// [`routing::resolve_scope`] does the tag/port-kind matching; this walks the one further step
+/// the netlist needs — from the matched `Goto` to whatever is wired to its `in` port. That
+/// driver may itself be another `From` (a Goto rebroadcasting a tag it received), so the walk
+/// loops, guarded by [`routing::Chase`] against a tag that closes back on itself.
+fn resolve_from_sources(scope: &Scope<'_>) -> Result<BTreeMap<String, Endpoint>, CompileError> {
+    let matched = routing::resolve_scope(scope.blocks, scope.wires)?;
+    let mut sources = BTreeMap::new();
+    for from_id in matched.keys() {
+        let mut chase = routing::Chase::new();
+        let mut cursor = from_id.clone();
+        let source = loop {
+            let from_block = scope.block(&cursor).expect("id came from this scope");
+            chase.visit(from_block)?;
+            let goto_id = matched
+                .get(&cursor)
+                .expect("routing::resolve_scope covers every From in this scope");
+            let peer = scope
+                .peer_of(goto_id, routing::GOTO_IN_PORT)
+                .ok_or_else(|| CompileError::UnconnectedRef {
+                    block: goto_id.clone(),
+                    port: routing::GOTO_IN_PORT.to_string(),
+                })?;
+            match scope.block(&peer.block) {
+                Some(b) if routing::is_from(b) => cursor = peer.block.clone(),
+                _ => break peer.clone(),
+            }
+        };
+        sources.insert(from_id.clone(), source);
+    }
+    Ok(sources)
 }
 
 /// §9: "If no `is_reference` net is declared for an acausal sub-network, the compiler selects

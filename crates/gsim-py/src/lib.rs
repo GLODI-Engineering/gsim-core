@@ -73,6 +73,10 @@ fn compile_err_to_py(e: CompileError) -> PyErr {
         CompileError::UnknownVariant { .. } => "unknown-variant",
         CompileError::VectorOutputPort { .. } => "vector-output-port",
         CompileError::IndexedRefArity { .. } => "indexed-ref-arity",
+        CompileError::UnresolvedFromTag { .. } => "unresolved-from-tag",
+        CompileError::AmbiguousFromTag { .. } => "ambiguous-from-tag",
+        CompileError::CyclicFromTag { .. } => "cyclic-from-tag",
+        CompileError::RoutingKindUnsupported { .. } => "routing-kind-unsupported",
     };
     PyErr::new::<PyValueError, _>(format!("{keyword}: {e}"))
 }
@@ -208,7 +212,8 @@ struct CompileResult {
 /// `ValueError` whose message is keyword-prefixed the same way the builder errors are
 /// (`unknown-type:`, `unknown-target:`, `floating-port:`, `unconnected-ref:`,
 /// `missing-param:`, `unknown-subckt-def:`, `unconnected-subckt-port:`, `unknown-variant:`, `vector-output-port:`,
-/// `indexed-ref-arity:`),
+/// `indexed-ref-arity:`, `unresolved-from-tag:`, `ambiguous-from-tag:`, `cyclic-from-tag:`,
+/// `routing-kind-unsupported:`),
 /// with the real underlying message following unmodified.
 #[pyfunction]
 fn compile(model_json: &str, target: &str) -> PyResult<String> {

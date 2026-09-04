@@ -409,6 +409,23 @@ pub const REGISTRY: &[TypeSpec] = &[
         structural: true,
         ..TypeSpec::empty("spice-subckt.boundary")
     },
+    // Goto/From are pure connectivity annotations: `structural` keeps both out of the emitted
+    // netlist entirely, and `super::routing` rewrites every reference that lands on a
+    // `routing.from` to the real driver behind its matched `routing.goto`. See that module.
+    TypeSpec {
+        structural: true,
+        ..TypeSpec::empty("routing.goto")
+    },
+    TypeSpec {
+        structural: true,
+        // A `From` *is* a driver as far as wire adjacency is concerned, so it declares its `out`
+        // port: `Scope::peer_of` prefers a peer with a known output when a port carries several
+        // wires (the chained fan-out convention), and a From must win that preference like any
+        // other source. The recorded name is never emitted -- `ref_name` substitutes the real
+        // driver's name before it is ever read.
+        output_ports: &["out"],
+        ..TypeSpec::empty("routing.from")
+    },
     // -- passives -----------------------------------------------------------
     rc!("passive.resistor", 'R', TWO_PIN, "R"),
     rc!("passive.capacitor", 'C', TWO_PIN, "C"),

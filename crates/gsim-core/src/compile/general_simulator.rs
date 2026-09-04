@@ -1630,4 +1630,201 @@ mod tests {
             }
         );
     }
+
+    // -- Goto/From lowering (docs/specs/gsim-sch-format.md §10) ------------------------------
+
+    fn routing(b: &mut ModelBuilder, id: &str, t: &str, params: serde_json::Value) {
+        b.add_block(NewBlockSpec {
+            r#type: t.to_string(),
+            paradigm: Paradigm::Routing,
+            domain: "signal".to_string(),
+            fidelity: Some("n_a".to_string()),
+            id: Some(id.to_string()),
+            params: params.as_object().cloned().unwrap_or_default(),
+            ..Default::default()
+        })
+        .unwrap();
+    }
+
+    /// `Kref -> Ga [CLK] ... Fa [CLK] -> Kdown`, with no wire between the two halves.
+    fn tagged_chain(from_tag: &str) -> ModelBuilder {
+        let mut b = ModelBuilder::new("m", "Tagged", 10);
+        add(
+            &mut b,
+            "SRC",
+            "source.const",
+            Paradigm::SignalFlow,
+            json!({"value": 2.0}),
+        );
+        add(
+            &mut b,
+            "Kup",
+            "control.gain",
+            Paradigm::SignalFlow,
+            json!({"k": 3.0}),
+        );
+        add(
+            &mut b,
+            "Kdown",
+            "control.gain",
+            Paradigm::SignalFlow,
+            json!({"k": 5.0}),
+        );
+        routing(&mut b, "Gclk", "routing.goto", json!({"tag": "CLK"}));
+        routing(&mut b, "Fclk", "routing.from", json!({"tag": from_tag}));
+        sig(&mut b, "SRC", "out", "Kup", "in");
+        sig(&mut b, "Kup", "out", "Gclk", "in");
+        sig(&mut b, "Fclk", "out", "Kdown", "in");
+        b
+    }
+
+    #[test]
+    fn a_from_compiles_to_the_real_driver_behind_its_goto() {
+        let out = compile(&tagged_chain("CLK").into_model(), "general-simulator").unwrap();
+        // The consumer is aliased straight to the Goto's own driver...
+        assert!(
+            out.netlist.contains("Kdown kind=gain k=5 in=Kup"),
+            "{}",
+            out.netlist
+        );
+        assert!(
+            out.netlist.contains("Kup kind=gain k=3 in=SRC"),
+            "{}",
+            out.netlist
+        );
+        // ...and neither routing block leaves any footprint at all.
+        assert!(!out.netlist.contains("Gclk"), "{}", out.netlist);
+        assert!(!out.netlist.contains("Fclk"), "{}", out.netlist);
+        assert!(!out.netlist.contains("routing."), "{}", out.netlist);
+    }
+
+    #[test]
+    fn a_goto_rebroadcasting_a_from_is_chased_to_the_original_source() {
+        // Fa -> Gb means tag B's driver is (transitively) SRC's gain, not the From itself.
+        let mut b = tagged_chain("CLK");
+        routing(&mut b, "Gb", "routing.goto", json!({"tag": "AUX"}));
+        routing(&mut b, "Fb", "routing.from", json!({"tag": "AUX"}));
+        add(
+            &mut b,
+            "Kaux",
+            "control.gain",
+            Paradigm::SignalFlow,
+            json!({"k": 7.0}),
+        );
+        sig(&mut b, "Fclk", "out", "Gb", "in");
+        sig(&mut b, "Fb", "out", "Kaux", "in");
+        let out = compile(&b.into_model(), "general-simulator").unwrap();
+        assert!(
+            out.netlist.contains("Kaux kind=gain k=7 in=Kup"),
+            "{}",
+            out.netlist
+        );
+    }
+
+    #[test]
+    fn an_unresolved_from_tag_is_a_compile_error() {
+        let err = compile(&tagged_chain("ENABLE").into_model(), "general-simulator").unwrap_err();
+        assert_eq!(
+            err,
+            CompileError::UnresolvedFromTag {
+                block: "Fclk".to_string(),
+                tag: "ENABLE".to_string()
+            }
+        );
+        assert!(
+            err.to_string()
+                .starts_with(r#"Unresolved From tag "ENABLE""#),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn an_ambiguous_from_tag_is_a_compile_error() {
+        let mut b = tagged_chain("CLK");
+        routing(&mut b, "Gclk2", "routing.goto", json!({"tag": "CLK"}));
+        sig(&mut b, "SRC", "out", "Gclk2", "in");
+        let err = compile(&b.into_model(), "general-simulator").unwrap_err();
+        assert_eq!(
+            err,
+            CompileError::AmbiguousFromTag {
+                block: "Fclk".to_string(),
+                tag: "CLK".to_string(),
+                candidates: vec!["Gclk".to_string(), "Gclk2".to_string()],
+            }
+        );
+        assert!(
+            err.to_string().starts_with(r#"Ambiguous From tag "CLK""#),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn a_from_whose_goto_input_is_unwired_reports_the_goto_not_the_consumer() {
+        let mut b = ModelBuilder::new("m", "Stub", 10);
+        add(
+            &mut b,
+            "Kdown",
+            "control.gain",
+            Paradigm::SignalFlow,
+            json!({"k": 5.0}),
+        );
+        routing(&mut b, "Gclk", "routing.goto", json!({"tag": "CLK"}));
+        routing(&mut b, "Fclk", "routing.from", json!({"tag": "CLK"}));
+        sig(&mut b, "Fclk", "out", "Kdown", "in");
+        assert_eq!(
+            compile(&b.into_model(), "general-simulator").unwrap_err(),
+            CompileError::UnconnectedRef {
+                block: "Gclk".to_string(),
+                port: "in".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn a_tag_that_closes_a_loop_on_itself_is_rejected_rather_than_looping_forever() {
+        let mut b = ModelBuilder::new("m", "Loop", 10);
+        routing(&mut b, "Gclk", "routing.goto", json!({"tag": "CLK"}));
+        routing(&mut b, "Fclk", "routing.from", json!({"tag": "CLK"}));
+        sig(&mut b, "Fclk", "out", "Gclk", "in");
+        assert_eq!(
+            compile(&b.into_model(), "general-simulator").unwrap_err(),
+            CompileError::CyclicFromTag {
+                block: "Fclk".to_string(),
+                tag: "CLK".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn a_goto_on_an_acausal_wire_is_rejected_with_the_named_net_advice() {
+        let mut b = ModelBuilder::new("m", "Acausal", 10);
+        add(
+            &mut b,
+            "R1",
+            "passive.resistor",
+            Paradigm::PhysicalNetwork,
+            json!({"R": 10.0}),
+        );
+        b.add_block(NewBlockSpec {
+            r#type: "routing.goto".to_string(),
+            paradigm: Paradigm::Routing,
+            domain: "physical-electrical".to_string(),
+            fidelity: Some("n_a".to_string()),
+            id: Some("Grail".to_string()),
+            params: json!({"tag": "RAIL"}).as_object().cloned().unwrap(),
+            ..Default::default()
+        })
+        .unwrap();
+        elec(&mut b, "R1", "p2", "Grail", "in");
+        let err = compile(&b.into_model(), "general-simulator").unwrap_err();
+        assert_eq!(
+            err,
+            CompileError::RoutingKindUnsupported {
+                block: "Grail".to_string(),
+                type_name: "routing.goto".to_string(),
+                kind: "physical-electrical".to_string(),
+            }
+        );
+        assert!(err.to_string().contains("named net"), "{err}");
+    }
 }

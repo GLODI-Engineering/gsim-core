@@ -20,3 +20,6 @@ pkg/
 *.wasm
 
 .DS_Store
+
+# Agent worktrees (Claude Code harness scratch), never part of the repo.
+.claude/worktrees/
