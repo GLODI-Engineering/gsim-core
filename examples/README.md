@@ -222,3 +222,34 @@ V(SW) = 23.976024 V (the closed-switch 0.01 Ω / 10 Ω divider, exactly)
 
 A gate reference that failed to reach the real driver would leave the switch open and V(SW)
 pinned at 0, so the run is a real end-to-end proof that the tag carried a live signal.
+
+## `port_kind_rejection.py`
+
+Proves the **per-port** compatibility rules (`docs/specs/gsim-sch-format.md` §8.1/§8.2) that
+`crates/gsim-core/src/document/port_compat.rs` adds below `connect()`'s older block-level
+cross-paradigm check (§8.3), ported from `general-simulator-gui`'s
+`apps/frontend/src/canvas/port-compat.ts`.
+
+A textbook-generic RC low-pass with an independent thermal branch (a thermal resistance to a
+thermal mass) in the same document, plus two signal sources and two gains. Three rejections
+are raised for real through `gsim_py.connect`, each with its own stable keyword prefix:
+
+```
+port-kind-mismatch: cannot connect 'R1.p2' to 'Rth.a' as a 'physical-electrical' wire:
+    kind-mismatch -- port 'Rth.a' is declared 'thermal'
+port-fan-in-on-signal: cannot connect 'U2.out' to 'K1.in' as a 'signal' wire:
+    fan-in-on-signal -- causal port 'K1.in' is already driven by wire 'wire1' ...
+port-reserved-kind: cannot connect 'R1.p2' to 'C1.p1' as a 'reserved.physical-magnetic'
+    wire: reserved-kind -- port kind 'reserved.physical-magnetic' is reserved ...
+```
+
+The electrical/thermal case is the one that matters most: **both blocks are
+`physical-network`**, so the block-level paradigm check has nothing to say about it — that is
+exactly the gap the per-port rule closes.
+
+The second half is the other side of the proof, and is why a checker that simply rejected
+everything would not pass this script: the *correct* wiring of those same blocks is accepted
+(electrical loop, thermal branch, one driver per signal input — fan-**out** and multi-wire
+acausal nodes both still legal), round-trips through `load_document`, and compiles to a real
+netlist. Only the thermal blocks are dropped before compiling, because `compile::spec::REGISTRY`
+has no `thermal.*` emitter yet — a netlist-target gap, not a connectivity one.
