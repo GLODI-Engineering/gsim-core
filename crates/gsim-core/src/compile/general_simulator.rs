@@ -227,79 +227,128 @@ fn emit_block_card(
     // Shares the element card's name when this type emits one too -- see spec::card_name.
     let mut tokens = vec![spec::card_name(&block.id, spec), format!("kind={kind}")];
     for field in kind_spec.fields {
-        match field {
-            FieldSpec::Param {
-                field,
-                param: p,
-                required,
-            } => match param(block, p) {
-                Some(v) => tokens.push(format!("{field}={}", spec::render_value(v))),
-                None if *required => {
-                    return Err(CompileError::MissingParam {
-                        block: block.id.clone(),
-                        param: (*p).to_string(),
-                    })
-                }
-                None => {}
-            },
-            FieldSpec::Literal { field, value } => tokens.push(format!("{field}={value}")),
-            FieldSpec::Ref { field, port } => {
-                tokens.push(format!("{field}={}", scope.ref_name(&block.id, port)?))
+        emit_field(scope, block, spec, field, &mut tokens)?;
+    }
+    Ok(tokens.join(" "))
+}
+
+/// Renders one [`FieldSpec`] into zero or one `field=value` tokens.
+///
+/// Recursive, because [`FieldSpec::Guarded`] wraps another spec: a family whose *field set*
+/// (not just its `kind=` string) depends on a selector parameter — `logic.gate`, `logic.flip_flop`
+/// — is expressed as guarded variants of the ordinary specs rather than as a bespoke arm each.
+fn emit_field(
+    scope: &Scope<'_>,
+    block: &Block,
+    spec: &TypeSpec,
+    field_spec: &FieldSpec,
+    tokens: &mut Vec<String>,
+) -> Result<(), CompileError> {
+    match field_spec {
+        FieldSpec::Param {
+            field,
+            param: p,
+            required,
+        } => match param(block, p) {
+            Some(v) => tokens.push(format!("{field}={}", spec::render_value(v))),
+            None if *required => {
+                return Err(CompileError::MissingParam {
+                    block: block.id.clone(),
+                    param: (*p).to_string(),
+                })
             }
-            FieldSpec::Refs { field, ports } => {
-                let mut names = Vec::new();
-                for port in *ports {
-                    names.push(scope.ref_name(&block.id, port)?);
-                }
-                tokens.push(format!("{field}={}", names.join(",")));
+            None => {}
+        },
+        FieldSpec::ParamList {
+            field,
+            param: p,
+            required,
+        } => match param(block, p).and_then(serde_json::Value::as_array) {
+            Some(items) => {
+                let rendered: Vec<String> = items.iter().map(spec::render_value).collect();
+                tokens.push(format!("{field}={}", rendered.join(",")));
             }
-            FieldSpec::RefsIndexed {
-                field,
-                prefix,
-                arity,
-            } => {
-                let expected = arity
-                    .count(block)
-                    .ok_or_else(|| CompileError::IndexedRefArity {
-                        block: block.id.clone(),
-                        field: (*field).to_string(),
-                        expected: 0,
-                        connected: 0,
-                    })?;
-                let mut names = Vec::new();
-                for i in 0..expected {
-                    let port = format!("{prefix}{i}");
-                    match scope.ref_name(&block.id, &port) {
-                        Ok(name) => names.push(name),
-                        Err(CompileError::UnconnectedRef { .. }) => break,
-                        Err(other) => return Err(other),
-                    }
-                }
-                if names.len() != expected {
-                    return Err(CompileError::IndexedRefArity {
-                        block: block.id.clone(),
-                        field: (*field).to_string(),
-                        expected,
-                        connected: names.len(),
-                    });
-                }
-                tokens.push(format!("{field}={}", names.join(",")));
+            None if *required => {
+                return Err(CompileError::MissingParam {
+                    block: block.id.clone(),
+                    param: (*p).to_string(),
+                })
             }
-            FieldSpec::Outputs { field } => {
-                let ports = spec.output_port_ids(block);
-                if ports.len() > 1 {
-                    let names: Vec<&str> = ports
-                        .iter()
-                        .filter_map(|p| scope.outputs.name_of(&block.id, p))
-                        .collect();
-                    if names.len() == ports.len() {
-                        tokens.push(format!("{field}={}", names.join(",")));
-                    }
+            None => {}
+        },
+        FieldSpec::Literal { field, value } => tokens.push(format!("{field}={value}")),
+        FieldSpec::Ref { field, port } => {
+            tokens.push(format!("{field}={}", scope.ref_name(&block.id, port)?))
+        }
+        FieldSpec::OptionalRef { field, port } => match scope.ref_name(&block.id, port) {
+            Ok(name) => tokens.push(format!("{field}={name}")),
+            Err(CompileError::UnconnectedRef { .. }) => {}
+            Err(other) => return Err(other),
+        },
+        FieldSpec::Guarded {
+            param: p,
+            values,
+            negate,
+            inner,
+        } => {
+            let current = param(block, p).map(spec::render_value).unwrap_or_default();
+            if values.contains(&current.as_str()) != *negate {
+                emit_field(scope, block, spec, inner, tokens)?;
+            }
+        }
+        FieldSpec::Refs { field, ports } => {
+            let mut names = Vec::new();
+            for port in *ports {
+                names.push(scope.ref_name(&block.id, port)?);
+            }
+            tokens.push(format!("{field}={}", names.join(",")));
+        }
+        FieldSpec::RefsIndexed {
+            field,
+            prefix,
+            arity,
+        } => {
+            let expected = arity
+                .count(block)
+                .ok_or_else(|| CompileError::IndexedRefArity {
+                    block: block.id.clone(),
+                    field: (*field).to_string(),
+                    expected: 0,
+                    connected: 0,
+                })?;
+            let mut names = Vec::new();
+            for i in 0..expected {
+                let port = format!("{prefix}{i}");
+                match scope.ref_name(&block.id, &port) {
+                    Ok(name) => names.push(name),
+                    Err(CompileError::UnconnectedRef { .. }) => break,
+                    Err(other) => return Err(other),
+                }
+            }
+            if names.len() != expected {
+                return Err(CompileError::IndexedRefArity {
+                    block: block.id.clone(),
+                    field: (*field).to_string(),
+                    expected,
+                    connected: names.len(),
+                });
+            }
+            tokens.push(format!("{field}={}", names.join(",")));
+        }
+        FieldSpec::Outputs { field } => {
+            let ports = spec.output_port_ids(block);
+            if ports.len() > 1 {
+                let names: Vec<&str> = ports
+                    .iter()
+                    .filter_map(|p| scope.outputs.name_of(&block.id, p))
+                    .collect();
+                if names.len() == ports.len() {
+                    tokens.push(format!("{field}={}", names.join(",")));
                 }
             }
         }
     }
-    Ok(tokens.join(" "))
+    Ok(())
 }
 
 /// The emitted `X`-card name for an instance id: real SPICE dispatches subcircuit instances on
@@ -1826,5 +1875,314 @@ mod tests {
             }
         );
         assert!(err.to_string().contains("named net"), "{err}");
+    }
+
+    // -- the fixture-backed families registered after the first switching-converter pass ------
+    //
+    // Every card asserted below was also written to a `.cir` file and run through the real
+    // `general-simulator` binary, with the block's own printed output checked against a
+    // hand-computed value -- see `docs/journal/2026-09.md`. Each of the four spellings these
+    // tests pin down (bare `signs=`, required `clamp_lo=`, `not`'s `in=`, `MathFn2`'s
+    // `in1=`/`in2=`) was verified to be a hard load-time error when written the other way.
+
+    /// One signal-flow block with `n` constant drivers on `in0..in{n-1}`, compiled.
+    fn signal_case(dut: &str, t: &str, params: serde_json::Value, ins: &[(&str, f64)]) -> String {
+        let mut b = ModelBuilder::new("m", "Case", 10);
+        add(&mut b, dut, t, Paradigm::SignalFlow, params);
+        for (i, (port, value)) in ins.iter().enumerate() {
+            let drv = format!("K{i}");
+            add(
+                &mut b,
+                &drv,
+                "source.const",
+                Paradigm::SignalFlow,
+                json!({ "value": value }),
+            );
+            sig(&mut b, &drv, "out", dut, port);
+        }
+        compile(&b.into_model(), "general-simulator")
+            .unwrap_or_else(|e| panic!("{t}: {e}"))
+            .netlist
+    }
+
+    #[test]
+    fn sum_emits_a_bare_comma_joined_signs_list_not_a_bracketed_literal() {
+        // `kind=sum`'s arm splits `signs` on ',' and parses each entry, so the bracketed form
+        // render_value produces for arrays fails with "entry '[1' is not a number".
+        let netlist = signal_case(
+            "SUM",
+            "control.sum",
+            json!({"signs": [1, -1, 1]}),
+            &[("in0", 3.0), ("in1", 1.0), ("in2", 0.5)],
+        );
+        assert!(
+            netlist.contains("SUM kind=sum inputs=K0,K1,K2 signs=1,-1,1"),
+            "{netlist}"
+        );
+    }
+
+    #[test]
+    fn product_takes_its_input_arity_from_a_plain_integer_param() {
+        let netlist = signal_case(
+            "MUL",
+            "control.product",
+            json!({"n_inputs": 3}),
+            &[("in0", 3.0), ("in1", 1.5), ("in2", 2.0)],
+        );
+        assert!(
+            netlist.contains("MUL kind=product inputs=K0,K1,K2"),
+            "{netlist}"
+        );
+        // A wired pin the arity does not cover must be a hard arity error, not a short list.
+        let short = signal_case(
+            "MUL",
+            "control.product",
+            json!({"n_inputs": 2}),
+            &[("in0", 3.0), ("in1", 1.5)],
+        );
+        assert!(short.contains("inputs=K0,K1"), "{short}");
+    }
+
+    #[test]
+    fn pid_emits_the_required_fixed_clamp_pair_and_a_single_in() {
+        let netlist = signal_case(
+            "PID",
+            "control.pid",
+            json!({"kp": 2.0, "ki": 0.0, "kd": 0.0, "n": 100.0,
+                   "clamp_lo": -1e30, "clamp_hi": 1e30}),
+            &[("in", 1.5)],
+        );
+        assert!(
+            netlist
+                .contains("PID kind=pid kp=2 ki=0 kd=0 n=100 clamp_lo=-1e30 clamp_hi=1e30 in=K0"),
+            "{netlist}"
+        );
+    }
+
+    #[test]
+    fn pid_without_a_clamp_is_a_missing_param_not_a_netlist_that_fails_at_load() {
+        let mut b = ModelBuilder::new("m", "Case", 10);
+        add(
+            &mut b,
+            "PID",
+            "control.pid",
+            Paradigm::SignalFlow,
+            json!({"kp": 1.0, "ki": 0.0, "kd": 0.0, "n": 100.0}),
+        );
+        add(
+            &mut b,
+            "K0",
+            "source.const",
+            Paradigm::SignalFlow,
+            json!({"value": 1.0}),
+        );
+        sig(&mut b, "K0", "out", "PID", "in");
+        assert_eq!(
+            compile(&b.into_model(), "general-simulator").unwrap_err(),
+            CompileError::MissingParam {
+                block: "PID".to_string(),
+                param: "clamp_lo".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn table_lookup_keeps_the_bracketed_matrix_form_signs_may_not_use() {
+        let netlist = signal_case(
+            "TBL",
+            "math.table_lookup",
+            json!({"points": [[0, 0], [1, 10], [2, 20]]}),
+            &[("in", 1.5)],
+        );
+        assert!(
+            netlist.contains("TBL kind=table points=[[0,0],[1,10],[2,20]] in=K0"),
+            "{netlist}"
+        );
+    }
+
+    #[test]
+    fn math_fn_families_emit_the_function_itself_as_the_kind_with_per_family_input_fields() {
+        // There is no `kind=mathfn1 fn=sgn`: build_kind's fallback resolves the kind= token
+        // through MathFn1/MathFn2/MathFn3::from_name in turn.
+        let one = signal_case("F", "math.fn1", json!({"fn": "sgn"}), &[("in", -4.0)]);
+        assert!(one.contains("F kind=sgn in=K0"), "{one}");
+
+        let two = signal_case(
+            "F",
+            "math.fn2",
+            json!({"fn": "max"}),
+            &[("in1", 2.0), ("in2", 7.0)],
+        );
+        assert!(two.contains("F kind=max in1=K0 in2=K1"), "{two}");
+
+        let three = signal_case(
+            "F",
+            "math.fn3",
+            json!({"fn": "limit"}),
+            &[("in1", 9.0), ("in2", -3.0), ("in3", 5.0)],
+        );
+        assert!(
+            three.contains("F kind=limit in1=K0 in2=K1 in3=K2"),
+            "{three}"
+        );
+    }
+
+    #[test]
+    fn an_unknown_math_function_is_rejected_rather_than_emitted_as_an_unknown_kind() {
+        let mut b = ModelBuilder::new("m", "Case", 10);
+        add(
+            &mut b,
+            "F",
+            "math.fn1",
+            Paradigm::SignalFlow,
+            json!({"fn": "arcsinhish"}),
+        );
+        add(
+            &mut b,
+            "K0",
+            "source.const",
+            Paradigm::SignalFlow,
+            json!({"value": 1.0}),
+        );
+        sig(&mut b, "K0", "out", "F", "in");
+        assert_eq!(
+            compile(&b.into_model(), "general-simulator").unwrap_err(),
+            CompileError::UnknownVariant {
+                block: "F".to_string(),
+                param: "fn".to_string(),
+                value: "arcsinhish".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn a_logic_gates_field_set_changes_with_its_op_not_just_its_kind() {
+        // Every non-`not` op reads a comma-joined inputs= of at least two entries...
+        let and = signal_case(
+            "G",
+            "logic.gate",
+            json!({"op": "and", "n_operands": 3}),
+            &[("in0", 1.0), ("in1", 1.0), ("in2", 0.0)],
+        );
+        assert!(and.contains("G kind=and inputs=K0,K1,K2"), "{and}");
+        assert!(!and.contains(" in="), "{and}");
+
+        // ...while `not` reads a single `in=` -- from the pin GSF v2 still numbers `in0`.
+        let not = signal_case(
+            "G",
+            "logic.gate",
+            json!({"op": "not", "n_operands": 2}),
+            &[("in0", 0.0)],
+        );
+        assert!(not.contains("G kind=not in=K0"), "{not}");
+        assert!(!not.contains("inputs="), "{not}");
+    }
+
+    #[test]
+    fn sr_latch_emits_named_set_reset_fields_and_its_priority() {
+        let netlist = signal_case(
+            "SR",
+            "logic.sr_latch",
+            json!({"priority": "reset"}),
+            &[("set", 1.0), ("reset", 0.0)],
+        );
+        assert!(
+            netlist.contains("SR kind=srlatch priority=reset set=K0 reset=K1"),
+            "{netlist}"
+        );
+    }
+
+    #[test]
+    fn flip_flop_data_fields_are_per_variant_and_reset_is_emitted_only_when_wired() {
+        let dff = signal_case(
+            "FF",
+            "logic.flip_flop",
+            json!({"kind": "dff", "reset": ""}),
+            &[("clk", 1.0), ("d", 1.0)],
+        );
+        assert!(dff.contains("FF kind=dff clk=K0 d=K1"), "{dff}");
+        // Presence, not value, decides the block's shape: an empty reset= would build a
+        // reset-capable flip-flop with a bogus input.
+        assert!(!dff.contains("reset="), "{dff}");
+
+        let tff = signal_case(
+            "FF",
+            "logic.flip_flop",
+            json!({"kind": "tff", "reset": ""}),
+            &[("clk", 1.0), ("t", 1.0)],
+        );
+        assert!(tff.contains("FF kind=tff clk=K0 t=K1"), "{tff}");
+
+        let jk = signal_case(
+            "FF",
+            "logic.flip_flop",
+            json!({"kind": "jkff", "reset": "rst"}),
+            &[("clk", 1.0), ("j", 1.0), ("k", 0.0), ("reset", 0.0)],
+        );
+        assert!(
+            jk.contains("FF kind=jkff clk=K0 j=K1 k=K2 reset=K3"),
+            "{jk}"
+        );
+    }
+
+    #[test]
+    fn counter_omits_modulus_at_its_unbounded_value_and_its_unwired_optional_inputs() {
+        // modulus=0 is documented as "unbounded" but the engine does count.rem_euclid(modulus),
+        // so emitting it is a divide-by-zero panic at run time. Omitting it is the unbounded form.
+        let unbounded = signal_case(
+            "CNT",
+            "control.counter",
+            json!({"clk": "clk", "up_down": "", "reset": "", "modulus": 0}),
+            &[("clk", 1.0)],
+        );
+        assert!(unbounded.contains("CNT kind=counter clk=K0"), "{unbounded}");
+        assert!(!unbounded.contains("modulus="), "{unbounded}");
+        assert!(!unbounded.contains("up_down="), "{unbounded}");
+
+        let bounded = signal_case(
+            "CNT",
+            "control.counter",
+            json!({"clk": "clk", "up_down": "ud", "reset": "rst", "modulus": 3}),
+            &[("clk", 1.0), ("up_down", 1.0), ("reset", 0.0)],
+        );
+        assert!(
+            bounded.contains("CNT kind=counter modulus=3 clk=K0 up_down=K1 reset=K2"),
+            "{bounded}"
+        );
+    }
+
+    #[test]
+    fn the_four_waveform_sources_are_distinct_kinds_with_no_input_fields() {
+        let cases = [
+            (
+                "source.sinwave",
+                json!({"va": 2.0, "freq": 1000.0, "v0": 0.0, "td": 0.0, "theta": 0.0,
+                       "phase": 0.0}),
+                "SRC kind=sinwave va=2 freq=1000 v0=0 td=0 theta=0 phase=0",
+            ),
+            (
+                "source.pulsewave",
+                json!({"v1": 0.0, "v2": 5.0, "td": 1e-4, "tr": 1e-6, "tf": 1e-6, "pw": 2e-4,
+                       "per": 4e-4}),
+                "SRC kind=pulsewave v1=0 v2=5 td=0.0001 tr=1e-6 tf=1e-6 pw=0.0002 per=0.0004",
+            ),
+            (
+                "source.expwave",
+                json!({"v1": 0.0, "v2": 3.0, "td1": 1e-4, "tau1": 1e-4, "td2": 1e30,
+                       "tau2": 1.0}),
+                "SRC kind=expwave v1=0 v2=3 td1=0.0001 tau1=0.0001 td2=1e30 tau2=1",
+            ),
+            (
+                "source.sffmwave",
+                json!({"va": 1.0, "fc": 1000.0, "fs": 100.0, "v0": 0.0, "mdi": 2.0}),
+                "SRC kind=sffmwave va=1 fc=1000 fs=100 v0=0 mdi=2",
+            ),
+        ];
+        for (type_name, params, expected) in cases {
+            let netlist = signal_case("SRC", type_name, params, &[]);
+            assert!(netlist.contains(expected), "{type_name}: {netlist}");
+            // A `...wave` source reads `t` directly; it never takes an input field.
+            assert!(!netlist.contains(" in="), "{type_name}: {netlist}");
+        }
     }
 }

@@ -110,6 +110,21 @@ fn pid_is_the_simplest_static_reference_case() {
     assert_eq!(evaluated.ports.len(), 2);
     assert!(validate_parameters(&c, &params(json!({"n": 50.0}))).is_empty());
     assert_eq!(validate_parameters(&c, &params(json!({"n": 0.0}))).len(), 1);
+
+    // `clamp_lo`/`clamp_hi` were added after the Phase 2 registry work found that
+    // `general-mna`'s `"pid"` arm reads both with `get(...)` and no default -- a contract
+    // without them compiles to a netlist that fails at load with `missing field 'clamp_lo'`.
+    // Their defaults are the same "effectively unbounded" 1e30 sentinel `source.pulsewave`'s
+    // `pw`/`per` already use, so a defaulted PID is an unclamped one.
+    let names: Vec<&str> = c.parameters.iter().map(|p| p.name.as_str()).collect();
+    assert_eq!(names, vec!["kp", "ki", "kd", "n", "clamp_lo", "clamp_hi"]);
+    assert!(validate_parameters(&c, &params(json!({}))).is_empty());
+    assert!(
+        validate_parameters(&c, &params(json!({"clamp_lo": -5.0, "clamp_hi": 5.0}))).is_empty()
+    );
+    let inverted = validate_parameters(&c, &params(json!({"clamp_lo": 5.0, "clamp_hi": -5.0})));
+    assert_eq!(inverted.len(), 1);
+    assert_eq!(inverted[0].parameter, "clamp_hi");
 }
 
 #[test]
