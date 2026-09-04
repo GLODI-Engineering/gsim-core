@@ -69,6 +69,23 @@ pub enum CompileError {
         param: String,
         value: String,
     },
+    /// A wire reads an output past the first on a family that emits **one vector-valued
+    /// signal** under the block's own name (`kind=statespace`/`discretestatespace`). There is
+    /// no netlist spelling for "element 2 of that vector", so emitting the block name would
+    /// silently hand the consumer the whole vector instead.
+    VectorOutputPort {
+        block: String,
+        port: String,
+        type_name: String,
+    },
+    /// An `inputs=` list whose length comes from a parameter had a hole, or that parameter is
+    /// missing/not an array so the length is unknowable.
+    IndexedRefArity {
+        block: String,
+        field: String,
+        expected: usize,
+        connected: usize,
+    },
 }
 
 impl std::fmt::Display for CompileError {
@@ -107,6 +124,23 @@ impl std::fmt::Display for CompileError {
             } => write!(
                 f,
                 "block '{block}' parameter '{param}' value '{value}' maps to no netlist kind= string"
+            ),
+            CompileError::VectorOutputPort {
+                block,
+                port,
+                type_name,
+            } => write!(
+                f,
+                "port '{block}.{port}' cannot be referenced: '{type_name}' emits one vector-valued signal under the block's own name, so only its first output port is addressable in netlist text"
+            ),
+            CompileError::IndexedRefArity {
+                block,
+                field,
+                expected,
+                connected,
+            } => write!(
+                f,
+                "block '{block}' needs {expected} driver(s) for its '{field}=' list but only {connected} of its indexed ports are wired -- a positional list cannot have a hole"
             ),
         }
     }
@@ -156,16 +190,19 @@ impl Outputs {
             _ => None,
         });
         let card = spec::card_name(&block.id, spec);
-        for (i, port) in spec.output_ports.iter().enumerate() {
+        for (i, port) in spec.output_port_ids(block).into_iter().enumerate() {
             let name = match &declared {
                 Some(names) if i < names.len() => names[i].clone(),
                 // The first output always aliases the block's own (card) name.
                 _ if i == 0 => card.clone(),
-                // Family default for a second output, matching general-mna's own.
-                _ => format!("{card}_{port}"),
+                // Family default for a second output, matching general-mna's own. The suffix
+                // is the port id, or -- for a family carrying its outputs' declared names in a
+                // parameter (`cscript`'s `output_names`) -- that name, so a generated
+                // `outputs=` list stays readable. Prefixing the card name keeps every emitted
+                // symbol unique even when two blocks declare the same output name.
+                _ => format!("{card}_{}", spec.output_suffix(block, i, &port)),
             };
-            self.by_port
-                .insert((block.id.clone(), (*port).to_string()), name);
+            self.by_port.insert((block.id.clone(), port), name);
         }
     }
 
@@ -227,6 +264,22 @@ impl Scope<'_> {
         if let Some(def) = self.def {
             if peer.block == def.id {
                 return Ok(peer.port.clone());
+            }
+        }
+        // A vector-output family has exactly one addressable name; reading any later port
+        // would silently mean "the whole vector" instead of "that element".
+        if let Some(peer_spec) = self
+            .block(&peer.block)
+            .and_then(|b| spec::lookup(&b.r#type))
+        {
+            if peer_spec.vector_output
+                && peer_spec.output_ports.first() != Some(&peer.port.as_str())
+            {
+                return Err(CompileError::VectorOutputPort {
+                    block: peer.block.clone(),
+                    port: peer.port.clone(),
+                    type_name: peer_spec.type_name.to_string(),
+                });
             }
         }
         Ok(self

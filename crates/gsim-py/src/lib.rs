@@ -71,6 +71,8 @@ fn compile_err_to_py(e: CompileError) -> PyErr {
         CompileError::UnknownSubcktDef { .. } => "unknown-subckt-def",
         CompileError::UnconnectedSubcktPort { .. } => "unconnected-subckt-port",
         CompileError::UnknownVariant { .. } => "unknown-variant",
+        CompileError::VectorOutputPort { .. } => "vector-output-port",
+        CompileError::IndexedRefArity { .. } => "indexed-ref-arity",
     };
     PyErr::new::<PyValueError, _>(format!("{keyword}: {e}"))
 }
@@ -201,7 +203,8 @@ struct CompileResult {
 /// `{"netlist": "<text>", "notes": ["<info-level compiler decision>", ...]}`. Raises a
 /// `ValueError` whose message is keyword-prefixed the same way the builder errors are
 /// (`unknown-type:`, `unknown-target:`, `floating-port:`, `unconnected-ref:`,
-/// `missing-param:`, `unknown-subckt-def:`, `unconnected-subckt-port:`, `unknown-variant:`),
+/// `missing-param:`, `unknown-subckt-def:`, `unconnected-subckt-port:`, `unknown-variant:`, `vector-output-port:`,
+/// `indexed-ref-arity:`),
 /// with the real underlying message following unmodified.
 #[pyfunction]
 fn compile(model_json: &str, target: &str) -> PyResult<String> {

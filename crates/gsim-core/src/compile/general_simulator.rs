@@ -39,6 +39,18 @@ impl NetlistTarget for GeneralSimulatorTarget {
                     .join(" ")
             ));
             emit_scope(scope, &mut lines)?;
+            // Nested X cards: a def may instantiate another def, exactly as a real `.SUBCKT`
+            // body may contain `X` cards of its own. Two spellings reach the same place --
+            // a body `Block` carrying a `subckt_ref` (wired through the body's own ports, so
+            // its connections are derived) and a `SubcktInstance` in `def.instances` (whose
+            // `connections` are already net/signal *names* in the body's namespace, the way a
+            // hand-written `X` card's are).
+            for nested in scope.blocks.iter().filter(|b| b.subckt_ref.is_some()) {
+                lines.push(emit_x_card(ctx, scope, nested)?);
+            }
+            for instance in &def.instances {
+                lines.push(emit_nested_instance(ctx, instance)?);
+            }
             lines.push(format!(".ends {}", def.name));
         }
 
@@ -200,20 +212,96 @@ fn emit_block_card(
                 }
                 tokens.push(format!("{field}={}", names.join(",")));
             }
+            FieldSpec::RefsIndexed {
+                field,
+                prefix,
+                arity,
+            } => {
+                let expected = arity
+                    .count(block)
+                    .ok_or_else(|| CompileError::IndexedRefArity {
+                        block: block.id.clone(),
+                        field: (*field).to_string(),
+                        expected: 0,
+                        connected: 0,
+                    })?;
+                let mut names = Vec::new();
+                for i in 0..expected {
+                    let port = format!("{prefix}{i}");
+                    match scope.ref_name(&block.id, &port) {
+                        Ok(name) => names.push(name),
+                        Err(CompileError::UnconnectedRef { .. }) => break,
+                        Err(other) => return Err(other),
+                    }
+                }
+                if names.len() != expected {
+                    return Err(CompileError::IndexedRefArity {
+                        block: block.id.clone(),
+                        field: (*field).to_string(),
+                        expected,
+                        connected: names.len(),
+                    });
+                }
+                tokens.push(format!("{field}={}", names.join(",")));
+            }
             FieldSpec::Outputs { field } => {
-                if spec.output_ports.len() > 1 {
-                    let names: Vec<&str> = spec
-                        .output_ports
+                let ports = spec.output_port_ids(block);
+                if ports.len() > 1 {
+                    let names: Vec<&str> = ports
                         .iter()
                         .filter_map(|p| scope.outputs.name_of(&block.id, p))
                         .collect();
-                    if names.len() == spec.output_ports.len() {
+                    if names.len() == ports.len() {
                         tokens.push(format!("{field}={}", names.join(",")));
                     }
                 }
             }
         }
     }
+    Ok(tokens.join(" "))
+}
+
+/// The emitted `X`-card name for an instance id: real SPICE dispatches subcircuit instances on
+/// the leading `X`, the same way [`spec::element_name`] handles element device letters.
+fn x_card_name(id: &str) -> String {
+    match id.chars().next() {
+        Some('X') | Some('x') => id.to_string(),
+        _ => format!("X{id}"),
+    }
+}
+
+/// `X<name> <connections...> <def_name>` for a [`SubcktInstance`] nested inside a def body.
+///
+/// Unlike a top-level instance block, a `SubcktInstance`'s `connections` are already *names* in
+/// the enclosing body's namespace (a boundary port name, or an internal net name) rather than
+/// endpoints to resolve — the same thing a hand-written `X` card inside a `.SUBCKT` carries.
+/// They are still positional, so a wrong count is a hard error rather than a short card.
+fn emit_nested_instance(
+    ctx: &CompileContext<'_>,
+    instance: &crate::document::SubcktInstance,
+) -> Result<String, CompileError> {
+    let def: &SubcktDef = ctx
+        .model
+        .subckt_defs
+        .iter()
+        .find(|d| d.id == instance.def_ref)
+        .ok_or_else(|| CompileError::UnknownSubcktDef {
+            block: instance.id.clone(),
+            def_ref: instance.def_ref.clone(),
+        })?;
+    if instance.connections.len() != def.ports.len() {
+        return Err(CompileError::UnconnectedSubcktPort {
+            block: instance.id.clone(),
+            port: def
+                .ports
+                .get(instance.connections.len())
+                .map(|p| p.id.clone())
+                .unwrap_or_else(|| format!("<{} extra>", instance.connections.len())),
+        });
+    }
+    let mut tokens = vec![x_card_name(&instance.id)];
+    tokens.extend(instance.connections.iter().cloned());
+    tokens.push(def.name.clone());
     Ok(tokens.join(" "))
 }
 
@@ -237,12 +325,7 @@ fn emit_x_card(
             def_ref: def_ref.to_string(),
         })?;
 
-    let name = if block.id.starts_with('X') || block.id.starts_with('x') {
-        block.id.clone()
-    } else {
-        format!("X{}", block.id)
-    };
-    let mut tokens = vec![name];
+    let mut tokens = vec![x_card_name(&block.id)];
     for port in &def.ports {
         let ep = Endpoint::new(&block.id, &port.id);
         let token = if crate::compile::nets::is_physical_kind(&port.kind) {
@@ -272,7 +355,7 @@ mod tests {
     use crate::compile::compile;
     use crate::document::{
         ConnectOptions, ModelBuilder, NewBlockSpec, NewSubcktInstanceSpec, Paradigm, SubcktDef,
-        SubcktPort,
+        SubcktInstance, SubcktPort,
     };
     use serde_json::json;
 
@@ -285,6 +368,16 @@ mod tests {
             params: params.as_object().cloned().unwrap_or_default(),
             ..Default::default()
         })
+        .unwrap();
+    }
+
+    fn sig(b: &mut ModelBuilder, fb: &str, fp: &str, tb: &str, tp: &str) {
+        b.connect(
+            Endpoint::new(fb, fp),
+            Endpoint::new(tb, tp),
+            "signal",
+            ConnectOptions::default(),
+        )
         .unwrap();
     }
 
@@ -721,6 +814,525 @@ mod tests {
             ),
             "{}",
             out.netlist
+        );
+    }
+
+    /// `b`'s column count is the input count, so `in0` is the only indexed port here.
+    #[test]
+    fn emits_a_siso_state_space_with_matrix_literals_and_an_inputs_list() {
+        let mut b = ModelBuilder::new("m", "M", 10);
+        add(
+            &mut b,
+            "SRC",
+            "source.const",
+            Paradigm::SignalFlow,
+            json!({"value": 1.0}),
+        );
+        add(
+            &mut b,
+            "SS1",
+            "control.state_space",
+            Paradigm::SignalFlow,
+            json!({"a": [[-1.0]], "b": [[1.0]], "c": [[1.0]]}),
+        );
+        sig(&mut b, "SRC", "out", "SS1", "in0");
+        let out = compile(&b.into_model(), "general-simulator").unwrap();
+        assert!(
+            out.netlist
+                .contains("SS1 kind=statespace a=[[-1]] b=[[1]] c=[[1]] inputs=SRC"),
+            "{}",
+            out.netlist
+        );
+        // `d=` is optional (general-mna defaults it to an all-zero q x p), so it is not forced.
+        assert!(!out.netlist.contains(" d="), "{}", out.netlist);
+    }
+
+    #[test]
+    fn a_mimo_state_space_gets_one_inputs_entry_per_b_column() {
+        let mut b = ModelBuilder::new("m", "M", 10);
+        for (id, v) in [("U1", 1.0), ("U2", 2.0)] {
+            add(
+                &mut b,
+                id,
+                "source.const",
+                Paradigm::SignalFlow,
+                json!({ "value": v }),
+            );
+        }
+        add(
+            &mut b,
+            "SS1",
+            "control.state_space",
+            Paradigm::SignalFlow,
+            json!({"a": [[0.0, 1.0], [-1.0, -1.0]], "b": [[1.0, 0.0], [0.0, 1.0]],
+                   "c": [[1.0, 0.0], [0.0, 1.0]], "d": [[0.0, 0.0], [0.0, 0.0]]}),
+        );
+        sig(&mut b, "U1", "out", "SS1", "in0");
+        sig(&mut b, "U2", "out", "SS1", "in1");
+        let out = compile(&b.into_model(), "general-simulator").unwrap();
+        assert!(out.netlist.contains("inputs=U1,U2"), "{}", out.netlist);
+        assert!(
+            out.netlist.contains("a=[[0,1],[-1,-1]] b=[[1,0],[0,1]]"),
+            "{}",
+            out.netlist
+        );
+    }
+
+    #[test]
+    fn an_indexed_inputs_list_with_a_hole_is_rejected() {
+        let mut b = ModelBuilder::new("m", "M", 10);
+        add(
+            &mut b,
+            "U1",
+            "source.const",
+            Paradigm::SignalFlow,
+            json!({"value": 1.0}),
+        );
+        add(
+            &mut b,
+            "SS1",
+            "control.state_space",
+            Paradigm::SignalFlow,
+            json!({"a": [[0.0]], "b": [[1.0, 0.0]], "c": [[1.0]]}),
+        );
+        sig(&mut b, "U1", "out", "SS1", "in0");
+        let err = compile(&b.into_model(), "general-simulator").unwrap_err();
+        assert_eq!(
+            err,
+            CompileError::IndexedRefArity {
+                block: "SS1".to_string(),
+                field: "inputs".to_string(),
+                expected: 2,
+                connected: 1,
+            }
+        );
+    }
+
+    #[test]
+    fn a_state_space_output_past_the_first_is_rejected_rather_than_silently_meaning_the_vector() {
+        // general-mna's "statespace" arm parses no `outputs=` field at all: a MIMO system is one
+        // SignalValue::Vector under the block's own name. Referencing `out1` would emit `SS1`
+        // and hand the consumer the whole vector -- a netlist that parses and means something
+        // else, which is exactly the class of bug worth failing loudly on.
+        let mut b = ModelBuilder::new("m", "M", 10);
+        add(
+            &mut b,
+            "U1",
+            "source.const",
+            Paradigm::SignalFlow,
+            json!({"value": 1.0}),
+        );
+        add(
+            &mut b,
+            "SS1",
+            "control.state_space",
+            Paradigm::SignalFlow,
+            json!({"a": [[0.0]], "b": [[1.0]], "c": [[1.0], [1.0]]}),
+        );
+        add(
+            &mut b,
+            "G1",
+            "control.gain",
+            Paradigm::SignalFlow,
+            json!({"k": 2.0}),
+        );
+        sig(&mut b, "U1", "out", "SS1", "in0");
+        sig(&mut b, "SS1", "out1", "G1", "in");
+        let err = compile(&b.into_model(), "general-simulator").unwrap_err();
+        assert!(
+            matches!(err, CompileError::VectorOutputPort { ref port, .. } if port == "out1"),
+            "{err:?}"
+        );
+    }
+
+    #[test]
+    fn emits_a_transfer_function_and_its_discrete_sibling() {
+        let mut b = ModelBuilder::new("m", "M", 10);
+        add(
+            &mut b,
+            "SRC",
+            "source.const",
+            Paradigm::SignalFlow,
+            json!({"value": 1.0}),
+        );
+        add(
+            &mut b,
+            "TF1",
+            "control.transfer_function",
+            Paradigm::SignalFlow,
+            json!({"num": [1.0], "den": [1.0, 1.0]}),
+        );
+        add(
+            &mut b,
+            "DTF1",
+            "control.discrete_transfer_function",
+            Paradigm::SignalFlow,
+            json!({"num": [0.1], "den": [1.0, -0.9], "ts": 1e-4}),
+        );
+        sig(&mut b, "SRC", "out", "TF1", "in");
+        sig(&mut b, "SRC", "out", "DTF1", "in");
+        let out = compile(&b.into_model(), "general-simulator").unwrap();
+        // `kind=tf` reads `in=` only -- it has no `inputs=` branch at all.
+        assert!(
+            out.netlist.contains("TF1 kind=tf num=[1] den=[1,1] in=SRC"),
+            "{}",
+            out.netlist
+        );
+        assert!(
+            out.netlist
+                .contains("DTF1 kind=discretetf num=[0.1] den=[1,-0.9] ts=0.0001 in=SRC"),
+            "{}",
+            out.netlist
+        );
+    }
+
+    #[test]
+    fn a_discrete_state_space_requires_its_sample_time() {
+        let mut b = ModelBuilder::new("m", "M", 10);
+        add(
+            &mut b,
+            "SRC",
+            "source.const",
+            Paradigm::SignalFlow,
+            json!({"value": 1.0}),
+        );
+        add(
+            &mut b,
+            "DSS",
+            "control.discrete_state_space",
+            Paradigm::SignalFlow,
+            json!({"a": [[0.9]], "b": [[0.1]], "c": [[1.0]]}),
+        );
+        sig(&mut b, "SRC", "out", "DSS", "in0");
+        let err = compile(&b.into_model(), "general-simulator").unwrap_err();
+        assert_eq!(
+            err,
+            CompileError::MissingParam {
+                block: "DSS".to_string(),
+                param: "ts".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn every_coordinate_transform_emits_its_own_kind_string_in_call_order() {
+        // Six distinct `kind=` strings, not one type plus a selector param -- matched against
+        // system_builder.rs's own `"clarke" | "clarkeinv" | ...` arm and against
+        // CoordinateTransform::call's positional input order.
+        let cases: &[(&str, &str, &[&str], &str)] = &[
+            (
+                "control.transform.clarke",
+                "clarke",
+                &["a", "b", "c"],
+                "outputs=T,T_beta,T_zero",
+            ),
+            (
+                "control.transform.clarke_inv",
+                "clarkeinv",
+                &["alpha", "beta", "zero"],
+                "outputs=T,T_b,T_c",
+            ),
+            (
+                "control.transform.park",
+                "park",
+                &["alpha", "beta", "zero", "theta"],
+                "outputs=T,T_q,T_zero_out",
+            ),
+            (
+                "control.transform.park_inv",
+                "parkinv",
+                &["d", "q", "zero", "theta"],
+                "outputs=T,T_beta,T_zero_out",
+            ),
+            (
+                "control.transform.clarke_park",
+                "clarkepark",
+                &["a", "b", "c", "theta"],
+                "outputs=T,T_q,T_zero",
+            ),
+            (
+                "control.transform.clarke_park_inv",
+                "clarkeparkinv",
+                &["d", "q", "zero", "theta"],
+                "outputs=T,T_b,T_c",
+            ),
+        ];
+        for (type_name, kind, ports, outputs) in cases {
+            let mut b = ModelBuilder::new("m", "M", 10);
+            add(&mut b, "T", type_name, Paradigm::SignalFlow, json!({}));
+            let mut names = Vec::new();
+            for (i, port) in ports.iter().enumerate() {
+                let src = format!("U{i}");
+                add(
+                    &mut b,
+                    &src,
+                    "source.const",
+                    Paradigm::SignalFlow,
+                    json!({ "value": i as f64 }),
+                );
+                sig(&mut b, &src, "out", "T", port);
+                names.push(src);
+            }
+            let out = compile(&b.into_model(), "general-simulator").unwrap();
+            let expected = format!("T kind={kind} inputs={} {outputs}", names.join(","));
+            assert!(
+                out.netlist.contains(&expected),
+                "{expected}\n{}",
+                out.netlist
+            );
+        }
+    }
+
+    #[test]
+    fn emits_a_pmsm_with_its_seven_parameters_and_four_named_outputs() {
+        let mut b = ModelBuilder::new("m", "M", 10);
+        add(
+            &mut b,
+            "M1",
+            "machine.pmsm",
+            Paradigm::SignalFlow,
+            json!({"r_s": 0.5, "l_d": 0.001, "l_q": 0.0012, "lambda_pm": 0.08,
+                   "pole_pairs": 4.0, "inertia": 0.001, "friction": 0.0001}),
+        );
+        for (i, port) in ["vd", "vq", "t_load"].iter().enumerate() {
+            let src = format!("U{i}");
+            add(
+                &mut b,
+                &src,
+                "source.const",
+                Paradigm::SignalFlow,
+                json!({ "value": i as f64 }),
+            );
+            sig(&mut b, &src, "out", "M1", port);
+        }
+        let out = compile(&b.into_model(), "general-simulator").unwrap();
+        assert!(
+            out.netlist.contains(
+                "M1 kind=pmsm r_s=0.5 l_d=0.001 l_q=0.0012 lambda_pm=0.08 pole_pairs=4 \
+                 inertia=0.001 friction=0.0001 inputs=U0,U1,U2 outputs=M1,M1_iq,M1_omega_m,M1_theta_e"
+            ),
+            "{}",
+            out.netlist
+        );
+    }
+
+    #[test]
+    fn each_script_hosted_family_emits_its_own_source_locating_field() {
+        // The one real surprise from re-reading system_builder.rs: cscript takes `lib=`
+        // (a precompiled .so), not `path=` like the rest of the family.
+        let mut b = ModelBuilder::new("m", "M", 10);
+        add(
+            &mut b,
+            "SRC",
+            "source.const",
+            Paradigm::SignalFlow,
+            json!({"value": 1.0}),
+        );
+        add(
+            &mut b,
+            "C1",
+            "extensibility.cscript",
+            Paradigm::SignalFlow,
+            json!({"lib": "./blk.so", "input_names": ["u"], "output_names": ["y"],
+                   "xc_count": 1, "ts": "variable"}),
+        );
+        add(
+            &mut b,
+            "P1",
+            "extensibility.pyblock",
+            Paradigm::SignalFlow,
+            json!({"path": "./blk.py", "input_names": ["u"], "output_names": ["y"]}),
+        );
+        add(
+            &mut b,
+            "P2",
+            "extensibility.pyfunc",
+            Paradigm::SignalFlow,
+            json!({"path": "./f.py", "function": "scale",
+                   "input_names": ["u"], "output_names": ["y1", "y2"]}),
+        );
+        add(
+            &mut b,
+            "O1",
+            "extensibility.octfunc",
+            Paradigm::SignalFlow,
+            json!({"path": "./f.m", "function": "scale",
+                   "input_names": ["u"], "output_names": ["y"]}),
+        );
+        for id in ["C1", "P1", "P2", "O1"] {
+            sig(&mut b, "SRC", "out", id, "in0");
+        }
+        let out = compile(&b.into_model(), "general-simulator").unwrap();
+        assert!(
+            out.netlist
+                .contains("C1 kind=cscript lib=./blk.so ts=variable xc_count=1 inputs=SRC"),
+            "{}",
+            out.netlist
+        );
+        assert!(
+            out.netlist
+                .contains("P1 kind=pyblock path=./blk.py inputs=SRC"),
+            "{}",
+            out.netlist
+        );
+        // Two declared outputs: the first aliases the block's own name, the second takes the
+        // declared name as its suffix -- card-name-prefixed so two blocks both declaring `y2`
+        // cannot collide.
+        assert!(
+            out.netlist
+                .contains("P2 kind=pyfunc path=./f.py function=scale inputs=SRC outputs=P2,P2_y2"),
+            "{}",
+            out.netlist
+        );
+        // A single-output block needs no `outputs=` at all: general-mna's own default is
+        // [name], which is exactly what this compiler already assumes.
+        assert!(
+            out.netlist
+                .contains("O1 kind=octfunc path=./f.m function=scale inputs=SRC\n"),
+            "{}",
+            out.netlist
+        );
+        // pyfunc/octfunc never parse xc_count, so it is not in their field list.
+        assert!(
+            !out.netlist.contains("kind=pyfunc")
+                || !out
+                    .netlist
+                    .contains("P2 kind=pyfunc path=./f.py function=scale xc_count"),
+            "{}",
+            out.netlist
+        );
+    }
+
+    #[test]
+    fn a_second_script_output_is_readable_downstream_by_its_generated_name() {
+        let mut b = ModelBuilder::new("m", "M", 10);
+        add(
+            &mut b,
+            "SRC",
+            "source.const",
+            Paradigm::SignalFlow,
+            json!({"value": 1.0}),
+        );
+        add(
+            &mut b,
+            "P2",
+            "extensibility.pyfunc",
+            Paradigm::SignalFlow,
+            json!({"path": "./f.py", "function": "split",
+                   "input_names": ["u"], "output_names": ["a", "b"]}),
+        );
+        add(
+            &mut b,
+            "G1",
+            "control.gain",
+            Paradigm::SignalFlow,
+            json!({"k": 2.0}),
+        );
+        sig(&mut b, "SRC", "out", "P2", "in0");
+        sig(&mut b, "P2", "out1", "G1", "in");
+        let out = compile(&b.into_model(), "general-simulator").unwrap();
+        assert!(
+            out.netlist.contains("G1 kind=gain k=2 inputs=P2_b"),
+            "{}",
+            out.netlist
+        );
+    }
+
+    #[test]
+    fn a_subckt_def_instantiating_another_def_emits_a_nested_x_card() {
+        let mut b = ModelBuilder::new("m", "M", 10);
+
+        let mut inner = SubcktDef::new("inner", "INNER").unwrap().with_ports([
+            SubcktPort::new("a", "physical-electrical").unwrap(),
+            SubcktPort::new("b", "physical-electrical").unwrap(),
+        ]);
+        {
+            let mut body = ModelBuilder::new("__inner", "inner", 10);
+            add(
+                &mut body,
+                "inner",
+                "spice-subckt.boundary",
+                Paradigm::SpiceSubckt,
+                json!({}),
+            );
+            add(
+                &mut body,
+                "Rin",
+                "passive.resistor",
+                Paradigm::PhysicalNetwork,
+                json!({"R": 100.0}),
+            );
+            elec(&mut body, "inner", "a", "Rin", "p1");
+            elec(&mut body, "Rin", "p2", "inner", "b");
+            let m = body.into_model();
+            inner.blocks = m.blocks;
+            inner.wires = m.wires;
+        }
+        b.add_subckt_def(inner).unwrap();
+
+        // OUTER's own body holds nothing but an X card of INNER -- the case the emitter used
+        // to drop silently.
+        let mut outer = SubcktDef::new("outer", "OUTER").unwrap().with_ports([
+            SubcktPort::new("p", "physical-electrical").unwrap(),
+            SubcktPort::new("q", "physical-electrical").unwrap(),
+        ]);
+        outer.instances = vec![
+            SubcktInstance::new("Xi", "inner").with_connections(["p", "mid"]),
+            SubcktInstance::new("Xj", "inner").with_connections(["mid", "q"]),
+        ];
+        b.add_subckt_def(outer).unwrap();
+
+        b.instantiate_subckt(NewSubcktInstanceSpec::new("outer", (0, 0)).with_id("X1"))
+            .unwrap();
+        add(
+            &mut b,
+            "gnd",
+            "routing.ground",
+            Paradigm::PhysicalNetwork,
+            json!({}),
+        );
+        elec(&mut b, "X1", "p", "gnd", "p");
+        elec(&mut b, "X1", "q", "gnd", "p");
+
+        let out = compile(&b.into_model(), "general-simulator").unwrap();
+        assert!(out.netlist.contains(".subckt OUTER p q"), "{}", out.netlist);
+        assert!(
+            out.netlist.contains("\nXi p mid INNER\n"),
+            "{}",
+            out.netlist
+        );
+        assert!(
+            out.netlist.contains("\nXj mid q INNER\n"),
+            "{}",
+            out.netlist
+        );
+        // The nested cards must land *inside* OUTER's own .subckt/.ends block.
+        let body = out.netlist.split(".subckt OUTER p q").nth(1).unwrap();
+        let body = body.split(".ends OUTER").next().unwrap();
+        assert!(body.contains("Xi p mid INNER"), "{body}");
+        assert!(body.contains("Xj mid q INNER"), "{body}");
+    }
+
+    #[test]
+    fn a_nested_instance_with_the_wrong_connection_count_is_rejected() {
+        let mut b = ModelBuilder::new("m", "M", 10);
+        let inner = SubcktDef::new("inner", "INNER").unwrap().with_ports([
+            SubcktPort::new("a", "physical-electrical").unwrap(),
+            SubcktPort::new("b", "physical-electrical").unwrap(),
+        ]);
+        b.add_subckt_def(inner).unwrap();
+        let mut outer = SubcktDef::new("outer", "OUTER")
+            .unwrap()
+            .with_ports([SubcktPort::new("p", "physical-electrical").unwrap()]);
+        outer.instances = vec![SubcktInstance::new("Xi", "inner").with_connections(["p"])];
+        b.add_subckt_def(outer).unwrap();
+        let err = compile(&b.into_model(), "general-simulator").unwrap_err();
+        assert_eq!(
+            err,
+            CompileError::UnconnectedSubcktPort {
+                block: "Xi".to_string(),
+                port: "b".to_string()
+            }
         );
     }
 }

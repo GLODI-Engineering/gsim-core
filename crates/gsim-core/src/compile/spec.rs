@@ -27,6 +27,7 @@
 //! [`element_name`] prefixes an id that doesn't already start with it, rather than silently
 //! emitting a line the simulator will refuse.
 
+use crate::document::Block;
 use serde_json::Value;
 
 /// What follows an element card's positional nodes.
@@ -44,6 +45,51 @@ pub enum ElementTail {
     },
     /// Nothing after the nodes.
     None,
+}
+
+/// How many ports a family whose port *count* is set by a parameter actually has.
+///
+/// GSF v2 already models these families with `for_each`-generated ports
+/// (`extensibility.cscript`'s `in${{ i }}` over `params.input_names`,
+/// `control.state_space`'s `in${{ i }}` over `count(at(params.b, 0))`), so the count is a
+/// property of the *instance*, not of the type — a `&'static [&'static str]` cannot express it.
+#[derive(Debug, Clone, Copy)]
+pub enum Arity {
+    /// The number of entries in an array parameter (`input_names`, `output_names`).
+    ParamLen(&'static str),
+    /// The column count of a matrix parameter. `general-mna`'s
+    /// `parse_matrix_or_vector_shorthand` accepts either a real matrix (`b=[[1,0],[0,1]]`,
+    /// `n x p` for `p` inputs) or a **flat vector as SISO shorthand** (`b=[1,0]` means one
+    /// input), so a flat array here counts as exactly one column, not as its own length.
+    MatrixCols(&'static str),
+}
+
+impl Arity {
+    pub fn count(&self, block: &Block) -> Option<usize> {
+        match self {
+            Arity::ParamLen(p) => block.params.get(*p)?.as_array().map(Vec::len),
+            Arity::MatrixCols(p) => {
+                let rows = block.params.get(*p)?.as_array()?;
+                match rows.first() {
+                    Some(Value::Array(first)) => Some(first.len()),
+                    // Flat-vector SISO shorthand.
+                    Some(_) => Some(1),
+                    None => Some(0),
+                }
+            }
+        }
+    }
+}
+
+/// Output ports whose count is set by a parameter rather than fixed by the type.
+#[derive(Debug, Clone, Copy)]
+pub struct DynamicOutputs {
+    /// Port ids are `<prefix><i>`, matching the GSF v2 fixture's own `for_each` emission.
+    pub prefix: &'static str,
+    pub arity: Arity,
+    /// The array parameter holding each output's *declared* name, used as the emitted name's
+    /// suffix so a generated `outputs=` list stays readable (`SCR,SCR_y2`).
+    pub names_param: Option<&'static str>,
 }
 
 /// One `field=value` token on a `kind=` block card.
@@ -71,6 +117,14 @@ pub enum FieldSpec {
     Refs {
         field: &'static str,
         ports: &'static [&'static str],
+    },
+    /// `field=<comma-joined names of the drivers of ports `<prefix>0`..`<prefix>{n-1}`>`, where
+    /// `n` comes from an [`Arity`] rather than being fixed by the type. Every one of those
+    /// ports must be driven — an `inputs=` list is positional and cannot have a hole.
+    RefsIndexed {
+        field: &'static str,
+        prefix: &'static str,
+        arity: Arity,
     },
     /// `outputs=<comma-joined output names>`, emitted only when this block declares more than
     /// one output and is not content with the target's own defaults.
@@ -115,6 +169,20 @@ pub struct TypeSpec {
     /// This type's output ports, in the order `general-mna`'s own `output_names` convention
     /// uses. `output_ports[0]` aliases the block's own name; later ones need explicit names.
     pub output_ports: &'static [&'static str],
+    /// Set instead of [`Self::output_ports`] when the output count is per-instance.
+    pub dynamic_outputs: Option<DynamicOutputs>,
+    /// This family emits **one vector-valued signal** under the block's own name rather than
+    /// one separately-addressable signal per output.
+    ///
+    /// True for `kind=statespace`/`discretestatespace`, verified against
+    /// `general-mna/src/system_builder.rs`: those two arms build their `BlockInstance` with no
+    /// `output_names` at all (there is no `outputs=` field to parse), and
+    /// `BlockKind::StateSpace`'s own doc states `outputs() > 1` produces a
+    /// `SignalValue::Vector`. The GSF v2 contract still draws `out0..out{q-1}` pins, so a
+    /// document *can* wire the second one — and referencing it would silently mean "the whole
+    /// vector" instead. [`super::Scope::ref_name`] rejects that rather than emitting a netlist
+    /// that parses and means something else.
+    pub vector_output: bool,
     /// A structural block that emits no netlist line at all (a ground symbol only *names* a
     /// net; a subckt boundary only marks the def's interface).
     pub structural: bool,
@@ -129,7 +197,39 @@ impl TypeSpec {
             tail: ElementTail::None,
             kind: None,
             output_ports: &[],
+            dynamic_outputs: None,
+            vector_output: false,
             structural: false,
+        }
+    }
+
+    /// This block's output port ids in declaration order — the static list, or the
+    /// `<prefix><i>` ids a [`DynamicOutputs`] arity generates for this particular instance.
+    pub fn output_port_ids(&self, block: &Block) -> Vec<String> {
+        match &self.dynamic_outputs {
+            Some(dynamic) => {
+                let n = dynamic.arity.count(block).unwrap_or(0);
+                (0..n).map(|i| format!("{}{i}", dynamic.prefix)).collect()
+            }
+            None => self.output_ports.iter().map(|p| (*p).to_string()).collect(),
+        }
+    }
+
+    /// The suffix used to build the emitted name of output `index` (never used for index 0,
+    /// which always aliases the block's own card name): the declared output name where the
+    /// family has a `names_param`, else the port id itself.
+    pub fn output_suffix(&self, block: &Block, index: usize, port: &str) -> String {
+        let declared = self
+            .dynamic_outputs
+            .as_ref()
+            .and_then(|d| d.names_param)
+            .and_then(|p| block.params.get(p))
+            .and_then(Value::as_array)
+            .and_then(|names| names.get(index))
+            .map(render_value);
+        match declared {
+            Some(name) if !name.is_empty() => name,
+            _ => port.to_string(),
         }
     }
 }
@@ -207,8 +307,78 @@ macro_rules! rc {
     };
 }
 
+/// `NAME kind=<kind> inputs=<in ports, in order> outputs=<the three output names>` — the
+/// whole shape of every coordinate-transform card.
+macro_rules! transform {
+    ($type_name:literal, $kind:literal, $inputs:expr, $outputs:expr) => {
+        TypeSpec {
+            kind: Some(KindSpec {
+                kind: KindName::Fixed($kind),
+                fields: &[
+                    FieldSpec::Refs {
+                        field: "inputs",
+                        ports: $inputs,
+                    },
+                    FieldSpec::Outputs { field: "outputs" },
+                ],
+            }),
+            output_ports: $outputs,
+            ..TypeSpec::empty($type_name)
+        }
+    };
+}
+
+/// A script-hosted block (`cscript`/`pyblock`/`pyfunc`/`octfunc`/`octblock`): the given
+/// source-locating fields, then the `inputs=`/`outputs=` lists whose lengths are this
+/// instance's own `input_names`/`output_names` parameters — exactly the arity the GSF v2
+/// fixtures' `for_each` port emission uses.
+macro_rules! script_block {
+    ($type_name:literal, $kind:literal, [$($field:expr),* $(,)?]) => {
+        TypeSpec {
+            kind: Some(KindSpec {
+                kind: KindName::Fixed($kind),
+                fields: &[
+                    $($field,)*
+                    FieldSpec::RefsIndexed {
+                        field: "inputs",
+                        prefix: "in",
+                        arity: Arity::ParamLen("input_names"),
+                    },
+                    FieldSpec::Outputs { field: "outputs" },
+                ],
+            }),
+            dynamic_outputs: Some(DynamicOutputs {
+                prefix: "out",
+                arity: Arity::ParamLen("output_names"),
+                names_param: Some("output_names"),
+            }),
+            ..TypeSpec::empty($type_name)
+        }
+    };
+}
+
+const fn req(field: &'static str, param: &'static str) -> FieldSpec {
+    FieldSpec::Param {
+        field,
+        param,
+        required: true,
+    }
+}
+
+const fn opt(field: &'static str, param: &'static str) -> FieldSpec {
+    FieldSpec::Param {
+        field,
+        param,
+        required: false,
+    }
+}
+
 const TWO_PIN: &[&str] = &["p1", "p2"];
 const SOURCE_PINS: &[&str] = &["p", "n"];
+const ABC: &[&str] = &["a", "b", "c"];
+const ALPHA_BETA_ZERO: &[&str] = &["alpha", "beta", "zero"];
+const DQ_ZERO_THETA: &[&str] = &["d", "q", "zero", "theta"];
+const DQ_ZERO_OUT: &[&str] = &["d", "q", "zero_out"];
 
 /// Every type the compiler knows how to emit.
 ///
@@ -565,6 +735,221 @@ pub const REGISTRY: &[TypeSpec] = &[
         output_ports: &["out"],
         ..TypeSpec::empty("logic.hysteresis")
     },
+    // -- linear dynamics: state-space and transfer function ------------------
+    //
+    // Field spellings read out of `general-mna/src/system_builder.rs`'s own `"statespace"` /
+    // `"tf"` / `"discretestatespace"` / `"discretetf"` arms, not from the fixtures alone:
+    //   * matrices are Python list literals (`a=[[1,2],[3,4]]`) -- `parse_matrix_rows` strips
+    //     one layer of brackets and splits on *top-level* commas, which is exactly what
+    //     `render_value` already produces for a nested JSON array;
+    //   * `b=`/`c=` also accept a flat vector as SISO shorthand, and `d=` is optional
+    //     (defaulting to an all-zero `q x p` matrix), so neither is forced here;
+    //   * inputs go through `inputs=<sig,...>`; `in=` is that same field's one-input special
+    //     case, so the list form covers both;
+    //   * there is deliberately **no** `outputs=` field on either state-space arm -- see
+    //     `TypeSpec::vector_output`.
+    TypeSpec {
+        kind: Some(KindSpec {
+            kind: KindName::Fixed("statespace"),
+            fields: &[
+                req("a", "a"),
+                req("b", "b"),
+                req("c", "c"),
+                opt("d", "d"),
+                FieldSpec::RefsIndexed {
+                    field: "inputs",
+                    prefix: "in",
+                    arity: Arity::MatrixCols("b"),
+                },
+            ],
+        }),
+        output_ports: &["out0"],
+        vector_output: true,
+        ..TypeSpec::empty("control.state_space")
+    },
+    TypeSpec {
+        kind: Some(KindSpec {
+            kind: KindName::Fixed("discretestatespace"),
+            fields: &[
+                req("a", "a"),
+                req("b", "b"),
+                req("c", "c"),
+                opt("d", "d"),
+                // `parse_required_periodic_sample_time`: mandatory here, unlike the optional
+                // `ts=` on cscript/pyblock/pyfunc.
+                req("ts", "ts"),
+                FieldSpec::RefsIndexed {
+                    field: "inputs",
+                    prefix: "in",
+                    arity: Arity::MatrixCols("b"),
+                },
+            ],
+        }),
+        output_ports: &["out0"],
+        vector_output: true,
+        ..TypeSpec::empty("control.discrete_state_space")
+    },
+    TypeSpec {
+        kind: Some(KindSpec {
+            kind: KindName::Fixed("tf"),
+            fields: &[
+                req("num", "num"),
+                req("den", "den"),
+                // Genuinely SISO: the `"tf"` arm reads `in=` only, with no `inputs=` branch.
+                FieldSpec::Ref {
+                    field: "in",
+                    port: "in",
+                },
+            ],
+        }),
+        output_ports: &["out"],
+        ..TypeSpec::empty("control.transfer_function")
+    },
+    TypeSpec {
+        kind: Some(KindSpec {
+            kind: KindName::Fixed("discretetf"),
+            fields: &[
+                req("num", "num"),
+                req("den", "den"),
+                req("ts", "ts"),
+                FieldSpec::Ref {
+                    field: "in",
+                    port: "in",
+                },
+            ],
+        }),
+        output_ports: &["out"],
+        ..TypeSpec::empty("control.discrete_transfer_function")
+    },
+    // -- coordinate transforms ----------------------------------------------
+    //
+    // `KindName::PerVariant` turns out **not** to be what this family needs: GSF v2 already
+    // gives each transform its own dotted type (`control.transform.clarke`, ...) with its own
+    // port names, and `system_builder.rs` matches
+    // `"clarke" | "clarkeinv" | "park" | "parkinv" | "clarkepark" | "clarkeparkinv"` as six
+    // distinct `kind=` strings with no selector parameter anywhere. So the mapping is one
+    // fixed `kind=` per type -- a plain `KindName::Fixed`.
+    //
+    // Input order is `CoordinateTransform::call`'s own positional order
+    // (`general-simulator/crates/continuous-blocks/src/coordinate_transforms.rs`), which
+    // matches each fixture's left-side port order exactly. `outputs=` is always emitted (all
+    // six have exactly three outputs), because the implicit default names come from
+    // `CoordinateTransform::output_names()`, not from GSF v2's port ids -- and the two differ:
+    // `control.transform.park`'s third *output* port is `zero_out`, its `zero` id being taken
+    // by an input. Leaving the names implicit would make document port and netlist symbol
+    // disagree.
+    transform!("control.transform.clarke", "clarke", ABC, ALPHA_BETA_ZERO),
+    transform!(
+        "control.transform.clarke_inv",
+        "clarkeinv",
+        ALPHA_BETA_ZERO,
+        ABC
+    ),
+    transform!(
+        "control.transform.park",
+        "park",
+        &["alpha", "beta", "zero", "theta"],
+        DQ_ZERO_OUT
+    ),
+    transform!(
+        "control.transform.park_inv",
+        "parkinv",
+        DQ_ZERO_THETA,
+        &["alpha", "beta", "zero_out"]
+    ),
+    transform!(
+        "control.transform.clarke_park",
+        "clarkepark",
+        &["a", "b", "c", "theta"],
+        &["d", "q", "zero"]
+    ),
+    transform!(
+        "control.transform.clarke_park_inv",
+        "clarkeparkinv",
+        DQ_ZERO_THETA,
+        ABC
+    ),
+    // -- machines -----------------------------------------------------------
+    TypeSpec {
+        kind: Some(KindSpec {
+            kind: KindName::Fixed("pmsm"),
+            fields: &[
+                req("r_s", "r_s"),
+                req("l_d", "l_d"),
+                req("l_q", "l_q"),
+                req("lambda_pm", "lambda_pm"),
+                req("pole_pairs", "pole_pairs"),
+                req("inertia", "inertia"),
+                req("friction", "friction"),
+                // Exactly three, in this order -- system_builder.rs rejects any other count
+                // with "kind='pmsm' needs 3 inputs (vd,vq,t_load)".
+                FieldSpec::Refs {
+                    field: "inputs",
+                    ports: &["vd", "vq", "t_load"],
+                },
+                FieldSpec::Outputs { field: "outputs" },
+            ],
+        }),
+        output_ports: &["id", "iq", "omega_m", "theta_e"],
+        ..TypeSpec::empty("machine.pmsm")
+    },
+    // -- script-hosted blocks -----------------------------------------------
+    //
+    // Every field re-read out of `system_builder.rs`'s own arms rather than carried over from
+    // `.cir` files skimmed earlier. The one real surprise: **`kind=cscript` takes `lib=`, not
+    // `path=`** -- it names a precompiled shared object, not a source file. The GSF v2 fixture
+    // agrees; its parameter really is `lib`. Everything else in the family takes `path=`, and
+    // `pyfunc`/`octfunc`/`octblock` additionally require `function=`. `xc_count=` exists only
+    // on the three *stateful* arms (`cscript`/`pyblock`/`octblock`); `pyfunc`/`octfunc` never
+    // parse it, so it is not emitted for them. `ts=` is optional throughout (`ts=variable` is
+    // accepted by the stateful three and rejected by the stateless two -- a distinction the
+    // simulator enforces on the value, which passes through here verbatim).
+    script_block!(
+        "extensibility.cscript",
+        "cscript",
+        [
+            req("lib", "lib"),
+            opt("ts", "ts"),
+            opt("xc_count", "xc_count")
+        ]
+    ),
+    script_block!(
+        "extensibility.pyblock",
+        "pyblock",
+        [
+            req("path", "path"),
+            opt("ts", "ts"),
+            opt("xc_count", "xc_count")
+        ]
+    ),
+    script_block!(
+        "extensibility.pyfunc",
+        "pyfunc",
+        [
+            req("path", "path"),
+            req("function", "function"),
+            opt("ts", "ts")
+        ]
+    ),
+    script_block!(
+        "extensibility.octfunc",
+        "octfunc",
+        [
+            req("path", "path"),
+            req("function", "function"),
+            opt("ts", "ts")
+        ]
+    ),
+    script_block!(
+        "extensibility.octblock",
+        "octblock",
+        [
+            req("path", "path"),
+            req("function", "function"),
+            opt("ts", "ts"),
+            opt("xc_count", "xc_count")
+        ]
+    ),
 ];
 
 pub fn lookup(type_name: &str) -> Option<&'static TypeSpec> {
