@@ -12,6 +12,7 @@ use super::paradigm::Paradigm;
 use super::port_compat::{self, PortIncompat};
 use super::subckt::{check_no_cyclic_defs, SubcktDef, SubcktError};
 use super::wire::{Endpoint, Wire};
+use crate::contract::{ComponentContract, ContractRegistry};
 use serde::Deserialize;
 use serde_json::{Map, Value};
 
@@ -220,6 +221,15 @@ pub struct ModelBuilder {
     model: Model,
     next_block_seq: u64,
     next_wire_seq: u64,
+    /// Component contracts this builder may consult, keyed by block `type`.
+    ///
+    /// **Not part of the document.** It is never serialized with the [`Model`], because it
+    /// describes the *component library* a caller is building against, not the schematic —
+    /// two callers with different libraries must be able to open the same `.gsim_sch`. Empty by
+    /// default, in which case every check behaves exactly as it did before this field existed.
+    ///
+    /// See [`ModelBuilder::register_contract`] for what consults it.
+    contracts: ContractRegistry,
 }
 
 impl ModelBuilder {
@@ -228,6 +238,7 @@ impl ModelBuilder {
             model: Model::new(id, name, grid),
             next_block_seq: 1,
             next_wire_seq: 1,
+            contracts: ContractRegistry::new(),
         }
     }
 
@@ -236,7 +247,37 @@ impl ModelBuilder {
             model,
             next_block_seq: 1,
             next_wire_seq: 1,
+            contracts: ContractRegistry::new(),
         }
+    }
+
+    /// Makes `contract` available to [`ModelBuilder::connect`] for every block whose `type` is
+    /// `type_name`, so its per-port `kind` and `dim` can be resolved (against each block's own
+    /// `params`) instead of approximated from the block's `domain`.
+    ///
+    /// This is what closes `port-compat.ts`'s `kind-mismatch` for ordinary components and its
+    /// `dim-mismatch` rule entirely — see [`super::port_compat`]. Registering is always
+    /// *additive*: an unregistered type keeps the coarser `domain`-based check it had before,
+    /// and no previously-accepted connection on a registered type is newly rejected unless the
+    /// contract genuinely contradicts it.
+    pub fn register_contract(
+        &mut self,
+        type_name: impl Into<String>,
+        contract: ComponentContract,
+    ) -> &mut Self {
+        self.contracts.register(type_name, contract);
+        self
+    }
+
+    /// Replaces the whole registry at once — the shape `gsim-py`/`gsim-wasm` use, since their
+    /// stateless entry points receive the caller's contracts as one JSON object per call.
+    pub fn with_contracts(mut self, contracts: ContractRegistry) -> ModelBuilder {
+        self.contracts = contracts;
+        self
+    }
+
+    pub fn contracts(&self) -> &ContractRegistry {
+        &self.contracts
     }
 
     pub fn model(&self) -> &Model {
@@ -511,9 +552,15 @@ impl ModelBuilder {
         }
 
         let kind = kind.into();
-        if let Err(failure) =
-            port_compat::check(&self.model, from_block, to_block, &from, &to, &kind)
-        {
+        if let Err(failure) = port_compat::check(
+            &self.model,
+            &self.contracts,
+            from_block,
+            to_block,
+            &from,
+            &to,
+            &kind,
+        ) {
             return Err(BuilderError::PortIncompatible(Box::new(PortIncompat {
                 from,
                 to,

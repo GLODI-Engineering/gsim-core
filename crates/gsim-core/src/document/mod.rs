@@ -36,7 +36,7 @@ pub use model::{
     DocumentLoadError, GsimSchDocument, Model, ModelParam, ModelRole, WrongSchemaVersion,
 };
 pub use paradigm::Paradigm;
-pub use port_compat::{CompatFailure, PortIncompat};
+pub use port_compat::{CompatFailure, PortFacts, PortIncompat};
 pub use subckt::{
     check_no_cyclic_defs, SubcktDef, SubcktError, SubcktInstance, SubcktPort, SUBCKT_BOUNDARY_TYPE,
     SUBCKT_PORT_KINDS,
