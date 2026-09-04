@@ -275,6 +275,7 @@
         "pinned": false
       }
     ],
+    "subckt_defs": [],
     "lines": [],
     "nets": [],
     "simulation": {},

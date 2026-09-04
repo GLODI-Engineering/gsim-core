@@ -34,6 +34,7 @@ pub use builder::{
 pub use model::{DocumentLoadError, GsimSchDocument, Model, ModelParam, WrongSchemaVersion};
 pub use paradigm::Paradigm;
 pub use subckt::{
-    check_no_cyclic_defs, SubcktDef, SubcktError, SubcktInstance, SubcktPort, SUBCKT_PORT_KINDS,
+    check_no_cyclic_defs, SubcktDef, SubcktError, SubcktInstance, SubcktPort, SUBCKT_BOUNDARY_TYPE,
+    SUBCKT_PORT_KINDS,
 };
 pub use wire::{Endpoint, Wire};

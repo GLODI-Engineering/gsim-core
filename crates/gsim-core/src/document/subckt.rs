@@ -68,6 +68,10 @@ pub const SUBCKT_PORT_KINDS: [&str; 5] = [
     "signal",
 ];
 
+/// The `type` of the pseudo-block standing for a def's own boundary inside its structured body
+/// — see [`SubcktDef::boundary_endpoint`].
+pub const SUBCKT_BOUNDARY_TYPE: &str = "spice-subckt.boundary";
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum SubcktError {
     InvalidDefId(String),
@@ -203,6 +207,26 @@ impl SubcktDef {
     pub fn with_instances(mut self, instances: impl IntoIterator<Item = SubcktInstance>) -> Self {
         self.instances = instances.into_iter().collect();
         self
+    }
+
+    /// How a wire *inside* this def's body reaches one of the def's own boundary ports.
+    ///
+    /// A structured body raised a question the opaque-text reference never had to answer: a
+    /// `.SUBCKT`'s internal cards name its boundary nets directly (`DEV d s idealswitchmodel`),
+    /// but a [`Wire`]'s [`super::Endpoint`] is always `(block, port)` — there is no third
+    /// endpoint kind for "the enclosing def's own port". Rather than add one (which every
+    /// consumer of `Wire` would then have to handle), the convention is:
+    ///
+    /// **a def's body contains one boundary block, whose `id` is the def's own `id` and whose
+    /// `type` is [`SUBCKT_BOUNDARY_TYPE`], carrying exactly the def's `ports[].id` list.**
+    ///
+    /// This keeps the body a genuinely self-consistent mini-model — every wire endpoint
+    /// resolves to a real block in `blocks`, so nothing in the body is dangling by the ordinary
+    /// rules — and needs no new type. The boundary block's paradigm is
+    /// [`super::Paradigm::SpiceSubckt`], which bridges paradigms, so it can legally carry both
+    /// the `physical-electrical` and the `signal` boundary nets a real def mixes.
+    pub fn boundary_endpoint(&self, port_id: impl Into<String>) -> super::Endpoint {
+        super::Endpoint::new(self.id.clone(), port_id)
     }
 
     pub fn port_ids(&self) -> Vec<&str> {
@@ -364,6 +388,16 @@ mod tests {
             def("leaf", &[]),
         ];
         assert!(check_no_cyclic_defs(&defs).is_ok());
+    }
+
+    #[test]
+    fn boundary_endpoint_addresses_the_def_by_its_own_id() {
+        let d = SubcktDef::new("sw_leg_fixed", "sw_leg_fixed")
+            .unwrap()
+            .with_ports([SubcktPort::new("d", "physical-electrical").unwrap()]);
+        let ep = d.boundary_endpoint("d");
+        assert_eq!(ep.block, "sw_leg_fixed");
+        assert_eq!(ep.port, "d");
     }
 
     #[test]
