@@ -31,8 +31,9 @@ pub enum BuilderError {
         to: Paradigm,
     },
     /// The finer-grained §8.1/§8.2 port-kind rule, below [`BuilderError::CrossParadigm`]'s
-    /// block-level paradigm boundary — see [`super::port_compat`], which also documents exactly
-    /// which of `port-compat.ts`'s rules this covers and which still need a contract registry.
+    /// block-level paradigm boundary — see [`super::port_compat`], which documents which source
+    /// of truth decides each rule, and what a block with no registered contract still falls back
+    /// to.
     /// Boxed to keep `BuilderError` small — see [`PortIncompat`].
     PortIncompatible(Box<PortIncompat>),
     UnknownBlock(String),
