@@ -94,6 +94,13 @@ pub struct NewBlockSpec {
     pub ic: Map<String, Value>,
     #[serde(default)]
     pub label: Option<String>,
+    /// Comment lines emitted above this block's card(s) by a [`crate::compile::NetlistTarget`] —
+    /// see [`Block::comment_before`]. One entry per line; a single multi-line string works too.
+    #[serde(default)]
+    pub comment_before: Vec<String>,
+    /// Comment lines emitted below this block's card(s) — see [`Block::comment_after`].
+    #[serde(default)]
+    pub comment_after: Vec<String>,
     #[serde(default)]
     pub id: Option<String>,
 }
@@ -111,6 +118,8 @@ impl Default for NewBlockSpec {
             params: Map::new(),
             ic: Map::new(),
             label: None,
+            comment_before: Vec::new(),
+            comment_after: Vec::new(),
             id: None,
         }
     }
@@ -151,6 +160,12 @@ pub struct NewSubcktInstanceSpec {
     pub params: Map<String, Value>,
     #[serde(default)]
     pub label: Option<String>,
+    /// Comment lines emitted above this instance's `X` card — see [`Block::comment_before`].
+    #[serde(default)]
+    pub comment_before: Vec<String>,
+    /// Comment lines emitted below this instance's `X` card — see [`Block::comment_after`].
+    #[serde(default)]
+    pub comment_after: Vec<String>,
     #[serde(default)]
     pub id: Option<String>,
 }
@@ -166,6 +181,8 @@ impl NewSubcktInstanceSpec {
             mirror: Mirror::None,
             params: Map::new(),
             label: None,
+            comment_before: Vec::new(),
+            comment_after: Vec::new(),
             id: None,
         }
     }
@@ -277,6 +294,8 @@ impl ModelBuilder {
             params: spec.params,
             ic: spec.ic,
             label: spec.label,
+            comment_before: spec.comment_before,
+            comment_after: spec.comment_after,
             // `add_block` never creates a subckt instance -- `instantiate_subckt` is the only
             // path that sets this, so the "Some(def_id) exactly when paradigm == SpiceSubckt"
             // invariant has exactly one place to be established.
@@ -358,6 +377,8 @@ impl ModelBuilder {
             params: spec.params,
             ic: Map::new(),
             label: spec.label,
+            comment_before: spec.comment_before,
+            comment_after: spec.comment_after,
             subckt_ref: Some(spec.def_ref),
         })?;
         self.model.blocks.push(block);

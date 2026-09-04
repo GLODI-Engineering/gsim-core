@@ -73,6 +73,18 @@ pub struct Block {
     pub ic: Map<String, Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
+    /// Free-text authoring comment emitted *above* this block's card(s) in a compiled netlist.
+    ///
+    /// One entry per comment line (an entry containing `\n` is split further at emit time, so a
+    /// single multi-line string is also accepted); empty vec — the default — means no comment.
+    /// Purely an annotation: it never affects nets, params or validation, and it round-trips
+    /// through `.gsim_sch` JSON like any other optional field.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub comment_before: Vec<String>,
+    /// Free-text authoring comment emitted *below* this block's card(s) — see
+    /// [`Block::comment_before`]. An independent slot: a block may carry either, both or neither.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub comment_after: Vec<String>,
     /// `Some(def_id)` exactly when `paradigm == Paradigm::SpiceSubckt`: names which
     /// [`super::SubcktDef`] this block instantiates. A subckt-instance block's own wireable
     /// ports are exactly that def's `ports[].id` list.
@@ -96,6 +108,8 @@ pub struct NewBlock {
     pub params: Map<String, Value>,
     pub ic: Map<String, Value>,
     pub label: Option<String>,
+    pub comment_before: Vec<String>,
+    pub comment_after: Vec<String>,
     pub subckt_ref: Option<String>,
 }
 
@@ -125,6 +139,8 @@ impl Block {
             params: spec.params,
             ic: spec.ic,
             label: spec.label,
+            comment_before: spec.comment_before,
+            comment_after: spec.comment_after,
             subckt_ref: spec.subckt_ref,
         })
     }
@@ -147,6 +163,8 @@ mod tests {
             params: Map::new(),
             ic: Map::new(),
             label: None,
+            comment_before: Vec::new(),
+            comment_after: Vec::new(),
             subckt_ref: None,
         }
     }
