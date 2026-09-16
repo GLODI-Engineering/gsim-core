@@ -250,6 +250,18 @@ fn emit_field(
             param: p,
             required,
         } => match param(block, p) {
+            // An *optional* string param whose value is the empty string is this format's
+            // own "not set" sentinel, not a real value to emit -- confirmed against a real
+            // compiled document: `converter.phys2sig` (`node`/`branch`, both optional and
+            // mutually exclusive at general-simulator's own load time) is always authored
+            // with the unused one as `""`, not omitted outright, so a probe reading a branch
+            // current used to still emit an empty `node=` token alongside it and get
+            // rejected with "'node' and 'branch' are mutually exclusive" even though only
+            // `branch` was ever really given. `required` fields are untouched: an empty
+            // string there stays a real (if probably wrong) value, not silently treated as
+            // absent -- this only changes what an *optional* field's blank default renders
+            // as, not whether a required one validates.
+            Some(v) if !*required && matches!(v, serde_json::Value::String(s) if s.is_empty()) => {}
             Some(v) => tokens.push(format!("{field}={}", spec::render_value(v))),
             None if *required => {
                 return Err(CompileError::MissingParam {
@@ -265,7 +277,31 @@ fn emit_field(
             required,
         } => match param(block, p).and_then(serde_json::Value::as_array) {
             Some(items) => {
-                let rendered: Vec<String> = items.iter().map(spec::render_value).collect();
+                // `control.sum`'s own metadata (the only caller of this field variant today —
+                // see the "summation and product" comment above its TypeSpec) declares
+                // `signs` as `type: string`, "Sequence of `+` or `-` characters" -- that
+                // spelling exists for the frontend's own port-label rendering (each input
+                // pin is drawn with a literal "+"/"-" beside it), not because
+                // general-simulator's own `kind=sum` grammar accepts it: its own arm parses
+                // every `signs=` entry with `str::parse::<f64>()`, so a bare `+`/`-`
+                // character is a hard parse error there (`field 'signs' entry '+' is not a
+                // number`), confirmed against a real compiled document. Translating the two
+                // symbolic characters to their numeric equivalents here, at emission time,
+                // is the fix -- not the frontend's documented authoring convention, and not
+                // a validation error to push back onto every caller of `param()` above.
+                let render_sign_entry = |v: &serde_json::Value| -> String {
+                    match v.as_str() {
+                        Some("+") => "1".to_string(),
+                        Some("-") => "-1".to_string(),
+                        _ => spec::render_value(v),
+                    }
+                };
+                let render_entry: &dyn Fn(&serde_json::Value) -> String = if *p == "signs" {
+                    &render_sign_entry
+                } else {
+                    &spec::render_value
+                };
+                let rendered: Vec<String> = items.iter().map(render_entry).collect();
                 tokens.push(format!("{field}={}", rendered.join(",")));
             }
             None if *required => {
@@ -1919,6 +1955,52 @@ mod tests {
             netlist.contains("SUM kind=sum inputs=K0,K1,K2 signs=1,-1,1"),
             "{netlist}"
         );
+    }
+
+    #[test]
+    fn sum_translates_the_catalogue_s_symbolic_plus_minus_signs_to_numbers() {
+        // control.sum's own metadata.yaml (packages/blocks/src/blocks/control/sum) declares
+        // `signs` as `type: string`, "Sequence of `+` or `-` characters, one per input port"
+        // -- the real authoring convention every document in the schematic-drawing benchmark
+        // actually used (e.g. `signs=['+', '-']`), for the frontend's own port-label
+        // rendering. general-simulator's own `kind=sum` grammar parses every `signs=` entry
+        // with `str::parse::<f64>()`, so emitting the symbolic characters unchanged used to
+        // produce `signs=+,-`, a hard parse error at load time ("entry '+' is not a number")
+        // confirmed against a real compiled document -- this pins the fix down instead.
+        let netlist = signal_case(
+            "SUM",
+            "control.sum",
+            json!({"signs": ["+", "-", "+"]}),
+            &[("in0", 3.0), ("in1", 1.0), ("in2", 0.5)],
+        );
+        assert!(
+            netlist.contains("SUM kind=sum inputs=K0,K1,K2 signs=1,-1,1"),
+            "{netlist}"
+        );
+    }
+
+    #[test]
+    fn phys2sig_omits_the_unused_optional_field_instead_of_emitting_it_blank() {
+        // converter.phys2sig's `node`/`branch` are both optional and mutually exclusive at
+        // general-simulator's own load time -- but every real document authors the block
+        // with the unused one set to `""`, not omitted from the params object at all (the
+        // document format's own "not set" sentinel for an optional string field). Before
+        // this fix, an empty string still rendered as a real token (`node=`), so a
+        // branch-current probe emitted `node= branch=L` and failed to load with "'node' and
+        // 'branch' are mutually exclusive" even though only `branch` was ever meant.
+        let mut b = ModelBuilder::new("m", "Case", 10);
+        add(
+            &mut b,
+            "A_IL",
+            "converter.phys2sig",
+            Paradigm::SignalFlow,
+            json!({"node": "", "branch": "L"}),
+        );
+        let netlist = compile(&b.into_model(), "general-simulator")
+            .unwrap_or_else(|e| panic!("{e}"))
+            .netlist;
+        assert!(netlist.contains("A_IL kind=phys2sig branch=L"), "{netlist}");
+        assert!(!netlist.contains("node="), "{netlist}");
     }
 
     #[test]
