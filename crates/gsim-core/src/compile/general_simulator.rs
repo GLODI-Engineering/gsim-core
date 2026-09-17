@@ -163,6 +163,16 @@ fn required_param(block: &Block, name: &str) -> Result<String, CompileError> {
         })
 }
 
+/// Like [`required_param`], but falls back to a literal default instead of erroring when the
+/// param is absent -- matching a catalogue field's own documented default (e.g.
+/// `source.voltage.sin`'s `TD`/`THETA`, which every real instance in this codebase's own
+/// schematics leaves unset rather than explicitly zeroing).
+fn param_or(block: &Block, name: &str, default: &str) -> String {
+    param(block, name)
+        .map(spec::render_value)
+        .unwrap_or_else(|| default.to_string())
+}
+
 fn node_of(scope: &Scope<'_>, block: &Block, port: &str) -> Result<String, CompileError> {
     scope
         .nets
@@ -197,6 +207,34 @@ fn emit_element(scope: &Scope<'_>, block: &Block, spec: &TypeSpec) -> Result<Str
             };
             tokens.push(name);
             tokens.push(required_param(block, gain)?);
+        }
+        ElementTail::Sin {
+            v0,
+            va,
+            freq,
+            td,
+            theta,
+            phase,
+        } => {
+            // VA/FREQ carry no sensible zero default (a zero-amplitude or zero-frequency
+            // source is never what an omitted field means here) so those two still hard-fail
+            // if missing; VO/TD/THETA/PHASE match the catalogue's own defaults for an unset
+            // field (`packages/blocks/src/blocks/source/voltage_sin/metadata.yaml`).
+            let v0 = param_or(block, v0, "0");
+            let va = required_param(block, va)?;
+            let freq = required_param(block, freq)?;
+            let td = param_or(block, td, "0");
+            let theta = param_or(block, theta, "0");
+            let phase = param_or(block, phase, "0");
+            // Six separate tokens, not one -- `general-mna`'s own tokenizer expects
+            // `SIN(0 10 1000 0 0 0)` as six whitespace-split tokens with the parens riding on
+            // the first/last, never a single quoted/bracketed literal.
+            tokens.push(format!("SIN({v0}"));
+            tokens.push(va);
+            tokens.push(freq);
+            tokens.push(td);
+            tokens.push(theta);
+            tokens.push(format!("{phase})"));
         }
         ElementTail::None => {}
     }
@@ -315,6 +353,33 @@ fn emit_field(
         FieldSpec::Literal { field, value } => tokens.push(format!("{field}={value}")),
         FieldSpec::Ref { field, port } => {
             tokens.push(format!("{field}={}", scope.ref_name(&block.id, port)?))
+        }
+        FieldSpec::PrevRef { field, port } => {
+            tokens.push(format!("{field}=prev:{}", scope.ref_name(&block.id, port)?))
+        }
+        FieldSpec::SymmetricLimit {
+            field,
+            limit_param,
+            hi_param,
+            lo_param,
+        } => {
+            let limit = match param(block, limit_param) {
+                Some(v) => spec::render_value(v),
+                None => {
+                    let hi = param(block, hi_param).and_then(serde_json::Value::as_f64);
+                    let lo = param(block, lo_param).and_then(serde_json::Value::as_f64);
+                    match (hi, lo) {
+                        (Some(h), Some(l)) if (h + l).abs() < 1e-9 => spec::format_number(h),
+                        _ => {
+                            return Err(CompileError::MissingParam {
+                                block: block.id.clone(),
+                                param: (*limit_param).to_string(),
+                            })
+                        }
+                    }
+                }
+            };
+            tokens.push(format!("{field}={limit}"));
         }
         FieldSpec::OptionalRef { field, port } => match scope.ref_name(&block.id, port) {
             Ok(name) => tokens.push(format!("{field}={name}")),
@@ -2023,6 +2088,104 @@ mod tests {
             &[("in0", 3.0), ("in1", 1.5)],
         );
         assert!(short.contains("inputs=K0,K1"), "{short}");
+    }
+
+    #[test]
+    fn integrator_is_an_unclamped_pure_ki_pid() {
+        let netlist = signal_case("INT", "control.integrator", json!({}), &[("in", 1.5)]);
+        assert!(
+            netlist.contains("INT kind=pid kp=0 ki=1 kd=0 n=1 clamp_lo=-1e30 clamp_hi=1e30 in=K0"),
+            "{netlist}"
+        );
+    }
+
+    #[test]
+    fn derivative_is_a_heavily_filtered_pure_kd_pid() {
+        let netlist = signal_case("DV", "control.derivative", json!({}), &[("in", 1.5)]);
+        assert!(
+            netlist.contains("DV kind=pid kp=0 ki=0 kd=1 n=1e5 clamp_lo=-1e30 clamp_hi=1e30 in=K0"),
+            "{netlist}"
+        );
+    }
+
+    #[test]
+    fn delay_reads_its_input_through_prev_to_break_a_same_step_loop() {
+        // The whole point of `control.delay` is to let a document close a loop around itself
+        // (`DELAY`'s own driver, `K0`, is read one step late) -- `book/user-guide/src/signals.md`
+        // is explicit that this is a `prev:` reference, not a plain one.
+        let netlist = signal_case("DELAY", "control.delay", json!({}), &[("in", 1.5)]);
+        assert!(
+            netlist.contains("DELAY kind=sum inputs=prev:K0 signs=1"),
+            "{netlist}"
+        );
+    }
+
+    #[test]
+    fn sin_source_emits_a_real_six_token_spice_sin_call() {
+        let mut b = ModelBuilder::new("m", "Case", 10);
+        add(
+            &mut b,
+            "EA",
+            "source.voltage.sin",
+            Paradigm::PhysicalNetwork,
+            json!({"VO": 0.0, "VA": 439.82, "FREQ": 60.0, "TD": 0.0, "THETA": 0.0, "PHASE": -120.0}),
+        );
+        add(
+            &mut b,
+            "GND",
+            "routing.ground",
+            Paradigm::PhysicalNetwork,
+            json!({}),
+        );
+        add(
+            &mut b,
+            "R1",
+            "passive.resistor",
+            Paradigm::PhysicalNetwork,
+            json!({"R": 1000.0}),
+        );
+        elec(&mut b, "EA", "p", "R1", "p1");
+        elec(&mut b, "R1", "p2", "GND", "p");
+        elec(&mut b, "EA", "n", "GND", "p");
+        let netlist = compile(&b.into_model(), "general-simulator")
+            .unwrap_or_else(|e| panic!("{e}"))
+            .netlist;
+        assert!(
+            netlist.contains("VEA") && netlist.contains("SIN(0 439.82 60 0 0 -120)"),
+            "{netlist}"
+        );
+    }
+
+    #[test]
+    fn saturation_derives_limit_from_a_genuinely_symmetric_hi_lo_pair() {
+        // control.saturation's own catalogue metadata declares `hi`/`lo` (default -1/1), not
+        // `limit` -- every real document authors it that way. `general-simulator`'s own
+        // `kind=saturation` only has a single symmetric `limit=`, so this only works when the
+        // authored bound genuinely is symmetric.
+        let netlist = signal_case(
+            "SAT",
+            "control.saturation",
+            json!({"hi": 1.0, "lo": -1.0}),
+            &[("in", 0.5)],
+        );
+        assert!(
+            netlist.contains("SAT kind=saturation limit=1 in=K0"),
+            "{netlist}"
+        );
+    }
+
+    #[test]
+    fn saturation_reports_a_missing_limit_rather_than_silently_misclamping_an_asymmetric_bound() {
+        let mut b = ModelBuilder::new("m", "Case", 10);
+        add(
+            &mut b,
+            "SAT",
+            "control.saturation",
+            Paradigm::SignalFlow,
+            json!({"hi": 0.9, "lo": 0.0}),
+        );
+        let err = compile(&b.into_model(), "general-simulator").unwrap_err();
+        assert!(matches!(err, CompileError::MissingParam { .. }), "{err}");
     }
 
     #[test]

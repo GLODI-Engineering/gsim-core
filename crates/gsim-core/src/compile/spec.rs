@@ -43,6 +43,19 @@ pub enum ElementTail {
         control: &'static str,
         gain: &'static str,
     },
+    /// `SIN(V0 VA FREQ TD THETA PHASE)` -- real SPICE's own transient-source call, rendered as
+    /// six separate whitespace tokens (`SIN(<v0>`, `<va>`, ..., `<phase>)`), matching
+    /// `general-mna::transient_source`'s own tokenization (`SIN(0 10 1000)` arrives as three
+    /// plain tokens, the open/close parens riding on the first/last). Field order fixed by that
+    /// grammar, not configurable per type.
+    Sin {
+        v0: &'static str,
+        va: &'static str,
+        freq: &'static str,
+        td: &'static str,
+        theta: &'static str,
+        phase: &'static str,
+    },
     /// Nothing after the nodes.
     None,
 }
@@ -146,6 +159,25 @@ pub enum FieldSpec {
         field: &'static str,
         prefix: &'static str,
         arity: Arity,
+    },
+    /// `field=<limit_param's value>`, or, when that's absent, `hi_param`'s value -- but only
+    /// when `hi_param`/`lo_param` are a genuinely symmetric pair (`hi == -lo`). `control.saturation`
+    /// is the one caller: its catalogue declares an asymmetric `[lo, hi]` interval, but
+    /// `general-simulator`'s own `kind=saturation` only ever clamps to `[-limit, limit]` (see
+    /// that entry's own comment) -- so a genuinely asymmetric instance is a real, reported
+    /// [`super::CompileError::MissingParam`], not a silently wrong clamp.
+    SymmetricLimit {
+        field: &'static str,
+        limit_param: &'static str,
+        hi_param: &'static str,
+        lo_param: &'static str,
+    },
+    /// `field=prev:<name of whatever drives this port>` -- the one-sample-delay reference
+    /// `general-simulator`'s own `prev:` syntax provides (see `book/user-guide/src/signals.md`)
+    /// for closing a same-step algebraic loop around a block, e.g. `control.delay`'s own `in`.
+    PrevRef {
+        field: &'static str,
+        port: &'static str,
     },
     /// Like [`Self::Ref`], but **omitted entirely** when the port is absent or undriven rather
     /// than being a hard [`super::CompileError::UnconnectedRef`].
@@ -626,6 +658,23 @@ pub const REGISTRY: &[TypeSpec] = &[
     // -- independent sources ------------------------------------------------
     rc!("source.voltage.dc", 'V', SOURCE_PINS, "V"),
     rc!("source.current.dc", 'I', SOURCE_PINS, "I"),
+    // `V<name> p n SIN(VO VA FREQ TD THETA PHASE)` -- the catalogue's own field names
+    // (`VO`/`VA`/`FREQ`/`TD`/`THETA`/`PHASE`) already match `general-mna`'s SIN() order and
+    // units (PHASE in degrees) exactly, so this is a direct field-for-field passthrough, not a
+    // translation.
+    TypeSpec {
+        device_letter: Some('V'),
+        node_ports: SOURCE_PINS,
+        tail: ElementTail::Sin {
+            v0: "VO",
+            va: "VA",
+            freq: "FREQ",
+            td: "TD",
+            theta: "THETA",
+            phase: "PHASE",
+        },
+        ..TypeSpec::empty("source.voltage.sin")
+    },
     // -- dependent sources (the E/F pair a true ideal transformer is built from) --
     TypeSpec {
         device_letter: Some('E'),
@@ -891,8 +940,18 @@ pub const REGISTRY: &[TypeSpec] = &[
             fields: &[
                 // A single *symmetric* bound (`|y| <= limit`), not a lower/upper pair --
                 // `BlockKind::Saturation`'s netlist form is
-                // `NAME kind=saturation in=<signal> limit=<f64>`.
-                req("limit", "limit"),
+                // `NAME kind=saturation in=<signal> limit=<f64>`. The catalogue's own
+                // `control.saturation` declares asymmetric `lo=`/`hi=` (default -1/1); a
+                // document authored straight from that catalogue (every real instance in this
+                // codebase's own schematics) therefore has no `limit=` param at all --
+                // `SymmetricLimit` derives it from `hi`/`lo` when they are genuinely symmetric
+                // (`hi == -lo`), which is what every case seen so far actually is.
+                FieldSpec::SymmetricLimit {
+                    field: "limit",
+                    limit_param: "limit",
+                    hi_param: "hi",
+                    lo_param: "lo",
+                },
                 FieldSpec::Ref {
                     field: "in",
                     port: "in",
@@ -1204,6 +1263,109 @@ pub const REGISTRY: &[TypeSpec] = &[
             FieldSpec::Ref {
                 field: "in",
                 port: "in",
+            },
+        ]
+    ),
+    // -- integrator / derivative ----------------------------------------------
+    //
+    // Neither has its own `kind=` in `general-mna` -- both are the `kind=pid` transfer function
+    // with two of its three gain terms zeroed and the anti-windup clamp pushed out to
+    // "effectively unbounded" (the same +/-1e30 sentinel `control.pid`'s own fixture uses), so
+    // the anti-windup logic never actually engages. `control.integrator`'s catalogue-documented
+    // `x0`/`lo`/`hi` params are not modelled: every instance in this codebase's own schematics
+    // leaves them at their catalogue defaults (0 / -1e30 / +1e30), so there is nothing yet to
+    // plumb through -- see the entries' own doc comments if that changes.
+    signal_block!(
+        "control.integrator",
+        KindName::Fixed("pid"),
+        [
+            FieldSpec::Literal {
+                field: "kp",
+                value: "0"
+            },
+            FieldSpec::Literal {
+                field: "ki",
+                value: "1"
+            },
+            FieldSpec::Literal {
+                field: "kd",
+                value: "0"
+            },
+            FieldSpec::Literal {
+                field: "n",
+                value: "1"
+            },
+            FieldSpec::Literal {
+                field: "clamp_lo",
+                value: "-1e30"
+            },
+            FieldSpec::Literal {
+                field: "clamp_hi",
+                value: "1e30"
+            },
+            FieldSpec::Ref {
+                field: "in",
+                port: "in",
+            },
+        ]
+    ),
+    // An ideal derivative (`Kd*s` alone) is non-causal -- `control.pid`'s own doc comment notes
+    // the standard fix is the filtered form `Kd*N*s/(s+N)`, a larger `N` tracking the ideal
+    // more closely. `n=1e5` here is chosen to sit well above every switching/control frequency
+    // this codebase's own schematics use (tens of kHz at most), not derived from any catalogue
+    // parameter -- `control.derivative` declares none.
+    signal_block!(
+        "control.derivative",
+        KindName::Fixed("pid"),
+        [
+            FieldSpec::Literal {
+                field: "kp",
+                value: "0"
+            },
+            FieldSpec::Literal {
+                field: "ki",
+                value: "0"
+            },
+            FieldSpec::Literal {
+                field: "kd",
+                value: "1"
+            },
+            FieldSpec::Literal {
+                field: "n",
+                value: "1e5"
+            },
+            FieldSpec::Literal {
+                field: "clamp_lo",
+                value: "-1e30"
+            },
+            FieldSpec::Literal {
+                field: "clamp_hi",
+                value: "1e30"
+            },
+            FieldSpec::Ref {
+                field: "in",
+                port: "in",
+            },
+        ]
+    ),
+    // -- one-sample delay ------------------------------------------------------
+    //
+    // Not a real block-graph kind of its own: `book/user-guide/src/signals.md`'s own sanctioned
+    // way to close a same-step algebraic loop is a plain `kind=sum` reading its one input
+    // through `prev:`, e.g. `DELAY kind=sum inputs=prev:PROBE signs=1`. `control.delay` is that
+    // pattern given its own catalogue type, so a schematic can draw the loop-breaking delay as
+    // its own block instead of hand-authoring the netlist-level `prev:` prefix.
+    signal_block!(
+        "control.delay",
+        KindName::Fixed("sum"),
+        [
+            FieldSpec::PrevRef {
+                field: "inputs",
+                port: "in",
+            },
+            FieldSpec::Literal {
+                field: "signs",
+                value: "1"
             },
         ]
     ),
