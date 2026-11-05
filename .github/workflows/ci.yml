@@ -16,6 +16,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # gsim-py's test binary links libpython directly (see below), so the
+      # interpreter has to be on the runner before cargo builds it.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -27,11 +33,27 @@ jobs:
       - name: cargo fmt --check
         run: cargo fmt --all -- --check
 
+      # gsim-py is handled separately below. `--all-targets` includes test
+      # binaries, and with its default features that crate cannot link one.
       - name: cargo clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy --workspace --exclude gsim-py --all-targets -- -D warnings
 
       - name: cargo test
-        run: cargo test --workspace
+        run: cargo test --workspace --exclude gsim-py
+
+      # gsim-py is a PyO3 `extension-module` cdylib: it deliberately does not
+      # link libpython, because the interpreter supplies those symbols when it
+      # dlopen's the module. A test binary is not loaded by an interpreter, so
+      # building one with the default features fails at link time with a wall
+      # of `undefined symbol: Py*`.
+      #
+      # Its own Cargo.toml states the intended answer — build this one crate
+      # with `--no-default-features` to get a real libpython-linked test
+      # binary — so it is tested that way rather than skipped.
+      - name: cargo clippy + test (gsim-py, libpython-linked)
+        run: |
+          cargo clippy -p gsim-py --all-targets --no-default-features -- -D warnings
+          cargo test -p gsim-py --no-default-features
 
       - name: cargo doc
         run: cargo doc --workspace --no-deps
