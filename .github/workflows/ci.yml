@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust:
+    name: Rust (fmt, clippy, test, doc)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: cargo fmt --check
+        run: cargo fmt --all -- --check
+
+      - name: cargo clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: cargo test
+        run: cargo test --workspace
+
+      - name: cargo doc
+        run: cargo doc --workspace --no-deps
+
+  python-bindings:
+    name: gsim-py (maturin build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # gsim-py is a PyO3 extension, not an ordinary cargo target: `cargo
+      # test` never builds it, so a change that breaks the binding passes the
+      # Rust job and only fails when somebody tries to import it.
+      - name: Install maturin
+        run: pip install maturin
+
+      - name: Build the wheel
+        working-directory: crates/gsim-py
+        run: maturin build --release
+
+      - name: Import it
+        run: |
+          pip install --find-links target/wheels gsim_py
+          python -c "import gsim_py; print('gsim_py imports')"
