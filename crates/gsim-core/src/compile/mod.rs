@@ -114,6 +114,19 @@ pub enum CompileError {
         type_name: String,
         kind: String,
     },
+    /// A `field=` reference landed on an endpoint that drives nothing — typically a peer
+    /// block's *input* port, reached by chaining one consumer to another instead of fanning
+    /// out from the driver's output.
+    ///
+    /// Fatal on purpose. This used to fall back to the peer block's own name, which almost
+    /// always names a block that really exists, so the netlist loaded and the engine
+    /// simulated a different circuit than the one drawn, with no diagnostic anywhere.
+    RefNotAnOutput {
+        block: String,
+        port: String,
+        peer_block: String,
+        peer_port: String,
+    },
 }
 
 impl std::fmt::Display for CompileError {
@@ -196,6 +209,15 @@ impl std::fmt::Display for CompileError {
                 f,
                 "block '{block}' is a '{type_name}' on port-kind '{kind}', which cannot be routed by tag -- acausal kinds must be connected through a named net instead (docs/specs/gsim-sch-format.md §10.2)"
             ),
+            CompileError::RefNotAnOutput {
+                block,
+                port,
+                peer_block,
+                peer_port,
+            } => write!(
+                f,
+                "port '{block}.{port}' must reference a block output, but the wire on it lands on '{peer_block}.{peer_port}', which drives nothing -- fan out from the driving block's own output port instead of chaining from another consumer's input"
+            ),
         }
     }
 }
@@ -227,13 +249,20 @@ pub trait NetlistTarget {
 /// name, taken from the block's own `outputs=` parameter where its type declares one
 /// (`cscript`/`octfunc`/`pyfunc`/`pspwm`/...), else from that family's documented default —
 /// for `pspwm` that default is `[name, "{name}_comp"]`, read straight out of `system_builder.rs`.
+///
+/// **Index 0 is not nameable.** The rule above is not a convention this compiler could choose
+/// to break: the engine registers a multi-output block's first output under the block's own
+/// card name and reads only `outputs[1..]` from the emitted list. Honouring a user-declared
+/// `outputs[0]` put a name in the netlist that the engine never registers, so the run died
+/// with `UnknownBlockInput(<that name>)` — verified by running one. [`Outputs::record`]
+/// therefore pins index 0 to the card name and records a note saying so.
 #[derive(Debug, Default, Clone)]
 pub struct Outputs {
     by_port: BTreeMap<(String, String), String>,
 }
 
 impl Outputs {
-    fn record(&mut self, block: &Block, spec: &TypeSpec) {
+    fn record(&mut self, block: &Block, spec: &TypeSpec, notes: &mut Vec<String>) {
         let declared: Option<Vec<String>> = block.params.get("outputs").and_then(|v| match v {
             serde_json::Value::Array(items) => {
                 Some(items.iter().map(spec::render_value).collect::<Vec<_>>())
@@ -244,11 +273,29 @@ impl Outputs {
             _ => None,
         });
         let card = spec::card_name(&block.id, spec);
+        // Index 0 is not the user's to name. The engine registers a multi-output block's
+        // first output under the block's own card name and only reads `outputs[1..]` from the
+        // list, so honouring a declared `outputs[0]` emitted a name nothing ever registers and
+        // every consumer of it died with `UnknownBlockInput`. Say so rather than dropping it
+        // in silence -- the user wrote that name expecting to use it.
+        if let Some(names) = &declared {
+            if let Some(first) = names.first() {
+                if !first.is_empty() && *first != card && spec.output_port_ids(block).len() > 1 {
+                    notes.push(format!(
+                        "block '{}': output 0 is always named after the block itself ('{card}'), \
+                         so the declared outputs[0] = '{first}' is not emitted -- refer to that \
+                         output as '{card}'",
+                        block.id
+                    ));
+                }
+            }
+        }
         for (i, port) in spec.output_port_ids(block).into_iter().enumerate() {
             let name = match &declared {
-                Some(names) if i < names.len() => names[i].clone(),
-                // The first output always aliases the block's own (card) name.
+                // The first output always aliases the block's own (card) name, whatever the
+                // block declared.
                 _ if i == 0 => card.clone(),
+                Some(names) if i < names.len() => names[i].clone(),
                 // Family default for a second output, matching general-mna's own. The suffix
                 // is the port id, or -- for a family carrying its outputs' declared names in a
                 // parameter (`cscript`'s `output_names`) -- that name, so a generated
@@ -347,11 +394,18 @@ impl Scope<'_> {
                 });
             }
         }
-        Ok(self
-            .outputs
+        // No silent fallback to the peer block's own name here. That name nearly always
+        // exists, so the netlist would load and the engine would simulate a circuit that was
+        // never drawn -- see the `RefNotAnOutput` doc comment.
+        self.outputs
             .name_of(&peer.block, &peer.port)
-            .unwrap_or(peer.block.as_str())
-            .to_string())
+            .map(str::to_string)
+            .ok_or_else(|| CompileError::RefNotAnOutput {
+                block: block.to_string(),
+                port: port.to_string(),
+                peer_block: peer.block.clone(),
+                peer_port: peer.port.clone(),
+            })
     }
 }
 
@@ -426,7 +480,7 @@ fn build_scope<'a>(
     let mut outputs = Outputs::default();
     for b in blocks {
         if let Some(spec) = spec::lookup(&b.r#type) {
-            outputs.record(b, spec);
+            outputs.record(b, spec, notes);
         } else if b.subckt_ref.is_none() {
             return Err(CompileError::UnknownType {
                 block: b.id.clone(),

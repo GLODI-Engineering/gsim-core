@@ -87,6 +87,7 @@ fn compile_err_to_py(e: CompileError) -> PyErr {
         CompileError::AmbiguousFromTag { .. } => "ambiguous-from-tag",
         CompileError::CyclicFromTag { .. } => "cyclic-from-tag",
         CompileError::RoutingKindUnsupported { .. } => "routing-kind-unsupported",
+        CompileError::RefNotAnOutput { .. } => "ref-not-an-output",
     };
     PyErr::new::<PyValueError, _>(format!("{keyword}: {e}"))
 }
