@@ -2430,4 +2430,202 @@ mod tests {
             assert!(!netlist.contains(" in="), "{type_name}: {netlist}");
         }
     }
+
+    /// Two switch poles sharing one gate driver, wired the way the sheet was actually drawn:
+    /// driver output into the first gate, then **gate to gate**. The second hop lands on an
+    /// input port, which drives nothing.
+    ///
+    /// This used to compile. `ref_name` fell back to the peer *block's* name, emitting
+    /// `ctrl=DS1B` — a block that really exists — so the netlist loaded and the engine ran a
+    /// circuit nobody drew, with no diagnostic. Caught only by reading the emitted text.
+    fn shared_gate_bridge(chain_gate_to_gate: bool) -> ModelBuilder {
+        let mut b = ModelBuilder::new("m", "BidirectionalPole", 10);
+        add(
+            &mut b,
+            "PWM",
+            "source.pulsewave",
+            Paradigm::SignalFlow,
+            json!({"v1": 0.0, "v2": 1.0, "td": 0.0, "tr": 1e-9, "tf": 1e-9, "pw": 5e-6,
+                   "per": 1e-5}),
+        );
+        b.add_block(NewBlockSpec {
+            r#type: "converter.sig2phys".to_string(),
+            paradigm: Paradigm::Converter,
+            domain: "electrical".to_string(),
+            id: Some("GATE".to_string()),
+            params: json!({"domain": "electrical"})
+                .as_object()
+                .cloned()
+                .unwrap_or_default(),
+            ..Default::default()
+        })
+        .unwrap();
+        for id in ["DS1A", "DS1B"] {
+            add(
+                &mut b,
+                id,
+                "passive.switch.ideal",
+                Paradigm::PhysicalNetwork,
+                json!({"r_on": 1e-3, "g_breakdown": 1.0, "v_breakdown": 1e3, "g_off": 1e-9,
+                       "v_th": 0.5, "g_on": 1e3}),
+            );
+        }
+        add(
+            &mut b,
+            "Vdc",
+            "source.voltage.dc",
+            Paradigm::PhysicalNetwork,
+            json!({"V": 100.0}),
+        );
+        add(
+            &mut b,
+            "Rload",
+            "passive.resistor",
+            Paradigm::PhysicalNetwork,
+            json!({"R": 10.0}),
+        );
+        add(
+            &mut b,
+            "gnd",
+            "routing.ground",
+            Paradigm::PhysicalNetwork,
+            json!({}),
+        );
+        // The two poles back to back, the way a bidirectional switch is drawn, in series with
+        // a load across the rail so no terminal is left floating.
+        elec(&mut b, "DS1A", "d", "DS1B", "s");
+        elec(&mut b, "Vdc", "p", "DS1B", "d");
+        elec(&mut b, "DS1A", "s", "Rload", "p1");
+        elec(&mut b, "Rload", "p2", "gnd", "p");
+        elec(&mut b, "Vdc", "n", "gnd", "p");
+        sig(&mut b, "PWM", "out", "GATE", "in");
+        elec(&mut b, "GATE", "out", "DS1B", "g");
+        if chain_gate_to_gate {
+            // The second pole takes its drive off the first pole's gate, not off the driver.
+            elec(&mut b, "DS1B", "g", "DS1A", "g");
+        } else {
+            elec(&mut b, "GATE", "out", "DS1A", "g");
+        }
+        b
+    }
+
+    #[test]
+    fn chaining_a_reference_from_one_gate_to_another_is_rejected_not_renamed() {
+        let err = compile(&shared_gate_bridge(true).into_model(), "general-simulator").unwrap_err();
+        assert_eq!(
+            err,
+            CompileError::RefNotAnOutput {
+                block: "DS1A".to_string(),
+                port: "g".to_string(),
+                peer_block: "DS1B".to_string(),
+                peer_port: "g".to_string(),
+            }
+        );
+        // The old failure was silent, so the message is half the fix: it has to name both
+        // ends and say what to do instead.
+        let text = err.to_string();
+        assert!(text.contains("DS1A.g"), "{text}");
+        assert!(text.contains("DS1B.g"), "{text}");
+        assert!(text.contains("drives nothing"), "{text}");
+    }
+
+    #[test]
+    fn fanning_out_from_the_driver_output_to_both_gates_compiles() {
+        let netlist = compile(&shared_gate_bridge(false).into_model(), "general-simulator")
+            .unwrap()
+            .netlist;
+        // Both poles follow the driver, which is what the sheet meant either way.
+        assert_eq!(
+            netlist.matches("ctrl=GATE").count(),
+            2,
+            "both gates should name the driver:\n{netlist}"
+        );
+    }
+
+    /// A multi-output block whose `outputs` parameter tries to name output 0.
+    ///
+    /// Verified against a real engine run, not inferred:
+    ///
+    /// ```text
+    /// BLK kind=pyblock path=two.py in=SRC outputs=AAA,BBB
+    /// G1  kind=gain k=2 in=AAA          -> error: UnknownBlockInput("AAA")
+    /// ```
+    ///
+    /// with the same netlist's header coming out as `t,SRC,BLK,G1,BBB`: the engine registers
+    /// output 0 under the block's own card name and reads only `outputs[1..]` from the list,
+    /// so a declared `outputs[0]` names nothing that exists. Emitting it produced a netlist
+    /// that could not be loaded at all.
+    fn multi_output_pyblock(declared: serde_json::Value) -> ModelBuilder {
+        let mut b = ModelBuilder::new("m", "MultiOut", 10);
+        add(
+            &mut b,
+            "SRC",
+            "source.const",
+            Paradigm::SignalFlow,
+            json!({"value": 3.0}),
+        );
+        let mut params = json!({"path": "./two.py", "input_names": ["u"],
+                                "output_names": ["y1", "y2"]});
+        params["outputs"] = declared;
+        add(
+            &mut b,
+            "CTRL",
+            "extensibility.pyblock",
+            Paradigm::SignalFlow,
+            params,
+        );
+        add(
+            &mut b,
+            "K",
+            "control.gain",
+            Paradigm::SignalFlow,
+            json!({"k": 2.0}),
+        );
+        sig(&mut b, "SRC", "out", "CTRL", "in0");
+        sig(&mut b, "CTRL", "out0", "K", "in");
+        b
+    }
+
+    #[test]
+    fn a_declared_outputs_zero_is_overridden_by_the_card_name_and_reported() {
+        let out = compile(
+            &multi_output_pyblock(json!(["AAA", "BBB"])).into_model(),
+            "general-simulator",
+        )
+        .unwrap();
+        // Index 0 is the card name; index 1 keeps the name the block declared.
+        assert!(out.netlist.contains("outputs=CTRL,BBB"), "{}", out.netlist);
+        assert!(!out.netlist.contains("AAA"), "{}", out.netlist);
+        // And the consumer reads output 0 by the only name the engine will know it under.
+        assert!(
+            out.netlist.contains("K kind=gain k=2 in=CTRL"),
+            "{}",
+            out.netlist
+        );
+        // Dropping a name the user wrote is reported, not silent.
+        let notes: Vec<&String> = out
+            .notes
+            .iter()
+            .filter(|n| n.contains("output 0"))
+            .collect();
+        assert_eq!(notes.len(), 1, "{:?}", out.notes);
+        for fragment in ["CTRL", "AAA", "output 0"] {
+            assert!(notes[0].contains(fragment), "{}", notes[0]);
+        }
+    }
+
+    #[test]
+    fn declaring_the_card_name_at_index_zero_is_not_reported() {
+        let out = compile(
+            &multi_output_pyblock(json!(["CTRL", "BBB"])).into_model(),
+            "general-simulator",
+        )
+        .unwrap();
+        assert!(out.netlist.contains("outputs=CTRL,BBB"), "{}", out.netlist);
+        assert!(
+            !out.notes.iter().any(|n| n.contains("output 0")),
+            "{:?}",
+            out.notes
+        );
+    }
 }
