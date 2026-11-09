@@ -108,6 +108,16 @@ fn version() -> &'static str {
 /// Parses `contract_json` as a `ComponentContract` and `params_json` as a JSON object of
 /// parameter values, evaluates it (GSF v2), and returns the resulting `EvaluatedSymbol`
 /// (`{"bbox": [w, h], "ports": [...], "primitives": [...]}`) as JSON.
+/// What this engine can compile, as JSON — see `gsim_core::compile::capabilities`.
+///
+/// The front end renders this instead of keeping its own list of supported types and their
+/// parameters. That list used to exist and had drifted to the point where none of the 143
+/// catalogue types matched it, so every block reported "not supported by the simulator".
+#[pyfunction]
+fn capabilities() -> String {
+    gsim_core::compile::capabilities::capabilities_json()
+}
+
 #[pyfunction]
 fn evaluate_component(contract_json: &str, params_json: &str) -> PyResult<String> {
     let contract: ComponentContract = parse_json(contract_json, "contract")?;
@@ -445,6 +455,7 @@ fn layered_layout(
 #[pymodule]
 fn gsim_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(version, m)?)?;
+    m.add_function(wrap_pyfunction!(capabilities, m)?)?;
     m.add_function(wrap_pyfunction!(evaluate_component, m)?)?;
     m.add_function(wrap_pyfunction!(validate_parameters, m)?)?;
     m.add_function(wrap_pyfunction!(new_model, m)?)?;
