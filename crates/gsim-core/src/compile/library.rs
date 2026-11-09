@@ -283,6 +283,31 @@ mod tests {
     }
 
     #[test]
+    fn a_main_parameter_names_one_of_the_components_own_parameters() {
+        // Merging the duplicate spellings took one entry's parameters and left the other's
+        // `main_param` beside them, so two components pointed at a parameter that was no
+        // longer there and the front end refused to load the whole catalogue. A main parameter
+        // that names nothing is worse than none: an inspector would highlight a field that
+        // does not exist.
+        let broken: Vec<_> = library()
+            .iter()
+            .filter_map(|c| {
+                let main = c.presentation.get("main_param")?.as_str()?;
+                let params = c.presentation.get("params")?.as_array()?;
+                let named = params
+                    .iter()
+                    .filter_map(|p| p.get("name")?.as_str())
+                    .any(|n| n == main);
+                (!named).then_some((c.id.as_str(), main))
+            })
+            .collect();
+        assert!(
+            broken.is_empty(),
+            "main_param names no parameter: {broken:?}"
+        );
+    }
+
+    #[test]
     fn the_catalog_covers_the_components_a_schematic_actually_uses() {
         let catalog = catalog();
         let compilable = catalog.components.iter().filter(|c| c.compilable).count();
