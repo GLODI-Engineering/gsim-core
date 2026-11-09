@@ -56,6 +56,21 @@ pub enum ElementTail {
         theta: &'static str,
         phase: &'static str,
     },
+    /// `PULSE(V1 V2 TD TR TF PW PER)` -- SPICE's own pulse source, rendered as seven
+    /// whitespace tokens with the parens riding on the first and last, exactly as
+    /// [`Self::Sin`] does and for the same reason: `general-mna`'s tokenizer splits on
+    /// whitespace and never sees a bracketed literal.
+    ///
+    /// Field order is SPICE's, not configurable per type.
+    Pulse {
+        v1: &'static str,
+        v2: &'static str,
+        td: &'static str,
+        tr: &'static str,
+        tf: &'static str,
+        pw: &'static str,
+        per: &'static str,
+    },
     /// Nothing after the nodes.
     None,
 }
@@ -674,6 +689,25 @@ pub const REGISTRY: &[TypeSpec] = &[
             phase: "PHASE",
         },
         ..TypeSpec::empty("source.voltage.sin")
+    },
+    // `V<name> p n PULSE(V1 V2 TD TR TF PW PER)`. The netlist grammar has accepted this since
+    // before the compile registry existed -- `device V accepts SIN/PULSE/EXP/PWL/SFFM` is the
+    // parser's own error -- but no *type* emitted it, so a schematic could not place a pulse
+    // source at all while a hand-written deck could use one freely. Field names match the
+    // catalogue's own, as the sine source's already do.
+    TypeSpec {
+        device_letter: Some('V'),
+        node_ports: SOURCE_PINS,
+        tail: ElementTail::Pulse {
+            v1: "V1",
+            v2: "V2",
+            td: "TD",
+            tr: "TR",
+            tf: "TF",
+            pw: "PW",
+            per: "PER",
+        },
+        ..TypeSpec::empty("source.voltage.pulse")
     },
     // -- dependent sources (the E/F pair a true ideal transformer is built from) --
     TypeSpec {

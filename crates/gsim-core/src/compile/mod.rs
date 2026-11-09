@@ -18,6 +18,8 @@
 //! Netlist emission logic lives here, in `gsim-core`, not in a binding — `AGENTS.md`'s "one
 //! implementation, thin bindings" rule.
 
+pub mod capabilities;
+pub mod library;
 pub mod nets;
 pub mod routing;
 pub mod spec;
