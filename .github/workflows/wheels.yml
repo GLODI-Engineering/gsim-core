@@ -28,7 +28,11 @@ jobs:
             target: x86_64
           - runner: ubuntu-24.04-arm
             target: aarch64
-          - runner: macos-14
+          # `macos-latest` rather than a pinned `macos-14`: that label resolved
+          # to 'macos-14-arm64-us-default', which this organisation's runner
+          # allowance does not include, and the job failed in 2s before doing
+          # any work. `macos-latest` has been arm64 since macos-14.
+          - runner: macos-latest
             target: aarch64
           - runner: macos-13
             target: x86_64
