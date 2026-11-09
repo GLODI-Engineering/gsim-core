@@ -1,0 +1,42 @@
+# Maturin builds a wheel from Cargo.toml alone, but then the wheel carries almost no
+# metadata: no description a package index can show, no classifiers, no links, no
+# declared Python support. This file supplies them.
+
+[build-system]
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "gsim-py"
+description = "Python bindings for gsim-core: the schematic document model, its validation rules, and the compile registry that turns a document into a netlist."
+requires-python = ">=3.9"
+license = { text = "MIT" }
+readme = "README.md"
+# No Python dependencies: this is a self-contained compiled extension.
+dependencies = []
+keywords = ["circuit", "schematic", "netlist", "simulation", "eda", "pyo3"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Electronic Design Automation (EDA)",
+    "Typing :: Typed",
+]
+# Version comes from Cargo.toml so the crate and the wheel cannot disagree.
+dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://github.com/GLODI-Engineering/gsim-core"
+Source = "https://github.com/GLODI-Engineering/gsim-core"
+Issues = "https://github.com/GLODI-Engineering/gsim-core/issues"
+"Python tooling built on it" = "https://github.com/GLODI-Engineering/gsim-tools"
+
+[tool.maturin]
+# The crate lives in a workspace; point maturin at this crate specifically.
+manifest-path = "Cargo.toml"
+module-name = "gsim_py"
+strip = true

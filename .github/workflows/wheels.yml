@@ -1,0 +1,87 @@
+name: wheels
+
+# `gsim_py` is the compiled half of the Python story: `gsim_tools.schematic`
+# needs it from the moment a Schematic is constructed, because the document
+# model and the compile registry live here rather than in Python. Without
+# wheels, every user needs a Rust toolchain, so building them is what makes
+# `pip install` a realistic instruction.
+#
+# Runs on a tag, and on demand. Not on every push: a full matrix is minutes of
+# runner time and nothing downstream consumes an untagged wheel.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.platform.target }} on ${{ matrix.platform.runner }}
+    runs-on: ${{ matrix.platform.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - runner: ubuntu-24.04
+            target: x86_64
+          - runner: ubuntu-24.04-arm
+            target: aarch64
+          - runner: macos-14
+            target: aarch64
+          - runner: macos-13
+            target: x86_64
+          - runner: windows-2022
+            target: x64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.platform.target }}
+          # `--find-interpreter` builds one wheel per CPython on the runner.
+          # On Linux the build happens in a manylinux container, so the wheel
+          # works on distributions older than the runner's own.
+          args: --release --out dist --find-interpreter --manifest-path crates/gsim-py/Cargo.toml
+          manylinux: auto
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.platform.runner }}-${{ matrix.platform.target }}
+          path: dist
+
+  sdist:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: build sdist
+        uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist --manifest-path crates/gsim-py/Cargo.toml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-sdist
+          path: dist
+
+  # Deliberately not a publish step. Pushing to an index needs a token this
+  # repository does not have, and publishing is a decision rather than a
+  # consequence of tagging. The artifacts above are what a release attaches.
+  collect:
+    needs: [build, sdist]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-*
+          merge-multiple: true
+          path: dist
+      - name: what was built
+        run: ls -la dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: all-wheels
+          path: dist
