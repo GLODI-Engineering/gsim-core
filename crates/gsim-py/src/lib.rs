@@ -118,6 +118,18 @@ fn capabilities() -> String {
     gsim_core::compile::capabilities::capabilities_json()
 }
 
+/// The component library: everything a front end needs to show a palette, plus whether this
+/// engine can compile each component.
+///
+/// The front end used to keep its own catalogue of components beside this -- labels, port
+/// geometry, parameter names and defaults -- and the two drifted until a switch's parameters
+/// disagreed about whether they were resistances or conductances. There is one description
+/// now, and it is this one.
+#[pyfunction]
+fn catalog() -> String {
+    gsim_core::compile::library::catalog_json()
+}
+
 #[pyfunction]
 fn evaluate_component(contract_json: &str, params_json: &str) -> PyResult<String> {
     let contract: ComponentContract = parse_json(contract_json, "contract")?;
@@ -456,6 +468,7 @@ fn layered_layout(
 fn gsim_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(version, m)?)?;
     m.add_function(wrap_pyfunction!(capabilities, m)?)?;
+    m.add_function(wrap_pyfunction!(catalog, m)?)?;
     m.add_function(wrap_pyfunction!(evaluate_component, m)?)?;
     m.add_function(wrap_pyfunction!(validate_parameters, m)?)?;
     m.add_function(wrap_pyfunction!(new_model, m)?)?;

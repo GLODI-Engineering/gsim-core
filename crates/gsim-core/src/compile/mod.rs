@@ -19,6 +19,7 @@
 //! implementation, thin bindings" rule.
 
 pub mod capabilities;
+pub mod library;
 pub mod nets;
 pub mod routing;
 pub mod spec;
