@@ -236,6 +236,34 @@ fn emit_element(scope: &Scope<'_>, block: &Block, spec: &TypeSpec) -> Result<Str
             tokens.push(theta);
             tokens.push(format!("{phase})"));
         }
+        ElementTail::Pulse {
+            v1,
+            v2,
+            td,
+            tr,
+            tf,
+            pw,
+            per,
+        } => {
+            // V1/V2 hard-fail if missing: a pulse between two unstated levels is not a
+            // source anyone meant. The four timings default to 0, which is what an omitted
+            // field means in SPICE and what the catalogue's own defaults say.
+            let v1 = required_param(block, v1)?;
+            let v2 = required_param(block, v2)?;
+            let td = param_or(block, td, "0");
+            let tr = param_or(block, tr, "0");
+            let tf = param_or(block, tf, "0");
+            let pw = param_or(block, pw, "0");
+            let per = param_or(block, per, "0");
+            // Seven tokens, parens riding on the first and last -- see the Sin arm.
+            tokens.push(format!("PULSE({v1}"));
+            tokens.push(v2);
+            tokens.push(td);
+            tokens.push(tr);
+            tokens.push(tf);
+            tokens.push(pw);
+            tokens.push(format!("{per})"));
+        }
         ElementTail::None => {}
     }
     Ok(tokens.join(" "))
@@ -2118,6 +2146,80 @@ mod tests {
             netlist.contains("DELAY kind=sum inputs=prev:K0 signs=1"),
             "{netlist}"
         );
+    }
+
+    #[test]
+    fn pulse_source_emits_a_real_seven_token_spice_pulse_call() {
+        // The netlist grammar has always taken PULSE on a V line -- the parser's own error
+        // lists it -- but no type emitted one, so a schematic could not place a pulse source
+        // while a hand-written deck could use it freely.
+        let mut b = ModelBuilder::new("m", "Case", 10);
+        add(
+            &mut b,
+            "V1",
+            "source.voltage.pulse",
+            Paradigm::PhysicalNetwork,
+            json!({"V1": 0.0, "V2": 5.0, "TD": 0.0, "TR": 1e-6,
+                   "TF": 1e-6, "PW": 10e-6, "PER": 20e-6}),
+        );
+        add(
+            &mut b,
+            "GND",
+            "routing.ground",
+            Paradigm::PhysicalNetwork,
+            json!({}),
+        );
+        add(
+            &mut b,
+            "R1",
+            "passive.resistor",
+            Paradigm::PhysicalNetwork,
+            json!({"R": 1000.0}),
+        );
+        elec(&mut b, "V1", "p", "R1", "p1");
+        elec(&mut b, "R1", "p2", "GND", "p");
+        elec(&mut b, "V1", "n", "GND", "p");
+        let netlist = compile(&b.into_model(), "general-simulator")
+            .unwrap_or_else(|e| panic!("{e}"))
+            .netlist;
+        // Seven whitespace tokens with the parens riding on the first and last, which is what
+        // general-mna's tokenizer reads -- not a bracketed literal.
+        assert!(
+            netlist.contains("PULSE(0 5 0 1e-6 1e-6 1e-5 2e-5)"),
+            "{netlist}"
+        );
+    }
+
+    #[test]
+    fn a_pulse_source_without_its_two_levels_is_rejected_not_defaulted() {
+        // The four timings default to 0, as an omitted SPICE field means. The two levels do
+        // not: a pulse between two unstated voltages is not a source anyone meant.
+        let mut b = ModelBuilder::new("m", "Case", 10);
+        add(
+            &mut b,
+            "V1",
+            "source.voltage.pulse",
+            Paradigm::PhysicalNetwork,
+            json!({"V1": 0.0}),
+        );
+        add(
+            &mut b,
+            "GND",
+            "routing.ground",
+            Paradigm::PhysicalNetwork,
+            json!({}),
+        );
+        add(
+            &mut b,
+            "R1",
+            "passive.resistor",
+            Paradigm::PhysicalNetwork,
+            json!({"R": 1000.0}),
+        );
+        elec(&mut b, "V1", "p", "R1", "p1");
+        elec(&mut b, "R1", "p2", "GND", "p");
+        elec(&mut b, "V1", "n", "GND", "p");
+        assert!(compile(&b.into_model(), "general-simulator").is_err());
     }
 
     #[test]

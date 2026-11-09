@@ -202,6 +202,32 @@ fn params_of(spec: &TypeSpec) -> Vec<ParamCapability> {
                 });
             }
         }
+        ElementTail::Pulse {
+            v1,
+            v2,
+            td,
+            tr,
+            tf,
+            pw,
+            per,
+        } => {
+            for (param, field) in [
+                (v1, "PULSE.v1"),
+                (v2, "PULSE.v2"),
+                (td, "PULSE.td"),
+                (tr, "PULSE.tr"),
+                (tf, "PULSE.tf"),
+                (pw, "PULSE.pw"),
+                (per, "PULSE.per"),
+            ] {
+                params.push(ParamCapability {
+                    param: param.to_string(),
+                    field: field.to_string(),
+                    required: true,
+                    form: ParamForm::SourceFunctionField,
+                });
+            }
+        }
         // A model token names a `.MODEL` card; the parameters live on the `kind=` card below.
         ElementTail::Model(_) | ElementTail::None => {}
     }
