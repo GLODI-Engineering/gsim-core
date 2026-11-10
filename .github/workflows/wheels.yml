@@ -47,12 +47,15 @@ jobs:
           # macOS resolves its Python symbols with `-undefined dynamic_lookup`,
           # so there is no libpython of the wrong architecture to link against,
           # and Apple's SDK carries both architectures.
+          #
+          # Dispatch run 42832549171 built both this and a `universal2` fat
+          # wheel successfully. This one wins: `file` on the extension inside
+          # reports `Mach-O 64-bit x86_64`, so the tag is not a mislabelled arm
+          # build, it is half the size (3.7 MB against 7.3 MB), and one wheel
+          # per architecture matches what Linux and Windows already ship. The
+          # fat wheel's arm half would only duplicate the arm64 job above.
           - runner: macos-latest
             target: x86_64-apple-darwin
-          # Candidate for the same slot, kept only until a dispatch run shows
-          # which of the two actually produces an installable Intel wheel.
-          - runner: macos-latest
-            target: universal2-apple-darwin
           - runner: windows-2022
             target: x64
     steps:
