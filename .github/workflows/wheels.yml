@@ -34,8 +34,25 @@ jobs:
           # any work. `macos-latest` has been arm64 since macos-14.
           - runner: macos-latest
             target: aarch64
-          - runner: macos-13
-            target: x86_64
+          # Intel macOS is built *on the arm runner*, not on an Intel one.
+          # `macos-13` is never assigned a runner for this account: the job sits
+          # queued for exactly 24 hours and GitHub cancels it on the queue
+          # timeout, taking the whole run and `collect` with it. Three runs,
+          # queued -> cancelled to the second: 42632760681 14:14:40Z ->
+          # 14:14:40Z next day, 42579600051 07:28:52Z -> 07:28:52Z,
+          # 42576322978 06:58:15Z -> 06:58:16Z. That is a label nobody serves,
+          # not a busy queue, so waiting for it is waiting for nothing.
+          #
+          # Cross-compiling is safe here because a PyO3 extension module on
+          # macOS resolves its Python symbols with `-undefined dynamic_lookup`,
+          # so there is no libpython of the wrong architecture to link against,
+          # and Apple's SDK carries both architectures.
+          - runner: macos-latest
+            target: x86_64-apple-darwin
+          # Candidate for the same slot, kept only until a dispatch run shows
+          # which of the two actually produces an installable Intel wheel.
+          - runner: macos-latest
+            target: universal2-apple-darwin
           - runner: windows-2022
             target: x64
     steps:
