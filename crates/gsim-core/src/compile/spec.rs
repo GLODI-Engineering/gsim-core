@@ -649,6 +649,16 @@ pub const REGISTRY: &[TypeSpec] = &[
         structural: true,
         ..TypeSpec::empty("spice-subckt.boundary")
     },
+    // A wire tap. The front end splices one of these in when a branch is landed on an existing
+    // conductor instead of on a port, so it is created by drawing, never placed from a palette
+    // — and it had no entry here at all, which made every tapped schematic fail to compile with
+    // `unknown-type: block 'junction-...' has type 'routing.junction'`. Structural like a
+    // ground: it carries no device, and the net walk already merges the conductors that meet at
+    // its `node` port.
+    TypeSpec {
+        structural: true,
+        ..TypeSpec::empty("routing.junction")
+    },
     // Goto/From are pure connectivity annotations: `structural` keeps both out of the emitted
     // netlist entirely, and `super::routing` rewrites every reference that lands on a
     // `routing.from` to the real driver behind its matched `routing.goto`. See that module.
