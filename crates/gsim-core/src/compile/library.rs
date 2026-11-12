@@ -171,6 +171,76 @@ mod tests {
     }
 
     #[test]
+    fn no_port_sits_on_a_face_corner() {
+        // A symbol is drawn inside its bbox, so a port declared on a face *corner* can only be
+        // met by artwork running into that corner -- which no symbol does. The port marker then
+        // draws as a loose circle beside the component with nothing joining the two, and a
+        // reader cannot tell which terminal belongs to what. Four components shipped that way
+        // (both dependent current-controlled sources with p and n on the same face's two
+        // corners, the comparator carrying the ideal opamp's offsets in a shorter box, and the
+        // n-MESFET putting all three terminals at the far corner of their faces).
+        //
+        // The geometry means nothing to this crate, which is exactly why the rule has to be
+        // asserted here rather than left to whichever generator wrote the file: the data is
+        // embedded from this repository, so this is the only place a fifth cannot slip past.
+        let mut offenders = Vec::new();
+        for c in library() {
+            let Some(bbox) = c
+                .presentation
+                .get("symbol")
+                .and_then(|s| s.get("bbox"))
+                .and_then(|b| b.as_array())
+            else {
+                continue;
+            };
+            let (Some(w), Some(h)) = (
+                bbox.first().and_then(|v| v.as_f64()),
+                bbox.get(1).and_then(|v| v.as_f64()),
+            ) else {
+                continue;
+            };
+            let Some(ports) = c.presentation.get("ports") else {
+                continue;
+            };
+            for group in ["inputs", "outputs"] {
+                let Some(list) = ports.get(group).and_then(|g| g.as_array()) else {
+                    continue;
+                };
+                for port in list {
+                    let (Some(side), Some(offset)) = (
+                        port.get("side").and_then(|v| v.as_str()),
+                        port.get("offset").and_then(|v| v.as_f64()),
+                    ) else {
+                        continue;
+                    };
+                    // A left/right port runs along the box's height; top/bottom along its width.
+                    let extent = match side {
+                        "left" | "right" => h,
+                        "top" | "bottom" => w,
+                        _ => continue,
+                    };
+                    if offset <= 2.0 || offset >= extent - 2.0 {
+                        let id = port
+                            .get("id")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("<unnamed>");
+                        offenders.push(format!(
+                            "{} {group}:{id} side={side} offset={offset} extent={extent}",
+                            c.id
+                        ));
+                    }
+                }
+            }
+        }
+        assert!(
+            offenders.is_empty(),
+            "{} port(s) sit within 2 units of a face corner, where no artwork reaches them:\n  {}",
+            offenders.len(),
+            offenders.join("\n  ")
+        );
+    }
+
+    #[test]
     fn ids_are_unique() {
         let mut ids: Vec<_> = library().iter().map(|c| c.id.as_str()).collect();
         let before = ids.len();
