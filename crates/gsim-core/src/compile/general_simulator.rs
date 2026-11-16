@@ -662,6 +662,62 @@ mod tests {
         assert!(out.notes.is_empty(), "{:?}", out.notes);
     }
 
+    /// The front end splices a `routing.junction` in when a branch is landed on an
+    /// existing conductor rather than on a port. It had no registry entry, so every
+    /// schematic drawn that way failed to compile with `unknown-type`. It emits no
+    /// card, and the conductors meeting at its `node` port share one node.
+    #[test]
+    fn a_wire_tap_junction_merges_its_conductors_and_emits_nothing() {
+        let mut b = ModelBuilder::new("m", "M", 10);
+        for (id, r) in [("R1", 10.0), ("R2", 20.0), ("R3", 30.0)] {
+            add(
+                &mut b,
+                id,
+                "passive.resistor",
+                Paradigm::PhysicalNetwork,
+                json!({ "R": r }),
+            );
+        }
+        add(
+            &mut b,
+            "J1",
+            "routing.junction",
+            Paradigm::Routing,
+            json!({}),
+        );
+        add(
+            &mut b,
+            "gnd",
+            "routing.ground",
+            Paradigm::PhysicalNetwork,
+            json!({}),
+        );
+        // Three resistors meet on the junction; their far ends go to ground.
+        elec(&mut b, "R1", "p1", "J1", "node");
+        elec(&mut b, "R2", "p1", "J1", "node");
+        elec(&mut b, "R3", "p1", "J1", "node");
+        elec(&mut b, "R1", "p2", "gnd", "p");
+        elec(&mut b, "R2", "p2", "gnd", "p");
+        elec(&mut b, "R3", "p2", "gnd", "p");
+
+        let out = compile(&b.into_model(), "general-simulator").unwrap();
+        // The junction emits no card of its own.
+        assert!(!out.netlist.contains("J1 "), "{}", out.netlist);
+        // All three resistors name the same first node.
+        let first_nodes: Vec<&str> = out
+            .netlist
+            .lines()
+            .filter(|l| l.starts_with("R1 ") || l.starts_with("R2 ") || l.starts_with("R3 "))
+            .map(|l| l.split_whitespace().nth(1).unwrap())
+            .collect();
+        assert_eq!(first_nodes.len(), 3, "{}", out.netlist);
+        assert!(
+            first_nodes.iter().all(|n| *n == first_nodes[0]),
+            "conductors at a junction must share a node: {}",
+            out.netlist
+        );
+    }
+
     #[test]
     fn prefixes_a_device_letter_when_the_block_id_lacks_one() {
         let mut b = ModelBuilder::new("m", "M", 10);
