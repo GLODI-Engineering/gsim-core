@@ -6,7 +6,10 @@ license.workspace = true
 publish.workspace = true
 repository.workspace = true
 homepage.workspace = true
-description = "Phase 1: parametric component-contract schema (GSF v2) + .gsim_sch document/builder + autolayout — the single implementation shared by gsim-py and gsim-wasm. Netlist compilation is out of scope until a later phase."
+description = "Schematic model for circuit and block-diagram simulation: a parametric component-contract schema (GSF v2) whose ports, geometry and validation are expressions evaluated live as parameters change, a .gsim_sch document/builder with .SUBCKT scoping, collision-avoiding autolayout, and netlist compilation — one Rust implementation shared by the gsim-py and gsim-wasm bindings instead of parallel Python and TypeScript copies."
+readme = "../../README.md"
+keywords = ["schematic", "netlist", "circuit-simulation", "autolayout", "electronics"]
+categories = ["science", "simulation"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
