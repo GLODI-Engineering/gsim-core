@@ -9425,7 +9425,7 @@
               "domain": "physical-electrical"
             },
             "label": "V+",
-            "offset": 20,
+            "offset": 14,
             "side": "left"
           },
           {
@@ -9434,7 +9434,7 @@
               "domain": "physical-electrical"
             },
             "label": "V-",
-            "offset": 40,
+            "offset": 26,
             "side": "left"
           }
         ],
@@ -17903,7 +17903,7 @@
               "domain": "physical-electrical"
             },
             "label": "Gate",
-            "offset": 56,
+            "offset": 53,
             "side": "left"
           }
         ],
@@ -17914,7 +17914,7 @@
               "domain": "physical-electrical"
             },
             "label": "Drain",
-            "offset": 56,
+            "offset": 28,
             "side": "top"
           },
           {
@@ -17923,7 +17923,7 @@
               "domain": "physical-electrical"
             },
             "label": "Source",
-            "offset": 56,
+            "offset": 28,
             "side": "bottom"
           }
         ]
@@ -24639,8 +24639,8 @@
               "domain": "physical-electrical"
             },
             "label": "+",
-            "offset": 1,
-            "side": "right"
+            "offset": 30,
+            "side": "left"
           }
         ],
         "outputs": [
@@ -24650,7 +24650,7 @@
               "domain": "physical-electrical"
             },
             "label": "-",
-            "offset": 59,
+            "offset": 30,
             "side": "right"
           }
         ]
@@ -24722,8 +24722,8 @@
               "domain": "physical-electrical"
             },
             "label": "+",
-            "offset": 1,
-            "side": "right"
+            "offset": 30,
+            "side": "left"
           }
         ],
         "outputs": [
@@ -24733,7 +24733,7 @@
               "domain": "physical-electrical"
             },
             "label": "-",
-            "offset": 59,
+            "offset": 30,
             "side": "right"
           }
         ]
