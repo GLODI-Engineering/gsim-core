@@ -3,7 +3,7 @@
 //! Every syntax detail here was matched against `general-mna`'s own parser and against real,
 //! working netlists run through `general-simulator`, not written from the spec alone.
 
-use super::spec::{self, ElementTail, FieldSpec, KindName, TypeSpec};
+use super::spec::{self, ElementTail, FieldSpec, KindName, SubElement, SubNode, SubTail, TypeSpec};
 use super::{CompileContext, CompileError, CompileOutput, NetlistTarget, Scope};
 use crate::document::{Block, Endpoint, SubcktDef};
 
@@ -70,10 +70,22 @@ impl NetlistTarget for GeneralSimulatorTarget {
             lines.push(emit_x_card(ctx, &ctx.top, block)?);
         }
 
+        // Unreferenced nodes, after everything else is placed: the analysis needs the X cards
+        // and composites above to already be accounted for.
+        let (refs, notes) = dc_reference_cards(&ctx.top)?;
+        if !refs.is_empty() {
+            lines.push(String::new());
+            lines.push(
+                "* DC references added by the compiler for nodes nothing else ties down."
+                    .to_string(),
+            );
+            lines.extend(refs);
+        }
+
         lines.push(String::new());
         Ok(CompileOutput {
             netlist: lines.join("\n"),
-            notes: Vec::new(),
+            notes,
         })
     }
 }
@@ -138,6 +150,15 @@ fn emit_scope(scope: &Scope<'_>, lines: &mut Vec<String>) -> Result<(), CompileE
         if spec.structural {
             continue;
         }
+        if let Some(parts) = spec.expansion {
+            // A composite contributes several ordinary element cards rather than one. They are
+            // emitted together, under the parent block's comments, so a reader sees the whole
+            // device in one place.
+            elements.push(with_comments(
+                block,
+                emit_expansion(scope, block, parts)?.join("\n"),
+            ));
+        }
         if spec.device_letter.is_some() {
             elements.push(with_comments(block, emit_element(scope, block, spec)?));
         }
@@ -181,6 +202,203 @@ fn node_of(scope: &Scope<'_>, block: &Block, port: &str) -> Result<String, Compi
         .ok_or_else(|| CompileError::FloatingPort {
             block: block.id.clone(),
             port: port.to_string(),
+        })
+}
+
+/// The resistance used to give an otherwise-unreferenced node a defined potential.
+///
+/// Large enough to carry no meaningful current: measured on the LLC's isolated secondary,
+/// 1e15 and 1e18 give bit-identical results, so the value has stopped mattering well before
+/// here. It is a reference, not a load.
+const DC_REFERENCE_OHMS: &str = "1e15";
+
+/// Whether a device letter conducts at DC, and between which of its nodes.
+///
+/// Only the pairs that are *rigidly* tied matter:
+///   * `R`, `L`, `V` tie their two nodes -- an inductor is a short at DC, a voltage source
+///     fixes a difference, and both therefore carry the node's potential.
+///   * `E` and `H` tie their **output** pair only. Their control pair senses a voltage and
+///     draws nothing, so it is not a path -- which is exactly why an ideal transformer
+///     isolates.
+///   * `C` blocks DC. `I`, `G` and `F` are current sources: infinite impedance.
+///   * `D` covers both ideal diodes and ideal switches here, and both are *conditional*. The
+///     worst case -- every one of them off -- is the case that leaves a node unreferenced, so
+///     they count as open.
+///   * `K` is a magnetic coupling, not a conductive path.
+fn dc_tied_pair(letter: char) -> bool {
+    matches!(letter.to_ascii_uppercase(), 'R' | 'L' | 'V' | 'E' | 'H')
+}
+
+/// Every node that has no DC path to ground, with a reference resistor for each island.
+///
+/// A node whose potential nothing fixes does not make the solve fail. It returns an answer --
+/// a stable, repeatable, plausible-looking answer that is simply a different one. On the LLC's
+/// isolated secondary the difference is 0.64%, and there is a genuine discontinuity at the
+/// limit: any finite reference converges to one value, removing it altogether gives another.
+/// Silence is the worst behaviour available here, so the compiler adds the reference itself
+/// and says so in a note.
+///
+/// A subckt instance is treated as providing **no** path between its ports. That is the
+/// conservative direction: an unnecessary 1e15 reference costs nothing, while a missed island
+/// costs a wrong answer. Composite blocks are expanded here, so an ideal transformer is
+/// analysed through its real `E`/`F` cards rather than guessed at.
+fn dc_reference_cards(scope: &Scope<'_>) -> Result<(Vec<String>, Vec<String>), CompileError> {
+    use std::collections::{BTreeMap, BTreeSet};
+
+    let mut parent: BTreeMap<String, String> = BTreeMap::new();
+    fn find(parent: &mut BTreeMap<String, String>, x: &str) -> String {
+        let p = parent.get(x).cloned().unwrap_or_else(|| x.to_string());
+        if p == x {
+            return p;
+        }
+        let r = find(parent, &p);
+        parent.insert(x.to_string(), r.clone());
+        r
+    }
+    let mut seen: BTreeSet<String> = BTreeSet::new();
+    let tie = |parent: &mut BTreeMap<String, String>, a: &str, b: &str| {
+        let (ra, rb) = (find(parent, a), find(parent, b));
+        if ra != rb {
+            parent.insert(ra, rb);
+        }
+    };
+    seen.insert("0".to_string());
+    parent.insert("0".to_string(), "0".to_string());
+    // Only nodes that actually appear on an element card are considered -- deliberately not
+    // every net in the scope. `NetScope::names` also returns the signal nets that carry gate
+    // drives and block-graph wiring, and those are not electrical nodes: hanging a resistor
+    // off one would be meaningless. A capacitor still registers its nodes below without
+    // tying them, so an AC-coupled node is not missed.
+
+    for block in scope.blocks {
+        let Some(spec) = spec::lookup(&block.r#type) else {
+            continue; // an unknown type is already a hard error on the emission path
+        };
+        if spec.structural {
+            continue;
+        }
+        // Collect this block's (letter, nodes) contributions: a composite gives several.
+        let mut cards: Vec<(char, Vec<String>)> = Vec::new();
+        if let Some(parts) = spec.expansion {
+            for part in parts {
+                let mut nodes = Vec::new();
+                for n in part.nodes {
+                    nodes.push(match n {
+                        SubNode::Port(p) => node_of(scope, block, p)?,
+                        SubNode::Internal(i) => format!("{}_{}", block.id, i),
+                        SubNode::Ground => "0".to_string(),
+                    });
+                }
+                cards.push((part.device_letter, nodes));
+            }
+        } else if let Some(letter) = spec.device_letter {
+            let mut nodes = Vec::new();
+            for p in spec.node_ports {
+                nodes.push(node_of(scope, block, p)?);
+            }
+            cards.push((letter, nodes));
+        } else {
+            // A subckt instance ties nothing: see the doc comment. Its nets are already
+            // registered above, so an island behind one is still found.
+            continue;
+        }
+
+        for (letter, nodes) in cards {
+            for n in &nodes {
+                seen.insert(n.clone());
+                parent.entry(n.clone()).or_insert_with(|| n.clone());
+            }
+            if dc_tied_pair(letter) && nodes.len() >= 2 {
+                tie(&mut parent, &nodes[0], &nodes[1]);
+            }
+        }
+    }
+
+    // One reference per island, at the island's lowest-sorting node so the choice is stable.
+    let ground = find(&mut parent, "0");
+    let mut islands: BTreeMap<String, String> = BTreeMap::new();
+    for n in &seen {
+        let r = find(&mut parent, n);
+        if r == ground {
+            continue;
+        }
+        islands.entry(r).or_insert_with(|| n.clone());
+    }
+    let mut cards = Vec::new();
+    let mut notes = Vec::new();
+    for (i, node) in islands.values().enumerate() {
+        cards.push(format!(
+            "Rgsim_dcref_{} {} 0 {}",
+            i + 1,
+            node,
+            DC_REFERENCE_OHMS
+        ));
+        notes.push(format!(
+            "node '{node}' has no DC path to ground; added a {DC_REFERENCE_OHMS} ohm reference \
+             so its potential is defined. Without one the solve still returns an answer, but a \
+             different one."
+        ));
+    }
+    Ok((cards, notes))
+}
+
+/// The emitted name of one sub-element of a composite: device letter, parent block id,
+/// suffix. Two instances of the same composite on one sheet therefore never collide, and the
+/// parent's id stays readable in every card it produced.
+fn sub_name(block_id: &str, part: &SubElement) -> String {
+    format!("{}{}_{}", part.device_letter, block_id, part.suffix)
+}
+
+/// Expands one composite block into its element cards.
+///
+/// Internal nodes are named `<block id>_<name>` for the same reason the cards are: they must
+/// be unique per instance, and they should say which block owns them when they turn up in an
+/// error or a waveform list.
+fn emit_expansion(
+    scope: &Scope<'_>,
+    block: &Block,
+    parts: &[SubElement],
+) -> Result<Vec<String>, CompileError> {
+    let mut out = Vec::with_capacity(parts.len());
+    for part in parts {
+        let mut tokens = vec![sub_name(&block.id, part)];
+        for node in part.nodes {
+            tokens.push(match node {
+                SubNode::Port(p) => node_of(scope, block, p)?,
+                SubNode::Internal(n) => format!("{}_{}", block.id, n),
+                SubNode::Ground => "0".to_string(),
+            });
+        }
+        match part.tail {
+            SubTail::Value(p) => tokens.push(required_param(block, p)?),
+            SubTail::Literal(t) => tokens.push(t.to_string()),
+            SubTail::SiblingThenValue { sibling, value } => {
+                tokens.push(sibling_name(block, parts, sibling)?);
+                tokens.push(required_param(block, value)?);
+            }
+            SubTail::TwoSiblingsThenValue { a, b, value } => {
+                tokens.push(sibling_name(block, parts, a)?);
+                tokens.push(sibling_name(block, parts, b)?);
+                tokens.push(required_param(block, value)?);
+            }
+        }
+        out.push(tokens.join(" "));
+    }
+    Ok(out)
+}
+
+/// Resolves a sibling reference inside one expansion to that sibling's emitted name.
+///
+/// A miss is a bug in this file's own registry, never in the user's document, so it reports as
+/// an internal error against the type rather than blaming the block.
+fn sibling_name(block: &Block, parts: &[SubElement], suffix: &str) -> Result<String, CompileError> {
+    parts
+        .iter()
+        .find(|p| p.suffix == suffix)
+        .map(|p| sub_name(&block.id, p))
+        .ok_or_else(|| CompileError::UnknownType {
+            block: block.id.clone(),
+            type_name: format!("{} (expansion has no sub-element '{suffix}')", block.r#type),
         })
 }
 
@@ -714,6 +932,192 @@ mod tests {
         assert!(
             first_nodes.iter().all(|n| *n == first_nodes[0]),
             "conductors at a junction must share a node: {}",
+            out.netlist
+        );
+    }
+
+    #[test]
+    fn an_isolated_secondary_is_given_a_dc_reference_it_did_not_have() {
+        // A transformer secondary feeding a capacitor through nothing conductive: the `E`
+        // fixes the voltage ACROSS the winding but never its potential against ground, so
+        // without help the node's absolute value is not determined by the circuit at all.
+        let mut b = ModelBuilder::new("m", "M", 10);
+        add(
+            &mut b,
+            "T1",
+            "physical_electrical.passive.transformer",
+            Paradigm::PhysicalNetwork,
+            json!({"n": 1.0}),
+        );
+        add(
+            &mut b,
+            "VIN",
+            "source.voltage.dc",
+            Paradigm::PhysicalNetwork,
+            json!({"V": 10.0}),
+        );
+        add(
+            &mut b,
+            "CO",
+            "passive.capacitor",
+            Paradigm::PhysicalNetwork,
+            json!({"C": 1e-6}),
+        );
+        add(
+            &mut b,
+            "gnd",
+            "routing.ground",
+            Paradigm::PhysicalNetwork,
+            json!({}),
+        );
+        elec(&mut b, "VIN", "p", "T1", "p1");
+        elec(&mut b, "VIN", "n", "gnd", "p");
+        elec(&mut b, "T1", "n1", "gnd", "p");
+        elec(&mut b, "T1", "p2", "CO", "p1"); // secondary: only a capacitor, which blocks DC
+        elec(&mut b, "T1", "n2", "CO", "p2");
+        let out = compile(&b.into_model(), "general-simulator").unwrap();
+        assert!(
+            out.netlist.contains("Rgsim_dcref_1"),
+            "the isolated secondary got no reference:\n{}",
+            out.netlist
+        );
+        assert!(
+            out.netlist.contains(" 0 1e15"),
+            "reference is not the expected magnitude:\n{}",
+            out.netlist
+        );
+        // It is a decision the compiler made for the user, so it has to be said out loud.
+        assert!(
+            out.notes.iter().any(|n| n.contains("no DC path to ground")),
+            "{:?}",
+            out.notes
+        );
+    }
+
+    #[test]
+    fn a_circuit_that_is_already_referenced_gets_no_added_resistors() {
+        // The other half of the contract: no gratuitous cards, and in particular none on the
+        // signal nets that carry gate drive -- those are not electrical nodes at all.
+        let mut b = ModelBuilder::new("m", "M", 10);
+        add(
+            &mut b,
+            "VIN",
+            "source.voltage.dc",
+            Paradigm::PhysicalNetwork,
+            json!({"V": 5.0}),
+        );
+        add(
+            &mut b,
+            "R1",
+            "passive.resistor",
+            Paradigm::PhysicalNetwork,
+            json!({"R": 1000.0}),
+        );
+        add(
+            &mut b,
+            "gnd",
+            "routing.ground",
+            Paradigm::PhysicalNetwork,
+            json!({}),
+        );
+        elec(&mut b, "VIN", "p", "R1", "p1");
+        elec(&mut b, "R1", "p2", "gnd", "p");
+        elec(&mut b, "VIN", "n", "gnd", "p");
+        let out = compile(&b.into_model(), "general-simulator").unwrap();
+        assert!(!out.netlist.contains("dcref"), "{}", out.netlist);
+        assert!(out.notes.is_empty(), "{:?}", out.notes);
+    }
+
+    #[test]
+    fn an_ideal_transformer_expands_into_its_e_f_pair() {
+        // Each winding end gets its own net, through its own resistor, so the emitted node
+        // ORDER is actually checked. Tying them all to ground would render every card as
+        // "0 0" and silently accept a reversed F -- which is the one mistake that matters
+        // here, since it makes the element source power instead of transferring it.
+        let mut b = ModelBuilder::new("m", "M", 10);
+        add(
+            &mut b,
+            "T1",
+            "physical_electrical.passive.transformer",
+            Paradigm::PhysicalNetwork,
+            json!({"n": 3.0}),
+        );
+        add(
+            &mut b,
+            "gnd",
+            "routing.ground",
+            Paradigm::PhysicalNetwork,
+            json!({}),
+        );
+        for (i, port) in ["p1", "n1", "p2", "n2"].iter().enumerate() {
+            let r = format!("R{i}");
+            add(
+                &mut b,
+                &r,
+                "passive.resistor",
+                Paradigm::PhysicalNetwork,
+                json!({"R": 1.0}),
+            );
+            elec(&mut b, "T1", port, &r, "p1");
+            elec(&mut b, &r, "p2", "gnd", "p");
+        }
+        let out = compile(&b.into_model(), "general-simulator").unwrap();
+        let net = |blk: &str| {
+            out.netlist
+                .lines()
+                .find(|l| l.starts_with(blk))
+                .map(|l| l.split_whitespace().nth(1).unwrap().to_string())
+                .unwrap()
+        };
+        // The ids already begin with R, so no device letter is prefixed; the trailing space
+        // keeps "R1" from also matching a hypothetical "R10".
+        let (p1, n1, p2, n2) = (net("R0 "), net("R1 "), net("R2 "), net("R3 "));
+        // Secondary voltage is n times the primary: E <p2 n2> <p1 n1> n.
+        assert!(
+            out.netlist
+                .contains(&format!("ET1_sec {p2} {n2} {p1} {n1} 3")),
+            "{}",
+            out.netlist
+        );
+        // Primary current is n times the current through that same E -- and the nodes read
+        // n1 then p1, because the E's branch reference direction is opposite to the current
+        // leaving into the load. Reversed, the transformer delivers power and the LCP fails.
+        assert!(
+            out.netlist
+                .contains(&format!("FT1_pri {n1} {p1} ET1_sec 3")),
+            "{}",
+            out.netlist
+        );
+    }
+
+    #[test]
+    fn coupled_inductors_expand_into_two_l_cards_and_a_k_card() {
+        let mut b = ModelBuilder::new("m", "M", 10);
+        add(
+            &mut b,
+            "LK",
+            "physical_electrical.passive.mutual_inductor",
+            Paradigm::PhysicalNetwork,
+            json!({"L1": 1e-3, "L2": 4e-3, "k": 0.95}),
+        );
+        add(
+            &mut b,
+            "gnd",
+            "routing.ground",
+            Paradigm::PhysicalNetwork,
+            json!({}),
+        );
+        for port in ["p1", "n1", "p2", "n2"] {
+            elec(&mut b, "LK", port, "gnd", "p");
+        }
+        let out = compile(&b.into_model(), "general-simulator").unwrap();
+        assert!(out.netlist.contains("LLK_a 0 0 0.001"), "{}", out.netlist);
+        assert!(out.netlist.contains("LLK_b 0 0 0.004"), "{}", out.netlist);
+        // The K card couples the two by name -- the whole point of the expansion being one
+        // block rather than three the user has to name consistently by hand.
+        assert!(
+            out.netlist.contains("KLK_k LLK_a LLK_b 0.95"),
+            "{}",
             out.netlist
         );
     }
