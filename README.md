@@ -22,11 +22,19 @@ tooling — one implementation instead of the separate TypeScript (frontend) and
   produce a visually clean, non-overlapping schematic without manually reasoning about every
   coordinate — today that's impossible without hand-placing everything.
 
-**Out of scope for Phase 1**: compiling a `.gsim_sch` document to an ngspice/Xyce/
-general-simulator netlist. That logic currently lives in the much larger
-`packages/simulator/src/simulator/compiler/` pipeline (`ir1_builder`, `ir2_lowering`,
-`spice_netlist_writer`, `dae_system`, `scipy_compiler`, and more) and stays there until a later
-phase, once Phase 1 has landed and proven itself.
+Phase 1 deferred netlist compilation deliberately. It has since landed, in
+[`compile`](crates/gsim-core/src/compile/): a `.gsim_sch` document compiles to
+`general-simulator`'s own dual-grammar netlist (SPICE element cards and `kind=` block cards from
+one registry), with real `.SUBCKT` scoping, so a def's internal nets stay invisible to its
+parent. An unknown block type is a fatal error rather than a skipped line — a silently dropped
+component is a wrong circuit that still simulates.
+
+[`compile::capabilities`](crates/gsim-core/src/compile/capabilities.rs) exports that registry as
+data, so a front end renders what the engine declares instead of keeping its own list. That list
+had drifted all the way: of 143 types in `general-simulator-gui`'s catalogue, **zero** matched
+its hand-written "supported" list, because the list spelled types the way the registry does and
+schematics spell them the way the catalogue does. Generating the manifest makes the drift
+impossible rather than merely discouraged.
 
 Full rationale and everything settled before writing code: [`docs/decisions/`](docs/decisions/).
 
@@ -42,7 +50,7 @@ Python separately is exactly the kind of two-implementation drift `general-simul
   is a real, tested, pydantic-based library (`ModelBuilder`, `SymbolBuilder`,
   `ComponentDefinition`, `.gsim_sym` I/O) — not a stub. `gsim-py` is the automation library a
   user or agent uses to build a schematic entirely from code, with no matplotlib/pandas/etc:
-  its only job is schematic construction and (in a later phase) netlist compilation.
+  its only job is schematic construction and netlist compilation.
 - `crates/gsim-wasm` — wasm-bindgen bindings, consumed by `general-simulator-gui`'s frontend
   for its own `.gsim_sch` serialization and for evaluating the GSF v2 contract to paint a
   component's ports/geometry — the frontend still owns all actual SVG/DOM painting.
@@ -57,9 +65,22 @@ already ships `pyblock-ffi` and `cscript-ffi` around its own Rust core.
 
 ## Status
 
-Design in progress; no schema/interpreter/document code has landed yet. The crates currently
-expose only a `version()` smoke-test function so the PyO3/wasm-bindgen build pipelines exist
-before there is real surface to bind against.
+All three Phase 1 deliverables are implemented — the GSF v2 contract schema with its
+`${{ }}` expression language, the `.gsim_sch` document model, and autolayout — and netlist
+compilation, which Phase 1 had deferred, has landed on top of them.
+
+```toml
+[dependencies]
+gsim-core = "0.3"
+```
+
+Module map: `expr` and `template` (the closed-grammar expression language), `resolve`
+(`for_each`/`when`/`emit` expansion of dynamic port and primitive lists), `port` and `primitive`
+(the resolved static shapes), `contract` (GSF v2 and `evaluate_component`), `document`
+(`.gsim_sch` build and validation), `layout` (autolayout), `compile` (netlist emission).
+
+Worked schematics, each with the netlist it compiles to, are in
+[`examples/`](examples/README.md); they drive the crate through its `gsim-py` binding.
 
 ## Relationship to the sibling repos
 
