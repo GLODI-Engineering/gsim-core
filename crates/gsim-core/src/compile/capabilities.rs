@@ -25,7 +25,7 @@
 
 use serde::Serialize;
 
-use super::spec::{ElementTail, FieldSpec, KindName, TypeSpec, REGISTRY};
+use super::spec::{ElementTail, FieldSpec, KindName, SubTail, TypeSpec, REGISTRY};
 
 /// The manifest's own version, so a consumer can refuse one it does not understand.
 pub const CAPABILITIES_SCHEMA_VERSION: u32 = 1;
@@ -69,6 +69,10 @@ pub enum Emits {
     Block { kind: String },
     /// Both — an element card whose real parameters live on an accompanying block card.
     ElementAndBlock { letter: char, kind: String },
+    /// Several ordinary element cards, emitted inline -- a composite device such as an ideal
+    /// transformer (an `E`/`F` pair) or coupled inductors (`L`, `L`, `K`). `letters` lists the
+    /// device letters it expands into, in emission order.
+    Composite { letters: Vec<char> },
     /// Nothing: a ground only names a net, a subckt boundary only marks an interface.
     Nothing,
 }
@@ -155,6 +159,31 @@ fn param_from_field(field: &FieldSpec, out: &mut Vec<ParamCapability>) {
 
 fn params_of(spec: &TypeSpec) -> Vec<ParamCapability> {
     let mut params = Vec::new();
+
+    // A composite has no tail of its own; its parameters are whatever its sub-element cards
+    // read. The same parameter can feed more than one card (a turns ratio drives both halves
+    // of an ideal transformer), so it is reported once, on first use.
+    if let Some(parts) = spec.expansion {
+        for part in parts {
+            let value = match part.tail {
+                SubTail::Value(v)
+                | SubTail::SiblingThenValue { value: v, .. }
+                | SubTail::TwoSiblingsThenValue { value: v, .. } => Some(v),
+                SubTail::Literal(_) => None,
+            };
+            if let Some(v) = value {
+                if !params.iter().any(|p: &ParamCapability| p.param == v) {
+                    params.push(ParamCapability {
+                        param: v.to_string(),
+                        field: "value".to_string(),
+                        required: true,
+                        form: ParamForm::Scalar,
+                    });
+                }
+            }
+        }
+        return params;
+    }
 
     // The element card's tail comes first: it is what follows the positional nodes.
     match spec.tail {
@@ -268,6 +297,11 @@ fn kind_of(spec: &TypeSpec) -> Option<(String, Option<ParamCapability>, Vec<Stri
 }
 
 fn emits_of(spec: &TypeSpec, kind: Option<&String>) -> Emits {
+    if let Some(parts) = spec.expansion {
+        return Emits::Composite {
+            letters: parts.iter().map(|p| p.device_letter).collect(),
+        };
+    }
     match (spec.device_letter, kind) {
         (Some(letter), Some(kind)) => Emits::ElementAndBlock {
             letter,

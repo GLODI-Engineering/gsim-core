@@ -8248,7 +8248,8 @@
       "paradigm": "physical-network",
       "domain": "physical-electrical",
       "version": 1,
-      "description": "Coupled inductors (mutual inductance). SPICE element K."
+      "description": "Coupled inductors (mutual inductance). SPICE element K.",
+      "compiles_to": "passive.inductor.coupled"
     },
     {
       "id": "passive.memristor",
@@ -9963,7 +9964,8 @@
       "paradigm": "physical-network",
       "domain": "physical-electrical",
       "version": 1,
-      "description": "Magnetically coupled inductors with coupling coefficient k."
+      "description": "Magnetically coupled inductors with coupling coefficient k.",
+      "compiles_to": "physical_electrical.passive.mutual_inductor"
     },
     {
       "id": "physical-electrical.passive.transformer",
@@ -10061,7 +10063,8 @@
       "paradigm": "physical-network",
       "domain": "physical-electrical",
       "version": 1,
-      "description": "Ideal transformer with turns ratio n."
+      "description": "Ideal transformer with turns ratio n.",
+      "compiles_to": "physical_electrical.passive.transformer"
     },
     {
       "id": "physical-electrical.probe.ammeter",

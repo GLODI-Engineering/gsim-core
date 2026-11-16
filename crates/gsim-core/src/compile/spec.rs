@@ -280,6 +280,9 @@ pub struct TypeSpec {
     /// A structural block that emits no netlist line at all (a ground symbol only *names* a
     /// net; a subckt boundary only marks the def's interface).
     pub structural: bool,
+    /// `Some` => this is a **composite**: it has no single element card of its own and is
+    /// emitted as several, inline. Mutually exclusive with [`Self::device_letter`].
+    pub expansion: Option<&'static [SubElement]>,
 }
 
 impl TypeSpec {
@@ -294,6 +297,7 @@ impl TypeSpec {
             dynamic_outputs: None,
             vector_output: false,
             structural: false,
+            expansion: None,
         }
     }
 
@@ -388,6 +392,55 @@ pub fn render_value(value: &Value) -> String {
         }
         Value::Object(_) => value.to_string().replace(' ', ""),
     }
+}
+
+/// One node of an expanded sub-element: where it comes from.
+#[derive(Debug, Clone, Copy)]
+pub enum SubNode {
+    /// One of the parent block's own ports -- resolves to whatever net the sheet wired it to.
+    Port(&'static str),
+    /// A node private to this expansion, emitted as `<block id>_<name>` so two instances of the
+    /// same composite never collide.
+    Internal(&'static str),
+    /// The global reference node.
+    Ground,
+}
+
+/// What follows the nodes on one expanded sub-element card.
+#[derive(Debug, Clone, Copy)]
+pub enum SubTail {
+    /// A parameter of the parent block, rendered as the value.
+    Value(&'static str),
+    /// Fixed text.
+    Literal(&'static str),
+    /// A sibling sub-element's emitted *name*, then a parent param -- `F` and `H` cards, whose
+    /// controlling quantity is the current through another element.
+    SiblingThenValue {
+        sibling: &'static str,
+        value: &'static str,
+    },
+    /// Two sibling names then a parameter -- the `K` coupling card.
+    TwoSiblingsThenValue {
+        a: &'static str,
+        b: &'static str,
+        value: &'static str,
+    },
+}
+
+/// One element card inside a composite block's expansion.
+///
+/// A composite is emitted *inline*, not as a `.SUBCKT`: each instance substitutes its own
+/// parameter values straight into its own cards. That sidesteps subcircuit parameter passing
+/// entirely -- `general-mna` has no `.param` -- and it means a composite costs the solver
+/// nothing it does not already understand, because every card emitted is an ordinary element
+/// card it already parses.
+#[derive(Debug, Clone, Copy)]
+pub struct SubElement {
+    /// Appended to the parent block's id to name this card, after the device letter.
+    pub suffix: &'static str,
+    pub device_letter: char,
+    pub nodes: &'static [SubNode],
+    pub tail: SubTail,
 }
 
 macro_rules! rc {
@@ -718,6 +771,105 @@ pub const REGISTRY: &[TypeSpec] = &[
             per: "PER",
         },
         ..TypeSpec::empty("source.voltage.pulse")
+    },
+    // -- composites: emitted inline as several ordinary cards ----------------
+    //
+    // The ideal transformer is the E/F pair below, wired up once here instead of by hand on
+    // every sheet that needs one. `E` forces the secondary voltage to `n` times the primary;
+    // `F` forces the primary current to `n` times the current through that same `E`, which is
+    // what makes the power balance and the element lossless. Both halves are required: an `E`
+    // alone is a voltage amplifier that draws no primary current.
+    TypeSpec {
+        expansion: Some(&[
+            SubElement {
+                suffix: "sec",
+                device_letter: 'E',
+                nodes: &[
+                    SubNode::Port("p2"),
+                    SubNode::Port("n2"),
+                    SubNode::Port("p1"),
+                    SubNode::Port("n1"),
+                ],
+                tail: SubTail::Value("n"),
+            },
+            // The node order here is n1 then p1, not p1 then n1, and that is load-bearing.
+            // `F` senses the branch current of the `E` above, whose reference direction is
+            // opposite to the secondary current flowing out into the load -- the current
+            // leaves the source at its negative terminal. Writing the nodes the other way
+            // round makes the element deliver power instead of transferring it, and the
+            // diode complementarity solve then fails to converge rather than giving a
+            // visibly wrong answer.
+            SubElement {
+                suffix: "pri",
+                device_letter: 'F',
+                nodes: &[SubNode::Port("n1"), SubNode::Port("p1")],
+                tail: SubTail::SiblingThenValue {
+                    sibling: "sec",
+                    value: "n",
+                },
+            },
+        ]),
+        ..TypeSpec::empty("physical_electrical.passive.transformer")
+    },
+    // Two real inductors plus a `K` coupling card -- the magnetising inductance is physical
+    // here, unlike the ideal transformer above, so this is the one to reach for when the
+    // magnetising current matters.
+    TypeSpec {
+        expansion: Some(&[
+            SubElement {
+                suffix: "a",
+                device_letter: 'L',
+                nodes: &[SubNode::Port("p1"), SubNode::Port("n1")],
+                tail: SubTail::Value("L1"),
+            },
+            SubElement {
+                suffix: "b",
+                device_letter: 'L',
+                nodes: &[SubNode::Port("p2"), SubNode::Port("n2")],
+                tail: SubTail::Value("L2"),
+            },
+            SubElement {
+                suffix: "k",
+                device_letter: 'K',
+                nodes: &[],
+                tail: SubTail::TwoSiblingsThenValue {
+                    a: "a",
+                    b: "b",
+                    value: "k",
+                },
+            },
+        ]),
+        ..TypeSpec::empty("physical_electrical.passive.mutual_inductor")
+    },
+    // Same shape, the catalogue's other spelling of it; its coupling param is capital `K` and
+    // its two inductances name sibling blocks rather than carrying values, so only the
+    // coupling differs in the rendering.
+    TypeSpec {
+        expansion: Some(&[
+            SubElement {
+                suffix: "a",
+                device_letter: 'L',
+                nodes: &[SubNode::Port("p1"), SubNode::Port("n1")],
+                tail: SubTail::Value("L1"),
+            },
+            SubElement {
+                suffix: "b",
+                device_letter: 'L',
+                nodes: &[SubNode::Port("p2"), SubNode::Port("n2")],
+                tail: SubTail::Value("L2"),
+            },
+            SubElement {
+                suffix: "k",
+                device_letter: 'K',
+                nodes: &[],
+                tail: SubTail::TwoSiblingsThenValue {
+                    a: "a",
+                    b: "b",
+                    value: "K",
+                },
+            },
+        ]),
+        ..TypeSpec::empty("passive.inductor.coupled")
     },
     // -- dependent sources (the E/F pair a true ideal transformer is built from) --
     TypeSpec {
