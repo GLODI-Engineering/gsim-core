@@ -9,11 +9,11 @@
       "type": "number",
       "default": -100.0,
       "unit": "V",
-      "validate": "${{ value < params.v_th }}",
-      "error": "v_breakdown must be less than v_th"
+      "validate": "${{ value < params.v_f }}",
+      "error": "v_breakdown must be less than v_f"
     },
     { "name": "g_off", "type": "number", "default": 1e-9, "unit": "S" },
-    { "name": "v_th", "type": "number", "default": 0.6, "unit": "V" },
+    { "name": "v_f", "type": "number", "default": 0.6, "unit": "V" },
     { "name": "g_on", "type": "number", "default": 5.0, "unit": "S" }
   ],
   "ports": [

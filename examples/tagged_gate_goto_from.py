@@ -57,11 +57,14 @@ TAG = "GATE_CMD"
 
 SWITCH_PARAMS = {
     "r_on": R_ON,
-    "g_breakdown": 0.0,
-    "v_breakdown": -500.0,
-    "g_off": 1e-9,
-    "v_th": 0.5,
-    "g_on": 200.0,
+    "body_g_breakdown": 0.0,
+    "body_v_breakdown": -500.0,
+    "body_g_off": 1e-9,
+    "body_v_f": 0.5,
+    "body_g_on": 200.0,
+    # The gate threshold, V_GS(th). Against a 0/1 gate drive the
+    # 0.5 default is the midpoint.
+    "v_gs_th": 0.5,
 }
 
 

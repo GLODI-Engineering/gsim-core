@@ -7326,9 +7326,9 @@
         },
         {
           "default": 0.6,
-          "description": "Forward threshold voltage in volts.",
-          "label": "Threshold voltage",
-          "name": "v_th",
+          "description": "Forward threshold voltage V_F in volts.",
+          "label": "Forward voltage",
+          "name": "v_f",
           "type": "number"
         },
         {
@@ -7347,7 +7347,7 @@
           "type": "number"
         }
       ],
-      "main_param": "v_th",
+      "main_param": "v_f",
       "fidelities": [
         {
           "doc": "Ideal diode: piecewise-conductance forward/reverse model with a breakdown branch.",
@@ -7368,8 +7368,8 @@
             },
             {
               "default": 0.6,
-              "doc": "Forward threshold voltage in volts.",
-              "id": "v_th",
+              "doc": "Forward threshold voltage V_F in volts.",
+              "id": "v_f",
               "type": "number"
             },
             {
@@ -7444,8 +7444,8 @@
             },
             {
               "default": 0.6,
-              "doc": "Forward threshold voltage in volts.",
-              "id": "v_th",
+              "doc": "Forward threshold voltage V_F in volts.",
+              "id": "v_f",
               "type": "number"
             },
             {
@@ -7501,8 +7501,8 @@
             },
             {
               "default": 0.6,
-              "doc": "Forward threshold voltage in volts.",
-              "id": "v_th",
+              "doc": "Forward threshold voltage V_F in volts.",
+              "id": "v_f",
               "type": "number"
             },
             {
@@ -8753,93 +8753,107 @@
       "params": [
         {
           "default": 0.1,
-          "description": "Series on-state resistance in ohms.",
-          "label": "On resistance",
+          "description": "Channel (drain-source) on-state resistance in ohms.",
+          "label": "Channel on resistance",
           "min": 0,
           "name": "r_on",
           "type": "number"
         },
         {
           "default": 5,
-          "description": "On-state conductance in siemens.",
-          "label": "On conductance",
+          "description": "Body diode forward conductance in siemens. Not the channel -- that is r_on.",
+          "label": "Body diode on conductance",
           "min": 0,
-          "name": "g_on",
+          "name": "body_g_on",
           "type": "number"
         },
         {
           "default": 1e-09,
-          "description": "Off-state leakage conductance in siemens.",
-          "label": "Off conductance",
+          "description": "Body diode reverse leakage conductance in siemens.",
+          "label": "Body diode off conductance",
           "min": 0,
-          "name": "g_off",
+          "name": "body_g_off",
           "type": "number"
         },
         {
           "default": 0.6,
-          "description": "Forward threshold voltage in volts.",
-          "label": "Threshold voltage",
-          "name": "v_th",
+          "description": "Body diode forward threshold V_F in volts. NOT the gate threshold -- that is v_gs_th.",
+          "label": "Body diode forward voltage",
+          "name": "body_v_f",
           "type": "number"
         },
         {
           "default": -100,
-          "description": "Reverse breakdown voltage in volts.",
-          "label": "Breakdown voltage",
-          "name": "v_breakdown",
+          "description": "Body diode reverse breakdown voltage in volts.",
+          "label": "Body diode breakdown voltage",
+          "name": "body_v_breakdown",
           "type": "number"
         },
         {
           "default": 0,
-          "description": "Conductance past reverse breakdown, in siemens.",
-          "label": "Breakdown conductance",
+          "description": "Body diode conductance past reverse breakdown, in siemens.",
+          "label": "Body diode breakdown conductance",
           "min": 0,
-          "name": "g_breakdown",
+          "name": "body_g_breakdown",
+          "type": "number"
+        },
+        {
+          "default": 0.5,
+          "description": "Gate threshold V_GS(th) in volts: the switch conducts while its gate signal is at or above this. Defaults to 0.5 for a logic-level gate.",
+          "label": "Gate threshold voltage",
+          "name": "v_gs_th",
           "type": "number"
         }
       ],
       "main_param": "r_on",
       "fidelities": [
         {
-          "doc": "Block-gated ideal switch: on/off conductance with a threshold and breakdown branch.",
+          "doc": "Block-gated ideal switch: a channel resistance plus an intrinsic body diode, gated at v_gs_th.",
           "params": [
             {
               "default": 0.1,
-              "doc": "Series on-state resistance in ohms.",
+              "doc": "Channel (drain-source) on-state resistance in ohms.",
               "id": "r_on",
               "min": 0,
               "type": "number"
             },
             {
               "default": 5,
-              "doc": "On-state conductance in siemens.",
-              "id": "g_on",
+              "doc": "Body diode forward conductance in siemens. Not the channel -- that is r_on.",
+              "id": "body_g_on",
               "min": 0,
               "type": "number"
             },
             {
               "default": 1e-09,
-              "doc": "Off-state leakage conductance in siemens.",
-              "id": "g_off",
+              "doc": "Body diode reverse leakage conductance in siemens.",
+              "id": "body_g_off",
               "min": 0,
               "type": "number"
             },
             {
               "default": 0.6,
-              "doc": "Forward threshold voltage in volts.",
-              "id": "v_th",
+              "doc": "Body diode forward threshold V_F in volts. NOT the gate threshold -- that is v_gs_th.",
+              "id": "body_v_f",
               "type": "number"
             },
             {
               "default": -100,
-              "doc": "Reverse breakdown voltage in volts.",
-              "id": "v_breakdown",
+              "doc": "Body diode reverse breakdown voltage in volts.",
+              "id": "body_v_breakdown",
               "type": "number"
             },
             {
               "default": 0,
-              "doc": "Conductance past reverse breakdown, in siemens.",
-              "id": "g_breakdown",
+              "doc": "Body diode conductance past reverse breakdown, in siemens.",
+              "id": "body_g_breakdown",
+              "min": 0,
+              "type": "number"
+            },
+            {
+              "default": 0.5,
+              "doc": "Gate threshold V_GS(th) in volts: the switch conducts while its gate signal is at or above this.",
+              "id": "v_gs_th",
               "min": 0,
               "type": "number"
             }
@@ -8904,41 +8918,48 @@
           "params": [
             {
               "default": 0.1,
-              "doc": "Series on-state resistance in ohms.",
+              "doc": "Channel (drain-source) on-state resistance in ohms.",
               "id": "r_on",
               "min": 0,
               "type": "number"
             },
             {
               "default": 5,
-              "doc": "On-state conductance in siemens.",
-              "id": "g_on",
+              "doc": "Body diode forward conductance in siemens. Not the channel -- that is r_on.",
+              "id": "body_g_on",
               "min": 0,
               "type": "number"
             },
             {
               "default": 1e-09,
-              "doc": "Off-state leakage conductance in siemens.",
-              "id": "g_off",
+              "doc": "Body diode reverse leakage conductance in siemens.",
+              "id": "body_g_off",
               "min": 0,
               "type": "number"
             },
             {
               "default": 0.6,
-              "doc": "Forward threshold voltage in volts.",
-              "id": "v_th",
+              "doc": "Body diode forward threshold V_F in volts. NOT the gate threshold -- that is v_gs_th.",
+              "id": "body_v_f",
               "type": "number"
             },
             {
               "default": -100,
-              "doc": "Reverse breakdown voltage in volts.",
-              "id": "v_breakdown",
+              "doc": "Body diode reverse breakdown voltage in volts.",
+              "id": "body_v_breakdown",
               "type": "number"
             },
             {
               "default": 0,
-              "doc": "Conductance past reverse breakdown, in siemens.",
-              "id": "g_breakdown",
+              "doc": "Body diode conductance past reverse breakdown, in siemens.",
+              "id": "body_g_breakdown",
+              "min": 0,
+              "type": "number"
+            },
+            {
+              "default": 0.5,
+              "doc": "Gate threshold V_GS(th) in volts: the switch conducts while its gate signal is at or above this.",
+              "id": "v_gs_th",
               "min": 0,
               "type": "number"
             }

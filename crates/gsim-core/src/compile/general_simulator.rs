@@ -1154,8 +1154,8 @@ mod tests {
             "DEV",
             "passive.switch.ideal",
             Paradigm::PhysicalNetwork,
-            json!({"r_on": 0.04, "g_breakdown": 0.0, "v_breakdown": -1e6,
-                   "g_off": 1e-6, "v_th": 0.6, "g_on": 100.0}),
+            json!({"r_on": 0.04, "body_g_breakdown": 0.0, "body_v_breakdown": -1e6,
+                   "body_g_off": 1e-6, "body_v_f": 0.6, "body_g_on": 100.0}),
         );
         add(
             &mut b,
@@ -1197,8 +1197,9 @@ mod tests {
         );
         assert!(
             out.netlist.contains(
-                "DEV kind=ideal_switch r_on=0.04 g_breakdown=0 v_breakdown=-1000000 \
-                 g_off=1e-6 v_th=0.6 g_on=100 gate=block ctrl=GATE"
+                "DEV kind=ideal_switch r_on=0.04 body_g_breakdown=0 \
+                 body_v_breakdown=-1000000 body_g_off=1e-6 body_v_f=0.6 body_g_on=100 \
+                 gate=block ctrl=GATE"
             ),
             "{}",
             out.netlist
@@ -1231,8 +1232,8 @@ mod tests {
             "lega_high",
             "passive.switch.ideal",
             Paradigm::PhysicalNetwork,
-            json!({"r_on": 0.1, "g_breakdown": 0.0, "v_breakdown": -100.0,
-                   "g_off": 1e-9, "v_th": 0.6, "g_on": 5.0}),
+            json!({"r_on": 0.1, "body_g_breakdown": 0.0, "body_v_breakdown": -100.0,
+                   "body_g_off": 1e-9, "body_v_f": 0.6, "body_g_on": 5.0}),
         );
         add(
             &mut b,
@@ -2128,8 +2129,8 @@ mod tests {
             "DEV",
             "passive.switch.ideal",
             Paradigm::PhysicalNetwork,
-            json!({"r_on": 0.04, "g_breakdown": 0.0, "v_breakdown": -1e6,
-                   "g_off": 1e-6, "v_th": 0.6, "g_on": 100.0}),
+            json!({"r_on": 0.04, "body_g_breakdown": 0.0, "body_v_breakdown": -1e6,
+                   "body_g_off": 1e-6, "body_v_f": 0.6, "body_g_on": 100.0}),
             &["high-side device"],
             &["end of device"],
         );
@@ -3028,8 +3029,8 @@ mod tests {
                 id,
                 "passive.switch.ideal",
                 Paradigm::PhysicalNetwork,
-                json!({"r_on": 1e-3, "g_breakdown": 1.0, "v_breakdown": 1e3, "g_off": 1e-9,
-                       "v_th": 0.5, "g_on": 1e3}),
+                json!({"r_on": 1e-3, "body_g_breakdown": 1.0, "body_v_breakdown": 1e3,
+                       "body_g_off": 1e-9, "body_v_f": 0.5, "body_g_on": 1e3}),
             );
         }
         add(
