@@ -213,38 +213,6 @@
             }
           ],
           "tier": "ideal"
-        },
-        {
-          "doc": "One-sample delay.",
-          "params": [
-            {
-              "default": 0,
-              "id": "ic",
-              "type": "number"
-            },
-            {
-              "default": 0.01,
-              "id": "sample_time",
-              "type": "number"
-            }
-          ],
-          "ports": [
-            {
-              "direction": "in",
-              "id": "in",
-              "kind": "signal",
-              "offset": 20,
-              "side": "left"
-            },
-            {
-              "direction": "out",
-              "id": "out",
-              "kind": "signal",
-              "offset": 20,
-              "side": "right"
-            }
-          ],
-          "tier": "n_a"
         }
       ],
       "symbol": {
@@ -337,27 +305,6 @@
             }
           ],
           "tier": "ideal"
-        },
-        {
-          "doc": "Continuous-time derivative.",
-          "params": [],
-          "ports": [
-            {
-              "direction": "in",
-              "id": "in",
-              "kind": "signal",
-              "offset": 20,
-              "side": "left"
-            },
-            {
-              "direction": "out",
-              "id": "out",
-              "kind": "signal",
-              "offset": 20,
-              "side": "right"
-            }
-          ],
-          "tier": "n_a"
         }
       ],
       "symbol": {
@@ -800,43 +747,6 @@
             }
           ],
           "tier": "ideal"
-        },
-        {
-          "doc": "Signal gain block.",
-          "params": [
-            {
-              "default": 1,
-              "id": "k",
-              "type": "number"
-            },
-            {
-              "choices": [
-                "element",
-                "matrix-pre",
-                "matrix-post"
-              ],
-              "default": "element",
-              "id": "mode",
-              "type": "enum"
-            }
-          ],
-          "ports": [
-            {
-              "direction": "in",
-              "id": "in",
-              "kind": "signal",
-              "offset": 20,
-              "side": "left"
-            },
-            {
-              "direction": "out",
-              "id": "out",
-              "kind": "signal",
-              "offset": 20,
-              "side": "right"
-            }
-          ],
-          "tier": "n_a"
         }
       ],
       "symbol": {
@@ -971,43 +881,6 @@
             }
           ],
           "tier": "ideal"
-        },
-        {
-          "doc": "Continuous-time integrator.",
-          "params": [
-            {
-              "default": 0,
-              "id": "ic",
-              "type": "number"
-            },
-            {
-              "default": -1000000000,
-              "id": "lo",
-              "type": "number"
-            },
-            {
-              "default": 1000000000,
-              "id": "hi",
-              "type": "number"
-            }
-          ],
-          "ports": [
-            {
-              "direction": "in",
-              "id": "in",
-              "kind": "signal",
-              "offset": 20,
-              "side": "left"
-            },
-            {
-              "direction": "out",
-              "id": "out",
-              "kind": "signal",
-              "offset": 20,
-              "side": "right"
-            }
-          ],
-          "tier": "n_a"
         }
       ],
       "symbol": {
@@ -1130,57 +1003,6 @@
       },
       "fidelities": [
         {
-          "doc": "Continuous PID controller.",
-          "params": [
-            {
-              "default": 1,
-              "id": "kp",
-              "type": "number"
-            },
-            {
-              "default": 0,
-              "id": "ki",
-              "type": "number"
-            },
-            {
-              "default": 0,
-              "id": "kd",
-              "type": "number"
-            },
-            {
-              "default": 100,
-              "id": "n",
-              "type": "number"
-            },
-            {
-              "choices": [
-                "parallel",
-                "ideal"
-              ],
-              "default": "parallel",
-              "id": "form",
-              "type": "enum"
-            }
-          ],
-          "ports": [
-            {
-              "direction": "in",
-              "id": "in",
-              "kind": "signal",
-              "offset": 20,
-              "side": "left"
-            },
-            {
-              "direction": "out",
-              "id": "out",
-              "kind": "signal",
-              "offset": 20,
-              "side": "right"
-            }
-          ],
-          "tier": "n_a"
-        },
-        {
           "doc": "PID controller `u = Kp·e + Ki·∫e dt + Kd·de/dt`, with optional anti-windup.",
           "params": [
             {
@@ -1204,10 +1026,22 @@
               "type": "number"
             },
             {
-              "default": true,
-              "doc": "Clamp integrator when output saturates.",
-              "id": "anti_windup",
-              "type": "bool"
+              "default": 100,
+              "doc": "Derivative filter coefficient N.",
+              "id": "n",
+              "type": "number"
+            },
+            {
+              "default": -1e+30,
+              "doc": "Output clamp, low. The integrator stops winding up here.",
+              "id": "clamp_lo",
+              "type": "number"
+            },
+            {
+              "default": 1e+30,
+              "doc": "Output clamp, high. The integrator stops winding up here.",
+              "id": "clamp_hi",
+              "type": "number"
             }
           ],
           "ports": [
@@ -1332,40 +1166,6 @@
             }
           ],
           "tier": "ideal"
-        },
-        {
-          "doc": "Signal product block.",
-          "params": [
-            {
-              "default": "**",
-              "id": "signs",
-              "type": "string"
-            }
-          ],
-          "ports": [
-            {
-              "direction": "in",
-              "id": "in0",
-              "kind": "signal",
-              "offset": 10,
-              "side": "left"
-            },
-            {
-              "direction": "in",
-              "id": "in1",
-              "kind": "signal",
-              "offset": 30,
-              "side": "left"
-            },
-            {
-              "direction": "out",
-              "id": "out",
-              "kind": "signal",
-              "offset": 20,
-              "side": "right"
-            }
-          ],
-          "tier": "n_a"
         }
       ],
       "symbol": {
@@ -1460,38 +1260,6 @@
         "out": "from(in)"
       },
       "fidelities": [
-        {
-          "doc": "Saturates a signal between lower and upper limits.",
-          "params": [
-            {
-              "default": -1,
-              "id": "lo",
-              "type": "number"
-            },
-            {
-              "default": 1,
-              "id": "hi",
-              "type": "number"
-            }
-          ],
-          "ports": [
-            {
-              "direction": "in",
-              "id": "in",
-              "kind": "signal",
-              "offset": 20,
-              "side": "left"
-            },
-            {
-              "direction": "out",
-              "id": "out",
-              "kind": "signal",
-              "offset": 20,
-              "side": "right"
-            }
-          ],
-          "tier": "n_a"
-        },
         {
           "doc": "Clamp output to the interval `[lo, hi]`.",
           "params": [
@@ -1705,71 +1473,6 @@
             }
           ],
           "tier": "ideal"
-        },
-        {
-          "doc": "Continuous state-space system.",
-          "params": [
-            {
-              "default": [
-                [
-                  0
-                ]
-              ],
-              "id": "A",
-              "type": "matrix"
-            },
-            {
-              "default": [
-                [
-                  1
-                ]
-              ],
-              "id": "B",
-              "type": "matrix"
-            },
-            {
-              "default": [
-                [
-                  1
-                ]
-              ],
-              "id": "C",
-              "type": "matrix"
-            },
-            {
-              "default": [
-                [
-                  0
-                ]
-              ],
-              "id": "D",
-              "type": "matrix"
-            },
-            {
-              "default": [
-                0
-              ],
-              "id": "ic",
-              "type": "vector"
-            }
-          ],
-          "ports": [
-            {
-              "direction": "in",
-              "id": "in",
-              "kind": "signal",
-              "offset": 20,
-              "side": "left"
-            },
-            {
-              "direction": "out",
-              "id": "out",
-              "kind": "signal",
-              "offset": 20,
-              "side": "right"
-            }
-          ],
-          "tier": "n_a"
         }
       ],
       "symbol": {
@@ -1873,49 +1576,6 @@
             }
           ],
           "tier": "ideal"
-        },
-        {
-          "doc": "Signal summing block.",
-          "params": [
-            {
-              "default": "++",
-              "id": "signs",
-              "type": "string"
-            },
-            {
-              "choices": [
-                "round",
-                "rectangular"
-              ],
-              "default": "round",
-              "id": "icon_shape",
-              "type": "enum"
-            }
-          ],
-          "ports": [
-            {
-              "direction": "in",
-              "id": "in0",
-              "kind": "signal",
-              "offset": 10,
-              "side": "left"
-            },
-            {
-              "direction": "in",
-              "id": "in1",
-              "kind": "signal",
-              "offset": 30,
-              "side": "left"
-            },
-            {
-              "direction": "out",
-              "id": "out",
-              "kind": "signal",
-              "offset": 20,
-              "side": "right"
-            }
-          ],
-          "tier": "n_a"
         }
       ],
       "symbol": {
@@ -2048,43 +1708,6 @@
             }
           ],
           "tier": "ideal"
-        },
-        {
-          "doc": "Continuous transfer function.",
-          "params": [
-            {
-              "default": [
-                1
-              ],
-              "id": "num",
-              "type": "vector"
-            },
-            {
-              "default": [
-                1,
-                1
-              ],
-              "id": "den",
-              "type": "vector"
-            }
-          ],
-          "ports": [
-            {
-              "direction": "in",
-              "id": "in",
-              "kind": "signal",
-              "offset": 20,
-              "side": "left"
-            },
-            {
-              "direction": "out",
-              "id": "out",
-              "kind": "signal",
-              "offset": 20,
-              "side": "right"
-            }
-          ],
-          "tier": "n_a"
         }
       ],
       "symbol": {
@@ -7785,11 +7408,117 @@
         },
         {
           "doc": "Behavioral diode — Shockley equation.",
-          "tier": "behavioral"
+          "tier": "behavioral",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "a",
+              "kind": "physical-electrical",
+              "label": "A",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "k",
+              "kind": "physical-electrical",
+              "label": "K",
+              "offset": 20,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": 5,
+              "doc": "Forward conductance in siemens.",
+              "id": "g_on",
+              "min": 0,
+              "type": "number"
+            },
+            {
+              "default": 1e-09,
+              "doc": "Reverse leakage conductance in siemens.",
+              "id": "g_off",
+              "min": 0,
+              "type": "number"
+            },
+            {
+              "default": 0.6,
+              "doc": "Forward threshold voltage in volts.",
+              "id": "v_th",
+              "type": "number"
+            },
+            {
+              "default": -100,
+              "doc": "Reverse breakdown voltage in volts.",
+              "id": "v_breakdown",
+              "type": "number"
+            },
+            {
+              "default": 0,
+              "doc": "Conductance past reverse breakdown, in siemens.",
+              "id": "g_breakdown",
+              "min": 0,
+              "type": "number"
+            }
+          ]
         },
         {
           "doc": "SPICE diode model.",
-          "tier": "spice"
+          "tier": "spice",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "a",
+              "kind": "physical-electrical",
+              "label": "A",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "k",
+              "kind": "physical-electrical",
+              "label": "K",
+              "offset": 20,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": 5,
+              "doc": "Forward conductance in siemens.",
+              "id": "g_on",
+              "min": 0,
+              "type": "number"
+            },
+            {
+              "default": 1e-09,
+              "doc": "Reverse leakage conductance in siemens.",
+              "id": "g_off",
+              "min": 0,
+              "type": "number"
+            },
+            {
+              "default": 0.6,
+              "doc": "Forward threshold voltage in volts.",
+              "id": "v_th",
+              "type": "number"
+            },
+            {
+              "default": -100,
+              "doc": "Reverse breakdown voltage in volts.",
+              "id": "v_breakdown",
+              "type": "number"
+            },
+            {
+              "default": 0,
+              "doc": "Conductance past reverse breakdown, in siemens.",
+              "id": "g_breakdown",
+              "min": 0,
+              "type": "number"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -9002,7 +8731,7 @@
           {
             "id": "g",
             "kind": {
-              "domain": "physical-electrical"
+              "domain": "signal"
             },
             "label": "gate",
             "offset": 30,
@@ -9127,7 +8856,7 @@
             {
               "direction": "in",
               "id": "g",
-              "kind": "physical-electrical",
+              "kind": "signal",
               "label": "gate",
               "offset": 30,
               "side": "left"
@@ -9145,7 +8874,75 @@
         },
         {
           "doc": "Behavioral generic switch.",
-          "tier": "behavioral"
+          "tier": "behavioral",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "d",
+              "kind": "physical-electrical",
+              "label": "D",
+              "offset": 30,
+              "side": "top"
+            },
+            {
+              "direction": "in",
+              "id": "g",
+              "kind": "signal",
+              "label": "gate",
+              "offset": 30,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "s",
+              "kind": "physical-electrical",
+              "label": "S",
+              "offset": 30,
+              "side": "bottom"
+            }
+          ],
+          "params": [
+            {
+              "default": 0.1,
+              "doc": "Series on-state resistance in ohms.",
+              "id": "r_on",
+              "min": 0,
+              "type": "number"
+            },
+            {
+              "default": 5,
+              "doc": "On-state conductance in siemens.",
+              "id": "g_on",
+              "min": 0,
+              "type": "number"
+            },
+            {
+              "default": 1e-09,
+              "doc": "Off-state leakage conductance in siemens.",
+              "id": "g_off",
+              "min": 0,
+              "type": "number"
+            },
+            {
+              "default": 0.6,
+              "doc": "Forward threshold voltage in volts.",
+              "id": "v_th",
+              "type": "number"
+            },
+            {
+              "default": -100,
+              "doc": "Reverse breakdown voltage in volts.",
+              "id": "v_breakdown",
+              "type": "number"
+            },
+            {
+              "default": 0,
+              "doc": "Conductance past reverse breakdown, in siemens.",
+              "id": "g_breakdown",
+              "min": 0,
+              "type": "number"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -9378,11 +9175,107 @@
       "fidelities": [
         {
           "doc": "Band-limited op-amp (ideal tier).",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "vp",
+              "kind": "physical-electrical",
+              "label": "V+",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "in",
+              "id": "vn",
+              "kind": "physical-electrical",
+              "label": "V-",
+              "offset": 40,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "out",
+              "kind": "physical-electrical",
+              "label": "out",
+              "offset": 30,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": 1000000,
+              "id": "gbp",
+              "type": "number"
+            },
+            {
+              "default": 500000,
+              "id": "sr",
+              "type": "number"
+            },
+            {
+              "default": 1000000,
+              "id": "rin",
+              "type": "number"
+            },
+            {
+              "default": 75,
+              "id": "rout",
+              "type": "number"
+            }
+          ]
         },
         {
           "doc": "Band-limited op-amp with GBP and slew rate.",
-          "tier": "behavioral"
+          "tier": "behavioral",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "vp",
+              "kind": "physical-electrical",
+              "label": "V+",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "in",
+              "id": "vn",
+              "kind": "physical-electrical",
+              "label": "V-",
+              "offset": 40,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "out",
+              "kind": "physical-electrical",
+              "label": "out",
+              "offset": 30,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": 1000000,
+              "id": "gbp",
+              "type": "number"
+            },
+            {
+              "default": 500000,
+              "id": "sr",
+              "type": "number"
+            },
+            {
+              "default": 1000000,
+              "id": "rin",
+              "type": "number"
+            },
+            {
+              "default": 75,
+              "id": "rout",
+              "type": "number"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -9474,11 +9367,97 @@
       "fidelities": [
         {
           "doc": "Ideal comparator.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "vp",
+              "kind": "physical-electrical",
+              "label": "V+",
+              "offset": 14,
+              "side": "left"
+            },
+            {
+              "direction": "in",
+              "id": "vn",
+              "kind": "physical-electrical",
+              "label": "V-",
+              "offset": 26,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "out",
+              "kind": "physical-electrical",
+              "label": "out",
+              "offset": 20,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": 0,
+              "id": "v_hys",
+              "type": "number"
+            },
+            {
+              "default": 5,
+              "id": "v_oh",
+              "type": "number"
+            },
+            {
+              "default": 0,
+              "id": "v_ol",
+              "type": "number"
+            }
+          ]
         },
         {
           "doc": "Behavioral comparator with hysteresis.",
-          "tier": "behavioral"
+          "tier": "behavioral",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "vp",
+              "kind": "physical-electrical",
+              "label": "V+",
+              "offset": 14,
+              "side": "left"
+            },
+            {
+              "direction": "in",
+              "id": "vn",
+              "kind": "physical-electrical",
+              "label": "V-",
+              "offset": 26,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "out",
+              "kind": "physical-electrical",
+              "label": "out",
+              "offset": 20,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": 0,
+              "id": "v_hys",
+              "type": "number"
+            },
+            {
+              "default": 5,
+              "id": "v_oh",
+              "type": "number"
+            },
+            {
+              "default": 0,
+              "id": "v_ol",
+              "type": "number"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -9564,11 +9543,87 @@
       "fidelities": [
         {
           "doc": "Finite-gain op-amp (ideal).",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "vp",
+              "kind": "physical-electrical",
+              "label": "V+",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "in",
+              "id": "vn",
+              "kind": "physical-electrical",
+              "label": "V-",
+              "offset": 40,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "out",
+              "kind": "physical-electrical",
+              "label": "out",
+              "offset": 30,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": 100000,
+              "id": "Av",
+              "type": "number"
+            },
+            {
+              "default": 15,
+              "id": "v_sat",
+              "type": "number"
+            }
+          ]
         },
         {
           "doc": "Finite-gain op-amp with saturation.",
-          "tier": "behavioral"
+          "tier": "behavioral",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "vp",
+              "kind": "physical-electrical",
+              "label": "V+",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "in",
+              "id": "vn",
+              "kind": "physical-electrical",
+              "label": "V-",
+              "offset": 40,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "out",
+              "kind": "physical-electrical",
+              "label": "out",
+              "offset": 30,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": 100000,
+              "id": "Av",
+              "type": "number"
+            },
+            {
+              "default": 15,
+              "id": "v_sat",
+              "type": "number"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -9642,11 +9697,63 @@
       "fidelities": [
         {
           "doc": "Ideal op-amp.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "vp",
+              "kind": "physical-electrical",
+              "label": "V+",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "in",
+              "id": "vn",
+              "kind": "physical-electrical",
+              "label": "V-",
+              "offset": 40,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "out",
+              "kind": "physical-electrical",
+              "label": "out",
+              "offset": 30,
+              "side": "right"
+            }
+          ]
         },
         {
           "doc": "Behavioral op-amp with finite saturation.",
-          "tier": "behavioral"
+          "tier": "behavioral",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "vp",
+              "kind": "physical-electrical",
+              "label": "V+",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "in",
+              "id": "vn",
+              "kind": "physical-electrical",
+              "label": "V-",
+              "offset": 40,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "out",
+              "kind": "physical-electrical",
+              "label": "out",
+              "offset": 30,
+              "side": "right"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -9735,15 +9842,138 @@
       "fidelities": [
         {
           "doc": "Ideal gyrator.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "p1",
+              "kind": "physical-electrical",
+              "label": "+1",
+              "offset": 10,
+              "side": "left"
+            },
+            {
+              "direction": "in",
+              "id": "n1",
+              "kind": "physical-electrical",
+              "label": "-1",
+              "offset": 30,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "p2",
+              "kind": "physical-electrical",
+              "label": "+2",
+              "offset": 10,
+              "side": "right"
+            },
+            {
+              "direction": "out",
+              "id": "n2",
+              "kind": "physical-electrical",
+              "label": "-2",
+              "offset": 30,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": 1,
+              "id": "g",
+              "type": "number"
+            }
+          ]
         },
         {
           "doc": "Behavioral gyrator with parasitic conductance.",
-          "tier": "behavioral"
+          "tier": "behavioral",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "p1",
+              "kind": "physical-electrical",
+              "label": "+1",
+              "offset": 10,
+              "side": "left"
+            },
+            {
+              "direction": "in",
+              "id": "n1",
+              "kind": "physical-electrical",
+              "label": "-1",
+              "offset": 30,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "p2",
+              "kind": "physical-electrical",
+              "label": "+2",
+              "offset": 10,
+              "side": "right"
+            },
+            {
+              "direction": "out",
+              "id": "n2",
+              "kind": "physical-electrical",
+              "label": "-2",
+              "offset": 30,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": 1,
+              "id": "g",
+              "type": "number"
+            }
+          ]
         },
         {
           "doc": "SPICE gyrator.",
-          "tier": "spice"
+          "tier": "spice",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "p1",
+              "kind": "physical-electrical",
+              "label": "+1",
+              "offset": 10,
+              "side": "left"
+            },
+            {
+              "direction": "in",
+              "id": "n1",
+              "kind": "physical-electrical",
+              "label": "-1",
+              "offset": 30,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "p2",
+              "kind": "physical-electrical",
+              "label": "+2",
+              "offset": 10,
+              "side": "right"
+            },
+            {
+              "direction": "out",
+              "id": "n2",
+              "kind": "physical-electrical",
+              "label": "-2",
+              "offset": 30,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": 1,
+              "id": "g",
+              "type": "number"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -9826,15 +10056,120 @@
       "fidelities": [
         {
           "doc": "Ideal memristor (HP-type linear drift).",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "p",
+              "kind": "physical-electrical",
+              "label": "+",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "n",
+              "kind": "physical-electrical",
+              "label": "-",
+              "offset": 20,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": 100,
+              "id": "R_on",
+              "type": "number"
+            },
+            {
+              "default": 16000,
+              "id": "R_off",
+              "type": "number"
+            },
+            {
+              "default": 1e-08,
+              "id": "D",
+              "type": "number"
+            }
+          ]
         },
         {
           "doc": "Behavioral memristor with smooth window function.",
-          "tier": "behavioral"
+          "tier": "behavioral",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "p",
+              "kind": "physical-electrical",
+              "label": "+",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "n",
+              "kind": "physical-electrical",
+              "label": "-",
+              "offset": 20,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": 100,
+              "id": "R_on",
+              "type": "number"
+            },
+            {
+              "default": 16000,
+              "id": "R_off",
+              "type": "number"
+            },
+            {
+              "default": 1e-08,
+              "id": "D",
+              "type": "number"
+            }
+          ]
         },
         {
           "doc": "SPICE memristor model.",
-          "tier": "spice"
+          "tier": "spice",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "p",
+              "kind": "physical-electrical",
+              "label": "+",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "n",
+              "kind": "physical-electrical",
+              "label": "-",
+              "offset": 20,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": 100,
+              "id": "R_on",
+              "type": "number"
+            },
+            {
+              "default": 16000,
+              "id": "R_off",
+              "type": "number"
+            },
+            {
+              "default": 1e-08,
+              "id": "D",
+              "type": "number"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -9936,15 +10271,168 @@
       "fidelities": [
         {
           "doc": "Ideal coupled inductors.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "p1",
+              "kind": "physical-electrical",
+              "label": "+1",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "in",
+              "id": "n1",
+              "kind": "physical-electrical",
+              "label": "-1",
+              "offset": 40,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "p2",
+              "kind": "physical-electrical",
+              "label": "+2",
+              "offset": 20,
+              "side": "right"
+            },
+            {
+              "direction": "out",
+              "id": "n2",
+              "kind": "physical-electrical",
+              "label": "-2",
+              "offset": 40,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": 1e-06,
+              "id": "L1",
+              "type": "number"
+            },
+            {
+              "default": 1e-06,
+              "id": "L2",
+              "type": "number"
+            },
+            {
+              "default": 0.99,
+              "id": "k",
+              "type": "number"
+            }
+          ]
         },
         {
           "doc": "Behavioral coupled inductors with core losses.",
-          "tier": "behavioral"
+          "tier": "behavioral",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "p1",
+              "kind": "physical-electrical",
+              "label": "+1",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "in",
+              "id": "n1",
+              "kind": "physical-electrical",
+              "label": "-1",
+              "offset": 40,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "p2",
+              "kind": "physical-electrical",
+              "label": "+2",
+              "offset": 20,
+              "side": "right"
+            },
+            {
+              "direction": "out",
+              "id": "n2",
+              "kind": "physical-electrical",
+              "label": "-2",
+              "offset": 40,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": 1e-06,
+              "id": "L1",
+              "type": "number"
+            },
+            {
+              "default": 1e-06,
+              "id": "L2",
+              "type": "number"
+            },
+            {
+              "default": 0.99,
+              "id": "k",
+              "type": "number"
+            }
+          ]
         },
         {
           "doc": "SPICE mutual inductor.",
-          "tier": "spice"
+          "tier": "spice",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "p1",
+              "kind": "physical-electrical",
+              "label": "+1",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "in",
+              "id": "n1",
+              "kind": "physical-electrical",
+              "label": "-1",
+              "offset": 40,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "p2",
+              "kind": "physical-electrical",
+              "label": "+2",
+              "offset": 20,
+              "side": "right"
+            },
+            {
+              "direction": "out",
+              "id": "n2",
+              "kind": "physical-electrical",
+              "label": "-2",
+              "offset": 40,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": 1e-06,
+              "id": "L1",
+              "type": "number"
+            },
+            {
+              "default": 1e-06,
+              "id": "L2",
+              "type": "number"
+            },
+            {
+              "default": 0.99,
+              "id": "k",
+              "type": "number"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -10035,15 +10523,138 @@
       "fidelities": [
         {
           "doc": "Ideal transformer.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "p1",
+              "kind": "physical-electrical",
+              "label": "+1",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "in",
+              "id": "n1",
+              "kind": "physical-electrical",
+              "label": "-1",
+              "offset": 40,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "p2",
+              "kind": "physical-electrical",
+              "label": "+2",
+              "offset": 20,
+              "side": "right"
+            },
+            {
+              "direction": "out",
+              "id": "n2",
+              "kind": "physical-electrical",
+              "label": "-2",
+              "offset": 40,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": 1,
+              "id": "n",
+              "type": "number"
+            }
+          ]
         },
         {
           "doc": "Transformer with leakage inductance and winding resistance.",
-          "tier": "behavioral"
+          "tier": "behavioral",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "p1",
+              "kind": "physical-electrical",
+              "label": "+1",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "in",
+              "id": "n1",
+              "kind": "physical-electrical",
+              "label": "-1",
+              "offset": 40,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "p2",
+              "kind": "physical-electrical",
+              "label": "+2",
+              "offset": 20,
+              "side": "right"
+            },
+            {
+              "direction": "out",
+              "id": "n2",
+              "kind": "physical-electrical",
+              "label": "-2",
+              "offset": 40,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": 1,
+              "id": "n",
+              "type": "number"
+            }
+          ]
         },
         {
           "doc": "SPICE transformer.",
-          "tier": "spice"
+          "tier": "spice",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "p1",
+              "kind": "physical-electrical",
+              "label": "+1",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "in",
+              "id": "n1",
+              "kind": "physical-electrical",
+              "label": "-1",
+              "offset": 40,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "p2",
+              "kind": "physical-electrical",
+              "label": "+2",
+              "offset": 20,
+              "side": "right"
+            },
+            {
+              "direction": "out",
+              "id": "n2",
+              "kind": "physical-electrical",
+              "label": "-2",
+              "offset": 40,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": 1,
+              "id": "n",
+              "type": "number"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -10335,11 +10946,77 @@
         },
         {
           "doc": "Ebers-Moll NPN BJT.",
-          "tier": "behavioral"
+          "tier": "behavioral",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "b",
+              "kind": "physical-electrical",
+              "label": "B",
+              "offset": 30,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "c",
+              "kind": "physical-electrical",
+              "label": "C",
+              "offset": 30,
+              "side": "top"
+            },
+            {
+              "direction": "out",
+              "id": "e",
+              "kind": "physical-electrical",
+              "label": "E",
+              "offset": 30,
+              "side": "bottom"
+            }
+          ],
+          "params": [
+            {
+              "default": "QNPN",
+              "id": "model",
+              "type": "string"
+            }
+          ]
         },
         {
           "doc": "SPICE NPN BJT.",
-          "tier": "spice"
+          "tier": "spice",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "b",
+              "kind": "physical-electrical",
+              "label": "B",
+              "offset": 30,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "c",
+              "kind": "physical-electrical",
+              "label": "C",
+              "offset": 30,
+              "side": "top"
+            },
+            {
+              "direction": "out",
+              "id": "e",
+              "kind": "physical-electrical",
+              "label": "E",
+              "offset": 30,
+              "side": "bottom"
+            }
+          ],
+          "params": [
+            {
+              "default": "QNPN",
+              "id": "model",
+              "type": "string"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -10425,15 +11102,129 @@
       "fidelities": [
         {
           "doc": "Ideal PNP BJT.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "b",
+              "kind": "physical-electrical",
+              "label": "B",
+              "offset": 30,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "c",
+              "kind": "physical-electrical",
+              "label": "C",
+              "offset": 30,
+              "side": "top"
+            },
+            {
+              "direction": "out",
+              "id": "e",
+              "kind": "physical-electrical",
+              "label": "E",
+              "offset": 30,
+              "side": "bottom"
+            }
+          ],
+          "params": [
+            {
+              "default": "QPNP",
+              "id": "model",
+              "type": "string"
+            },
+            {
+              "default": 100,
+              "id": "beta_F",
+              "type": "number"
+            }
+          ]
         },
         {
           "doc": "Ebers-Moll PNP BJT.",
-          "tier": "behavioral"
+          "tier": "behavioral",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "b",
+              "kind": "physical-electrical",
+              "label": "B",
+              "offset": 30,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "c",
+              "kind": "physical-electrical",
+              "label": "C",
+              "offset": 30,
+              "side": "top"
+            },
+            {
+              "direction": "out",
+              "id": "e",
+              "kind": "physical-electrical",
+              "label": "E",
+              "offset": 30,
+              "side": "bottom"
+            }
+          ],
+          "params": [
+            {
+              "default": "QPNP",
+              "id": "model",
+              "type": "string"
+            },
+            {
+              "default": 100,
+              "id": "beta_F",
+              "type": "number"
+            }
+          ]
         },
         {
           "doc": "SPICE PNP BJT.",
-          "tier": "spice"
+          "tier": "spice",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "b",
+              "kind": "physical-electrical",
+              "label": "B",
+              "offset": 30,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "c",
+              "kind": "physical-electrical",
+              "label": "C",
+              "offset": 30,
+              "side": "top"
+            },
+            {
+              "direction": "out",
+              "id": "e",
+              "kind": "physical-electrical",
+              "label": "E",
+              "offset": 30,
+              "side": "bottom"
+            }
+          ],
+          "params": [
+            {
+              "default": "QPNP",
+              "id": "model",
+              "type": "string"
+            },
+            {
+              "default": 100,
+              "id": "beta_F",
+              "type": "number"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -10526,15 +11317,144 @@
       "fidelities": [
         {
           "doc": "Ideal IGBT.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "g",
+              "kind": "physical-electrical",
+              "label": "G",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "c",
+              "kind": "physical-electrical",
+              "label": "C",
+              "offset": 12,
+              "side": "right"
+            },
+            {
+              "direction": "out",
+              "id": "e",
+              "kind": "physical-electrical",
+              "label": "E",
+              "offset": 28,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": "IGBT",
+              "id": "model",
+              "type": "string"
+            },
+            {
+              "default": 4.5,
+              "id": "V_th",
+              "type": "number"
+            },
+            {
+              "default": 0.01,
+              "id": "K",
+              "type": "number"
+            }
+          ]
         },
         {
           "doc": "Behavioral IGBT.",
-          "tier": "behavioral"
+          "tier": "behavioral",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "g",
+              "kind": "physical-electrical",
+              "label": "G",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "c",
+              "kind": "physical-electrical",
+              "label": "C",
+              "offset": 12,
+              "side": "right"
+            },
+            {
+              "direction": "out",
+              "id": "e",
+              "kind": "physical-electrical",
+              "label": "E",
+              "offset": 28,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": "IGBT",
+              "id": "model",
+              "type": "string"
+            },
+            {
+              "default": 4.5,
+              "id": "V_th",
+              "type": "number"
+            },
+            {
+              "default": 0.01,
+              "id": "K",
+              "type": "number"
+            }
+          ]
         },
         {
           "doc": "SPICE IGBT model.",
-          "tier": "spice"
+          "tier": "spice",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "g",
+              "kind": "physical-electrical",
+              "label": "G",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "c",
+              "kind": "physical-electrical",
+              "label": "C",
+              "offset": 12,
+              "side": "right"
+            },
+            {
+              "direction": "out",
+              "id": "e",
+              "kind": "physical-electrical",
+              "label": "E",
+              "offset": 28,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": "IGBT",
+              "id": "model",
+              "type": "string"
+            },
+            {
+              "default": 4.5,
+              "id": "V_th",
+              "type": "number"
+            },
+            {
+              "default": 0.01,
+              "id": "K",
+              "type": "number"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -10618,15 +11538,120 @@
       "fidelities": [
         {
           "doc": "Ideal LED.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "a",
+              "kind": "physical-electrical",
+              "label": "A",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "k",
+              "kind": "physical-electrical",
+              "label": "K",
+              "offset": 20,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": "LED",
+              "id": "model",
+              "type": "string"
+            },
+            {
+              "default": 1e-12,
+              "id": "Is",
+              "type": "number"
+            },
+            {
+              "default": 2,
+              "id": "n",
+              "type": "number"
+            }
+          ]
         },
         {
           "doc": "Behavioral LED with Shockley equation.",
-          "tier": "behavioral"
+          "tier": "behavioral",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "a",
+              "kind": "physical-electrical",
+              "label": "A",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "k",
+              "kind": "physical-electrical",
+              "label": "K",
+              "offset": 20,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": "LED",
+              "id": "model",
+              "type": "string"
+            },
+            {
+              "default": 1e-12,
+              "id": "Is",
+              "type": "number"
+            },
+            {
+              "default": 2,
+              "id": "n",
+              "type": "number"
+            }
+          ]
         },
         {
           "doc": "SPICE LED model.",
-          "tier": "spice"
+          "tier": "spice",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "a",
+              "kind": "physical-electrical",
+              "label": "A",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "k",
+              "kind": "physical-electrical",
+              "label": "K",
+              "offset": 20,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": "LED",
+              "id": "model",
+              "type": "string"
+            },
+            {
+              "default": 1e-12,
+              "id": "Is",
+              "type": "number"
+            },
+            {
+              "default": 2,
+              "id": "n",
+              "type": "number"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -10758,11 +11783,97 @@
         },
         {
           "doc": "Behavioral N-channel MOSFET.",
-          "tier": "behavioral"
+          "tier": "behavioral",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "g",
+              "kind": "physical-electrical",
+              "label": "G",
+              "offset": 30,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "d",
+              "kind": "physical-electrical",
+              "label": "D",
+              "offset": 30,
+              "side": "top"
+            },
+            {
+              "direction": "out",
+              "id": "s",
+              "kind": "physical-electrical",
+              "label": "S",
+              "offset": 30,
+              "side": "bottom"
+            }
+          ],
+          "params": [
+            {
+              "default": "NMOS",
+              "id": "model",
+              "type": "string"
+            },
+            {
+              "default": 1e-06,
+              "id": "W",
+              "type": "number"
+            },
+            {
+              "default": 1.8e-07,
+              "id": "L",
+              "type": "number"
+            }
+          ]
         },
         {
           "doc": "SPICE N-channel MOSFET.",
-          "tier": "spice"
+          "tier": "spice",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "g",
+              "kind": "physical-electrical",
+              "label": "G",
+              "offset": 30,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "d",
+              "kind": "physical-electrical",
+              "label": "D",
+              "offset": 30,
+              "side": "top"
+            },
+            {
+              "direction": "out",
+              "id": "s",
+              "kind": "physical-electrical",
+              "label": "S",
+              "offset": 30,
+              "side": "bottom"
+            }
+          ],
+          "params": [
+            {
+              "default": "NMOS",
+              "id": "model",
+              "type": "string"
+            },
+            {
+              "default": 1e-06,
+              "id": "W",
+              "type": "number"
+            },
+            {
+              "default": 1.8e-07,
+              "id": "L",
+              "type": "number"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -10892,11 +12003,97 @@
         },
         {
           "doc": "Behavioral P-channel MOSFET.",
-          "tier": "behavioral"
+          "tier": "behavioral",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "g",
+              "kind": "physical-electrical",
+              "label": "G",
+              "offset": 30,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "d",
+              "kind": "physical-electrical",
+              "label": "D",
+              "offset": 30,
+              "side": "top"
+            },
+            {
+              "direction": "out",
+              "id": "s",
+              "kind": "physical-electrical",
+              "label": "S",
+              "offset": 30,
+              "side": "bottom"
+            }
+          ],
+          "params": [
+            {
+              "default": "PMOS",
+              "id": "model",
+              "type": "string"
+            },
+            {
+              "default": 1e-06,
+              "id": "W",
+              "type": "number"
+            },
+            {
+              "default": 1.8e-07,
+              "id": "L",
+              "type": "number"
+            }
+          ]
         },
         {
           "doc": "SPICE P-channel MOSFET.",
-          "tier": "spice"
+          "tier": "spice",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "g",
+              "kind": "physical-electrical",
+              "label": "G",
+              "offset": 30,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "d",
+              "kind": "physical-electrical",
+              "label": "D",
+              "offset": 30,
+              "side": "top"
+            },
+            {
+              "direction": "out",
+              "id": "s",
+              "kind": "physical-electrical",
+              "label": "S",
+              "offset": 30,
+              "side": "bottom"
+            }
+          ],
+          "params": [
+            {
+              "default": "PMOS",
+              "id": "model",
+              "type": "string"
+            },
+            {
+              "default": 1e-06,
+              "id": "W",
+              "type": "number"
+            },
+            {
+              "default": 1.8e-07,
+              "id": "L",
+              "type": "number"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -10988,15 +12185,144 @@
       "fidelities": [
         {
           "doc": "Ideal photodiode.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "a",
+              "kind": "physical-electrical",
+              "label": "A",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "in",
+              "id": "k",
+              "kind": "physical-electrical",
+              "label": "K",
+              "offset": 20,
+              "side": "right"
+            },
+            {
+              "direction": "out",
+              "id": "light",
+              "kind": "physical-signal",
+              "label": "light",
+              "offset": 20,
+              "side": "top"
+            }
+          ],
+          "params": [
+            {
+              "default": "PD",
+              "id": "model",
+              "type": "string"
+            },
+            {
+              "default": 1e-12,
+              "id": "Is",
+              "type": "number"
+            },
+            {
+              "default": 0.5,
+              "id": "responsivity",
+              "type": "number"
+            }
+          ]
         },
         {
           "doc": "Behavioral photodiode.",
-          "tier": "behavioral"
+          "tier": "behavioral",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "a",
+              "kind": "physical-electrical",
+              "label": "A",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "in",
+              "id": "k",
+              "kind": "physical-electrical",
+              "label": "K",
+              "offset": 20,
+              "side": "right"
+            },
+            {
+              "direction": "out",
+              "id": "light",
+              "kind": "physical-signal",
+              "label": "light",
+              "offset": 20,
+              "side": "top"
+            }
+          ],
+          "params": [
+            {
+              "default": "PD",
+              "id": "model",
+              "type": "string"
+            },
+            {
+              "default": 1e-12,
+              "id": "Is",
+              "type": "number"
+            },
+            {
+              "default": 0.5,
+              "id": "responsivity",
+              "type": "number"
+            }
+          ]
         },
         {
           "doc": "SPICE photodiode model.",
-          "tier": "spice"
+          "tier": "spice",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "a",
+              "kind": "physical-electrical",
+              "label": "A",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "in",
+              "id": "k",
+              "kind": "physical-electrical",
+              "label": "K",
+              "offset": 20,
+              "side": "right"
+            },
+            {
+              "direction": "out",
+              "id": "light",
+              "kind": "physical-signal",
+              "label": "light",
+              "offset": 20,
+              "side": "top"
+            }
+          ],
+          "params": [
+            {
+              "default": "PD",
+              "id": "model",
+              "type": "string"
+            },
+            {
+              "default": 1e-12,
+              "id": "Is",
+              "type": "number"
+            },
+            {
+              "default": 0.5,
+              "id": "responsivity",
+              "type": "number"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -11090,15 +12416,144 @@
       "fidelities": [
         {
           "doc": "Ideal thyristor.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "g",
+              "kind": "physical-electrical",
+              "label": "G",
+              "offset": 20,
+              "side": "bottom"
+            },
+            {
+              "direction": "out",
+              "id": "a",
+              "kind": "physical-electrical",
+              "label": "A",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "k",
+              "kind": "physical-electrical",
+              "label": "K",
+              "offset": 20,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": "SCR",
+              "id": "model",
+              "type": "string"
+            },
+            {
+              "default": 400,
+              "id": "V_bo",
+              "type": "number"
+            },
+            {
+              "default": 0.01,
+              "id": "I_h",
+              "type": "number"
+            }
+          ]
         },
         {
           "doc": "Behavioral thyristor.",
-          "tier": "behavioral"
+          "tier": "behavioral",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "g",
+              "kind": "physical-electrical",
+              "label": "G",
+              "offset": 20,
+              "side": "bottom"
+            },
+            {
+              "direction": "out",
+              "id": "a",
+              "kind": "physical-electrical",
+              "label": "A",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "k",
+              "kind": "physical-electrical",
+              "label": "K",
+              "offset": 20,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": "SCR",
+              "id": "model",
+              "type": "string"
+            },
+            {
+              "default": 400,
+              "id": "V_bo",
+              "type": "number"
+            },
+            {
+              "default": 0.01,
+              "id": "I_h",
+              "type": "number"
+            }
+          ]
         },
         {
           "doc": "SPICE thyristor model.",
-          "tier": "spice"
+          "tier": "spice",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "g",
+              "kind": "physical-electrical",
+              "label": "G",
+              "offset": 20,
+              "side": "bottom"
+            },
+            {
+              "direction": "out",
+              "id": "a",
+              "kind": "physical-electrical",
+              "label": "A",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "k",
+              "kind": "physical-electrical",
+              "label": "K",
+              "offset": 20,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": "SCR",
+              "id": "model",
+              "type": "string"
+            },
+            {
+              "default": 400,
+              "id": "V_bo",
+              "type": "number"
+            },
+            {
+              "default": 0.01,
+              "id": "I_h",
+              "type": "number"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -11182,15 +12637,120 @@
       "fidelities": [
         {
           "doc": "Ideal zener.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "a",
+              "kind": "physical-electrical",
+              "label": "A",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "k",
+              "kind": "physical-electrical",
+              "label": "K",
+              "offset": 20,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": "ZENER",
+              "id": "model",
+              "type": "string"
+            },
+            {
+              "default": 5.1,
+              "id": "V_z",
+              "type": "number"
+            },
+            {
+              "default": 0.005,
+              "id": "I_z",
+              "type": "number"
+            }
+          ]
         },
         {
           "doc": "Behavioral zener with smooth breakdown.",
-          "tier": "behavioral"
+          "tier": "behavioral",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "a",
+              "kind": "physical-electrical",
+              "label": "A",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "k",
+              "kind": "physical-electrical",
+              "label": "K",
+              "offset": 20,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": "ZENER",
+              "id": "model",
+              "type": "string"
+            },
+            {
+              "default": 5.1,
+              "id": "V_z",
+              "type": "number"
+            },
+            {
+              "default": 0.005,
+              "id": "I_z",
+              "type": "number"
+            }
+          ]
         },
         {
           "doc": "SPICE zener model.",
-          "tier": "spice"
+          "tier": "spice",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "a",
+              "kind": "physical-electrical",
+              "label": "A",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "k",
+              "kind": "physical-electrical",
+              "label": "K",
+              "offset": 20,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": "ZENER",
+              "id": "model",
+              "type": "string"
+            },
+            {
+              "default": 5.1,
+              "id": "V_z",
+              "type": "number"
+            },
+            {
+              "default": 0.005,
+              "id": "I_z",
+              "type": "number"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -11253,7 +12813,25 @@
       "fidelities": [
         {
           "doc": "Ideal Current Sensor.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "p",
+              "kind": "physical-electrical",
+              "label": "+",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "n",
+              "kind": "physical-electrical",
+              "label": "-",
+              "offset": 20,
+              "side": "right"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -11316,7 +12894,25 @@
       "fidelities": [
         {
           "doc": "Ideal Voltage Sensor.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "p",
+              "kind": "physical-electrical",
+              "label": "+",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "n",
+              "kind": "physical-electrical",
+              "label": "-",
+              "offset": 20,
+              "side": "right"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -11387,7 +12983,32 @@
       "fidelities": [
         {
           "doc": "Ideal Controlled Current Source.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "p",
+              "kind": "physical-electrical",
+              "label": "+",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "n",
+              "kind": "physical-electrical",
+              "label": "-",
+              "offset": 20,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": 0,
+              "id": "I",
+              "type": "number"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -11458,7 +13079,32 @@
       "fidelities": [
         {
           "doc": "Ideal Controlled Voltage Source.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "p",
+              "kind": "physical-electrical",
+              "label": "+",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "n",
+              "kind": "physical-electrical",
+              "label": "-",
+              "offset": 20,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": 0,
+              "id": "V",
+              "type": "number"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -11541,7 +13187,42 @@
       "fidelities": [
         {
           "doc": "Ideal AC Current Source.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "p",
+              "kind": "physical-electrical",
+              "label": "+",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "n",
+              "kind": "physical-electrical",
+              "label": "-",
+              "offset": 20,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": 1,
+              "id": "I",
+              "type": "number"
+            },
+            {
+              "default": 60,
+              "id": "freq",
+              "type": "number"
+            },
+            {
+              "default": 0,
+              "id": "phase",
+              "type": "number"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -11834,7 +13515,42 @@
       "fidelities": [
         {
           "doc": "Ideal AC Voltage Source.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "p",
+              "kind": "physical-electrical",
+              "label": "+",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "n",
+              "kind": "physical-electrical",
+              "label": "-",
+              "offset": 20,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": 1,
+              "id": "V",
+              "type": "number"
+            },
+            {
+              "default": 60,
+              "id": "freq",
+              "type": "number"
+            },
+            {
+              "default": 0,
+              "id": "phase",
+              "type": "number"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -11905,7 +13621,32 @@
       "fidelities": [
         {
           "doc": "Ideal PWL Voltage Source.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "p",
+              "kind": "physical-electrical",
+              "label": "+",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "n",
+              "kind": "physical-electrical",
+              "label": "-",
+              "offset": 20,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": 1,
+              "id": "V",
+              "type": "number"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -12012,11 +13753,123 @@
       "fidelities": [
         {
           "doc": "Ideal current-controlled switch.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "p",
+              "kind": "physical-electrical",
+              "label": "+",
+              "offset": 10,
+              "side": "left"
+            },
+            {
+              "direction": "in",
+              "id": "n",
+              "kind": "physical-electrical",
+              "label": "-",
+              "offset": 30,
+              "side": "left"
+            },
+            {
+              "direction": "in",
+              "id": "p_ctl",
+              "kind": "physical-electrical",
+              "label": "+ctl",
+              "offset": 10,
+              "side": "right"
+            },
+            {
+              "direction": "in",
+              "id": "n_ctl",
+              "kind": "physical-electrical",
+              "label": "-ctl",
+              "offset": 30,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": 0.01,
+              "id": "i_on",
+              "type": "number"
+            },
+            {
+              "default": 0,
+              "id": "i_off",
+              "type": "number"
+            },
+            {
+              "default": 0.001,
+              "id": "r_on",
+              "type": "number"
+            },
+            {
+              "default": 1000000,
+              "id": "r_off",
+              "type": "number"
+            }
+          ]
         },
         {
           "doc": "Behavioral current-controlled switch.",
-          "tier": "behavioral"
+          "tier": "behavioral",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "p",
+              "kind": "physical-electrical",
+              "label": "+",
+              "offset": 10,
+              "side": "left"
+            },
+            {
+              "direction": "in",
+              "id": "n",
+              "kind": "physical-electrical",
+              "label": "-",
+              "offset": 30,
+              "side": "left"
+            },
+            {
+              "direction": "in",
+              "id": "p_ctl",
+              "kind": "physical-electrical",
+              "label": "+ctl",
+              "offset": 10,
+              "side": "right"
+            },
+            {
+              "direction": "in",
+              "id": "n_ctl",
+              "kind": "physical-electrical",
+              "label": "-ctl",
+              "offset": 30,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": 0.01,
+              "id": "i_on",
+              "type": "number"
+            },
+            {
+              "default": 0,
+              "id": "i_off",
+              "type": "number"
+            },
+            {
+              "default": 0.001,
+              "id": "r_on",
+              "type": "number"
+            },
+            {
+              "default": 1000000,
+              "id": "r_off",
+              "type": "number"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -12123,11 +13976,123 @@
       "fidelities": [
         {
           "doc": "Ideal voltage-controlled switch.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "p",
+              "kind": "physical-electrical",
+              "label": "+",
+              "offset": 10,
+              "side": "left"
+            },
+            {
+              "direction": "in",
+              "id": "n",
+              "kind": "physical-electrical",
+              "label": "-",
+              "offset": 30,
+              "side": "left"
+            },
+            {
+              "direction": "in",
+              "id": "p_ctl",
+              "kind": "physical-electrical",
+              "label": "+ctl",
+              "offset": 10,
+              "side": "right"
+            },
+            {
+              "direction": "in",
+              "id": "n_ctl",
+              "kind": "physical-electrical",
+              "label": "-ctl",
+              "offset": 30,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": 1,
+              "id": "v_on",
+              "type": "number"
+            },
+            {
+              "default": 0,
+              "id": "v_off",
+              "type": "number"
+            },
+            {
+              "default": 0.001,
+              "id": "r_on",
+              "type": "number"
+            },
+            {
+              "default": 1000000,
+              "id": "r_off",
+              "type": "number"
+            }
+          ]
         },
         {
           "doc": "Behavioral voltage-controlled switch with smooth transition.",
-          "tier": "behavioral"
+          "tier": "behavioral",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "p",
+              "kind": "physical-electrical",
+              "label": "+",
+              "offset": 10,
+              "side": "left"
+            },
+            {
+              "direction": "in",
+              "id": "n",
+              "kind": "physical-electrical",
+              "label": "-",
+              "offset": 30,
+              "side": "left"
+            },
+            {
+              "direction": "in",
+              "id": "p_ctl",
+              "kind": "physical-electrical",
+              "label": "+ctl",
+              "offset": 10,
+              "side": "right"
+            },
+            {
+              "direction": "in",
+              "id": "n_ctl",
+              "kind": "physical-electrical",
+              "label": "-ctl",
+              "offset": 30,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": 1,
+              "id": "v_on",
+              "type": "number"
+            },
+            {
+              "default": 0,
+              "id": "v_off",
+              "type": "number"
+            },
+            {
+              "default": 0.001,
+              "id": "r_on",
+              "type": "number"
+            },
+            {
+              "default": 1000000,
+              "id": "r_off",
+              "type": "number"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -12190,7 +14155,25 @@
       "fidelities": [
         {
           "doc": "Ideal Lossless Transmission Line.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "p",
+              "kind": "physical-electrical",
+              "label": "+",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "n",
+              "kind": "physical-electrical",
+              "label": "-",
+              "offset": 20,
+              "side": "right"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -12253,7 +14236,25 @@
       "fidelities": [
         {
           "doc": "Ideal Lossy Transmission Line.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "p",
+              "kind": "physical-electrical",
+              "label": "+",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "n",
+              "kind": "physical-electrical",
+              "label": "-",
+              "offset": 20,
+              "side": "right"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -12418,11 +14419,71 @@
       "fidelities": [
         {
           "doc": "Smooth rotational friction.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "a",
+              "kind": "physical-rotational",
+              "label": "a",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "b",
+              "kind": "physical-rotational",
+              "label": "b",
+              "offset": 20,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": 1,
+              "id": "coulomb",
+              "type": "number"
+            },
+            {
+              "default": 0.1,
+              "id": "viscous",
+              "type": "number"
+            }
+          ]
         },
         {
           "doc": "Stribeck rotational friction.",
-          "tier": "behavioral"
+          "tier": "behavioral",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "a",
+              "kind": "physical-rotational",
+              "label": "a",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "b",
+              "kind": "physical-rotational",
+              "label": "b",
+              "offset": 20,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": 1,
+              "id": "coulomb",
+              "type": "number"
+            },
+            {
+              "default": 0.1,
+              "id": "viscous",
+              "type": "number"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -12510,11 +14571,91 @@
       "fidelities": [
         {
           "doc": "Ideal rotational hard stop.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "a",
+              "kind": "physical-rotational",
+              "label": "a",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "b",
+              "kind": "physical-rotational",
+              "label": "b",
+              "offset": 20,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": -1.5707963267948966,
+              "id": "lo",
+              "type": "number"
+            },
+            {
+              "default": 1.5707963267948966,
+              "id": "hi",
+              "type": "number"
+            },
+            {
+              "default": 10000,
+              "id": "stiffness",
+              "type": "number"
+            },
+            {
+              "default": 10,
+              "id": "damping",
+              "type": "number"
+            }
+          ]
         },
         {
           "doc": "Behavioral rotational hard stop.",
-          "tier": "behavioral"
+          "tier": "behavioral",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "a",
+              "kind": "physical-rotational",
+              "label": "a",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "b",
+              "kind": "physical-rotational",
+              "label": "b",
+              "offset": 20,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": -1.5707963267948966,
+              "id": "lo",
+              "type": "number"
+            },
+            {
+              "default": 1.5707963267948966,
+              "id": "hi",
+              "type": "number"
+            },
+            {
+              "default": 10000,
+              "id": "stiffness",
+              "type": "number"
+            },
+            {
+              "default": 10,
+              "id": "damping",
+              "type": "number"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -12818,7 +14959,25 @@
       "fidelities": [
         {
           "doc": "Ideal Angle Sensor.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "a",
+              "kind": "physical-rotational",
+              "label": "a",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "b",
+              "kind": "physical-rotational",
+              "label": "b",
+              "offset": 20,
+              "side": "right"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -12881,7 +15040,25 @@
       "fidelities": [
         {
           "doc": "Ideal Angular Velocity Sensor.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "a",
+              "kind": "physical-rotational",
+              "label": "a",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "b",
+              "kind": "physical-rotational",
+              "label": "b",
+              "offset": 20,
+              "side": "right"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -12944,7 +15121,25 @@
       "fidelities": [
         {
           "doc": "Ideal Torque Sensor.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "a",
+              "kind": "physical-rotational",
+              "label": "a",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "b",
+              "kind": "physical-rotational",
+              "label": "b",
+              "offset": 20,
+              "side": "right"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -13187,7 +15382,25 @@
       "fidelities": [
         {
           "doc": "Ideal Thermal Conduction.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "a",
+              "kind": "physical-thermal",
+              "label": "a",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "b",
+              "kind": "physical-thermal",
+              "label": "b",
+              "offset": 20,
+              "side": "right"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -13339,7 +15552,25 @@
       "fidelities": [
         {
           "doc": "Ideal Thermal Convection.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "a",
+              "kind": "physical-thermal",
+              "label": "a",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "b",
+              "kind": "physical-thermal",
+              "label": "b",
+              "offset": 20,
+              "side": "right"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -13491,7 +15722,25 @@
       "fidelities": [
         {
           "doc": "Ideal Thermal Radiation.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "a",
+              "kind": "physical-thermal",
+              "label": "a",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "b",
+              "kind": "physical-thermal",
+              "label": "b",
+              "offset": 20,
+              "side": "right"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -13554,7 +15803,25 @@
       "fidelities": [
         {
           "doc": "Ideal Thermal Resistance.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "a",
+              "kind": "physical-thermal",
+              "label": "a",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "b",
+              "kind": "physical-thermal",
+              "label": "b",
+              "offset": 20,
+              "side": "right"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -13693,7 +15960,25 @@
       "fidelities": [
         {
           "doc": "Ideal Heat Flow Sensor.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "a",
+              "kind": "physical-thermal",
+              "label": "a",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "b",
+              "kind": "physical-thermal",
+              "label": "b",
+              "offset": 20,
+              "side": "right"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -13756,7 +16041,25 @@
       "fidelities": [
         {
           "doc": "Ideal Temperature Sensor.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "a",
+              "kind": "physical-thermal",
+              "label": "a",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "b",
+              "kind": "physical-thermal",
+              "label": "b",
+              "offset": 20,
+              "side": "right"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -13819,7 +16122,25 @@
       "fidelities": [
         {
           "doc": "Ideal Controlled Heat Flow Source.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "a",
+              "kind": "physical-thermal",
+              "label": "a",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "b",
+              "kind": "physical-thermal",
+              "label": "b",
+              "offset": 20,
+              "side": "right"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -13882,7 +16203,25 @@
       "fidelities": [
         {
           "doc": "Ideal Controlled Temperature Source.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "a",
+              "kind": "physical-thermal",
+              "label": "a",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "b",
+              "kind": "physical-thermal",
+              "label": "b",
+              "offset": 20,
+              "side": "right"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -14227,11 +16566,71 @@
       "fidelities": [
         {
           "doc": "Smooth friction (ideal).",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "p",
+              "kind": "physical-translational",
+              "label": "p",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "n",
+              "kind": "physical-translational",
+              "label": "n",
+              "offset": 20,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": 1,
+              "id": "coulomb",
+              "type": "number"
+            },
+            {
+              "default": 0.1,
+              "id": "viscous",
+              "type": "number"
+            }
+          ]
         },
         {
           "doc": "Behavioral friction with stiction.",
-          "tier": "behavioral"
+          "tier": "behavioral",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "p",
+              "kind": "physical-translational",
+              "label": "p",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "n",
+              "kind": "physical-translational",
+              "label": "n",
+              "offset": 20,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": 1,
+              "id": "coulomb",
+              "type": "number"
+            },
+            {
+              "default": 0.1,
+              "id": "viscous",
+              "type": "number"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -14319,11 +16718,91 @@
       "fidelities": [
         {
           "doc": "Ideal hard stop.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "p",
+              "kind": "physical-translational",
+              "label": "p",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "n",
+              "kind": "physical-translational",
+              "label": "n",
+              "offset": 20,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": -0.1,
+              "id": "lo",
+              "type": "number"
+            },
+            {
+              "default": 0.1,
+              "id": "hi",
+              "type": "number"
+            },
+            {
+              "default": 100000,
+              "id": "stiffness",
+              "type": "number"
+            },
+            {
+              "default": 100,
+              "id": "damping",
+              "type": "number"
+            }
+          ]
         },
         {
           "doc": "Behavioral hard stop.",
-          "tier": "behavioral"
+          "tier": "behavioral",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "p",
+              "kind": "physical-translational",
+              "label": "p",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "n",
+              "kind": "physical-translational",
+              "label": "n",
+              "offset": 20,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": -0.1,
+              "id": "lo",
+              "type": "number"
+            },
+            {
+              "default": 0.1,
+              "id": "hi",
+              "type": "number"
+            },
+            {
+              "default": 100000,
+              "id": "stiffness",
+              "type": "number"
+            },
+            {
+              "default": 100,
+              "id": "damping",
+              "type": "number"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -14637,11 +17116,63 @@
       "fidelities": [
         {
           "doc": "Ideal force sensor.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "p",
+              "kind": "physical-translational",
+              "label": "p",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "in",
+              "id": "n",
+              "kind": "physical-translational",
+              "label": "n",
+              "offset": 20,
+              "side": "right"
+            },
+            {
+              "direction": "out",
+              "id": "out",
+              "kind": "physical-signal",
+              "label": "F",
+              "offset": 20,
+              "side": "top"
+            }
+          ]
         },
         {
           "doc": "Behavioral force sensor.",
-          "tier": "behavioral"
+          "tier": "behavioral",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "p",
+              "kind": "physical-translational",
+              "label": "p",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "in",
+              "id": "n",
+              "kind": "physical-translational",
+              "label": "n",
+              "offset": 20,
+              "side": "right"
+            },
+            {
+              "direction": "out",
+              "id": "out",
+              "kind": "physical-signal",
+              "label": "F",
+              "offset": 20,
+              "side": "top"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -14714,11 +17245,63 @@
       "fidelities": [
         {
           "doc": "Ideal position sensor.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "p",
+              "kind": "physical-translational",
+              "label": "p",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "in",
+              "id": "n",
+              "kind": "physical-translational",
+              "label": "n",
+              "offset": 20,
+              "side": "right"
+            },
+            {
+              "direction": "out",
+              "id": "out",
+              "kind": "physical-signal",
+              "label": "x",
+              "offset": 20,
+              "side": "top"
+            }
+          ]
         },
         {
           "doc": "Behavioral position sensor.",
-          "tier": "behavioral"
+          "tier": "behavioral",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "p",
+              "kind": "physical-translational",
+              "label": "p",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "in",
+              "id": "n",
+              "kind": "physical-translational",
+              "label": "n",
+              "offset": 20,
+              "side": "right"
+            },
+            {
+              "direction": "out",
+              "id": "out",
+              "kind": "physical-signal",
+              "label": "x",
+              "offset": 20,
+              "side": "top"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -14791,11 +17374,63 @@
       "fidelities": [
         {
           "doc": "Ideal velocity sensor.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "p",
+              "kind": "physical-translational",
+              "label": "p",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "in",
+              "id": "n",
+              "kind": "physical-translational",
+              "label": "n",
+              "offset": 20,
+              "side": "right"
+            },
+            {
+              "direction": "out",
+              "id": "out",
+              "kind": "physical-signal",
+              "label": "v",
+              "offset": 20,
+              "side": "top"
+            }
+          ]
         },
         {
           "doc": "Behavioral velocity sensor.",
-          "tier": "behavioral"
+          "tier": "behavioral",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "p",
+              "kind": "physical-translational",
+              "label": "p",
+              "offset": 20,
+              "side": "left"
+            },
+            {
+              "direction": "in",
+              "id": "n",
+              "kind": "physical-translational",
+              "label": "n",
+              "offset": 20,
+              "side": "right"
+            },
+            {
+              "direction": "out",
+              "id": "out",
+              "kind": "physical-signal",
+              "label": "v",
+              "offset": 20,
+              "side": "top"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -23568,26 +26203,6 @@
             }
           ],
           "tier": "ideal"
-        },
-        {
-          "doc": "Constant signal source.",
-          "params": [
-            {
-              "default": 1,
-              "id": "value",
-              "type": "number"
-            }
-          ],
-          "ports": [
-            {
-              "direction": "out",
-              "id": "out",
-              "kind": "signal",
-              "offset": 20,
-              "side": "right"
-            }
-          ],
-          "tier": "n_a"
         }
       ],
       "symbol": {
@@ -24675,7 +27290,37 @@
       "fidelities": [
         {
           "doc": "Ideal Current-Controlled Current Source.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "p",
+              "kind": "physical-electrical",
+              "label": "+",
+              "offset": 30,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "n",
+              "kind": "physical-electrical",
+              "label": "-",
+              "offset": 30,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": "",
+              "id": "control",
+              "type": "string"
+            },
+            {
+              "default": 1,
+              "id": "gain",
+              "type": "number"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -24758,7 +27403,37 @@
       "fidelities": [
         {
           "doc": "Ideal Current-Controlled Voltage Source.",
-          "tier": "ideal"
+          "tier": "ideal",
+          "ports": [
+            {
+              "direction": "in",
+              "id": "p",
+              "kind": "physical-electrical",
+              "label": "+",
+              "offset": 30,
+              "side": "left"
+            },
+            {
+              "direction": "out",
+              "id": "n",
+              "kind": "physical-electrical",
+              "label": "-",
+              "offset": 30,
+              "side": "right"
+            }
+          ],
+          "params": [
+            {
+              "default": "",
+              "id": "control",
+              "type": "string"
+            },
+            {
+              "default": 1,
+              "id": "gain",
+              "type": "number"
+            }
+          ]
         }
       ],
       "symbol": {
@@ -25470,41 +28145,6 @@
             }
           ],
           "tier": "ideal"
-        },
-        {
-          "doc": "Pulse signal source.",
-          "params": [
-            {
-              "default": 1,
-              "id": "amplitude",
-              "type": "number"
-            },
-            {
-              "default": 1,
-              "id": "period",
-              "type": "number"
-            },
-            {
-              "default": 0.5,
-              "id": "pulse_width",
-              "type": "number"
-            },
-            {
-              "default": 0,
-              "id": "phase_delay",
-              "type": "number"
-            }
-          ],
-          "ports": [
-            {
-              "direction": "out",
-              "id": "out",
-              "kind": "signal",
-              "offset": 20,
-              "side": "right"
-            }
-          ],
-          "tier": "n_a"
         }
       ],
       "symbol": {
@@ -25807,46 +28447,6 @@
             }
           ],
           "tier": "ideal"
-        },
-        {
-          "doc": "Sine signal source.",
-          "params": [
-            {
-              "default": 1,
-              "id": "amplitude",
-              "type": "number"
-            },
-            {
-              "default": 1,
-              "id": "frequency",
-              "type": "number"
-            },
-            {
-              "default": 0,
-              "id": "phase",
-              "type": "number"
-            },
-            {
-              "default": 0,
-              "id": "bias",
-              "type": "number"
-            },
-            {
-              "default": 0,
-              "id": "sample_time",
-              "type": "number"
-            }
-          ],
-          "ports": [
-            {
-              "direction": "out",
-              "id": "out",
-              "kind": "signal",
-              "offset": 20,
-              "side": "right"
-            }
-          ],
-          "tier": "n_a"
         }
       ],
       "symbol": {
