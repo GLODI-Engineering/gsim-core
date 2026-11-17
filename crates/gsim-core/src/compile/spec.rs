@@ -915,30 +915,45 @@ pub const REGISTRY: &[TypeSpec] = &[
                     param: "r_on",
                     required: true,
                 },
+                // A `kind=ideal_switch` line describes two devices: a channel (`r_on`, above)
+                // and an intrinsic body diode. Every field belonging to the diode says so, so
+                // that reading a switch line tells you which of its two devices each number
+                // describes. See GLODI-Engineering/general-mna#27 -- the unprefixed spellings
+                // used to collide with a standalone diode's, and `v_th` in particular read as
+                // the MOSFET gate threshold to every engineer while meaning the body diode's
+                // forward drop.
                 FieldSpec::Param {
-                    field: "g_breakdown",
-                    param: "g_breakdown",
+                    field: "body_g_breakdown",
+                    param: "body_g_breakdown",
                     required: true,
                 },
                 FieldSpec::Param {
-                    field: "v_breakdown",
-                    param: "v_breakdown",
+                    field: "body_v_breakdown",
+                    param: "body_v_breakdown",
                     required: true,
                 },
                 FieldSpec::Param {
-                    field: "g_off",
-                    param: "g_off",
+                    field: "body_g_off",
+                    param: "body_g_off",
                     required: true,
                 },
                 FieldSpec::Param {
-                    field: "v_th",
-                    param: "v_th",
+                    field: "body_v_f",
+                    param: "body_v_f",
                     required: true,
                 },
                 FieldSpec::Param {
-                    field: "g_on",
-                    param: "g_on",
+                    field: "body_g_on",
+                    param: "body_g_on",
                     required: true,
+                },
+                // The gate threshold, $V_{GS(th)}$. Optional in the netlist, where it defaults
+                // to 0.5, so a schematic that does not set it emits nothing and gets the same
+                // behaviour the hard-coded comparison had.
+                FieldSpec::Param {
+                    field: "v_gs_th",
+                    param: "v_gs_th",
+                    required: false,
                 },
                 // Every gate is block-driven -- general-mna rejects any other gate= spelling.
                 FieldSpec::Literal {
@@ -976,8 +991,8 @@ pub const REGISTRY: &[TypeSpec] = &[
                     required: true,
                 },
                 FieldSpec::Param {
-                    field: "v_th",
-                    param: "v_th",
+                    field: "v_f",
+                    param: "v_f",
                     required: true,
                 },
                 FieldSpec::Param {

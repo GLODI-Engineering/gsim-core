@@ -46,21 +46,24 @@ KP = 0.005
 KI = 50.0
 
 # Generic ideal-switch / ideal-diode model constants chosen for this example: 10 mOhm on,
-# 1 nS off, a 0.5 V gate threshold against the 0/1 V gate drive, and a breakdown well clear
+# 1 nS off, a 0.5 gate threshold (v_gs_th) against the 0/1 gate drive, and a breakdown well clear
 # of the 24 V link so it never participates. Nothing here is copied from another circuit.
 SWITCH_PARAMS = {
     "r_on": 0.01,
-    "g_breakdown": 0.0,
-    "v_breakdown": -500.0,
-    "g_off": 1e-9,
-    "v_th": 0.5,
-    "g_on": 200.0,
+    "body_g_breakdown": 0.0,
+    "body_v_breakdown": -500.0,
+    "body_g_off": 1e-9,
+    "body_v_f": 0.5,
+    "body_g_on": 200.0,
+    # The gate threshold, V_GS(th). Against a 0/1 gate drive the
+    # 0.5 default is the midpoint.
+    "v_gs_th": 0.5,
 }
 DIODE_PARAMS = {
     "g_breakdown": 0.0,
     "v_breakdown": -500.0,
     "g_off": 1e-9,
-    "v_th": 0.0,
+    "v_f": 0.0,
     "g_on": 200.0,
 }
 

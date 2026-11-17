@@ -106,7 +106,7 @@ impl std::error::Error for ContractError {}
 /// Every declared parameter's default, overridden by whatever the caller actually supplied.
 /// Both [`validate_parameters`] and [`evaluate_component`] evaluate against this, not against
 /// the caller's map directly — an expression that cross-references another parameter
-/// (`${{ value < params.v_th }}` inside `v_breakdown`'s own `validate`) must see `v_th`'s
+/// (`${{ value < params.v_f }}` inside `v_breakdown`'s own `validate`) must see `v_f`'s
 /// default even when the caller only supplied `v_breakdown`, or every such cross-reference would
 /// spuriously fail as "unknown field" whenever a caller omits an unrelated, defaulted parameter.
 fn resolved_params(

@@ -49,11 +49,11 @@ def add_switch(model_json: str, block_id: str, position: tuple[int, int]) -> str
         # Defaults matching crates/gsim-core/tests/fixtures/general_simulator/passive.switch.ideal.json
         "params": {
             "r_on": 0.1,
-            "g_breakdown": 0.0,
-            "v_breakdown": -100.0,
-            "g_off": 1e-9,
-            "v_th": 0.6,
-            "g_on": 5.0,
+            "body_g_breakdown": 0.0,
+            "body_v_breakdown": -100.0,
+            "body_g_off": 1e-9,
+            "body_v_f": 0.6,
+            "body_g_on": 5.0,
         },
     }
     result = json.loads(gsim_py.add_block(model_json, json.dumps(spec)))
