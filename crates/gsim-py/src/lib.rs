@@ -88,6 +88,7 @@ fn compile_err_to_py(e: CompileError) -> PyErr {
         CompileError::CyclicFromTag { .. } => "cyclic-from-tag",
         CompileError::RoutingKindUnsupported { .. } => "routing-kind-unsupported",
         CompileError::RefNotAnOutput { .. } => "ref-not-an-output",
+        CompileError::DuplicateName(_) => "duplicate-name",
     };
     PyErr::new::<PyValueError, _>(format!("{keyword}: {e}"))
 }
@@ -236,14 +237,23 @@ fn instantiate_subckt(model_json: &str, spec_json: &str) -> PyResult<String> {
 struct CompileResult {
     netlist: String,
     notes: Vec<String>,
+    /// The document-to-netlist map — see `gsim_core::compile::provenance`. Carried across the
+    /// boundary rather than re-derived, because a consumer cannot re-derive it: the device
+    /// letter is prefixed onto a block id only when the id does not already start with it, so
+    /// `load` and `Rload` both compile to `Rload`.
+    provenance: gsim_core::compile::Provenance,
 }
 
 /// Compiles a `Model` into netlist text for `target` (currently only `"general-simulator"`).
 ///
 /// **Shared JSON contract** (identical in `gsim-wasm`'s `compile`): returns
-/// `{"netlist": "<text>", "notes": ["<info-level compiler decision>", ...]}`. Raises a
+/// `{"netlist": "<text>", "notes": ["<info-level compiler decision>", ...], "provenance":
+/// {"elements": [{"element": "<netlist name>", "blocks": ["<block id>", ...], "role":
+/// "element"|"block"|"element_and_block"|"part"|"instance", "suffix"?, "def"?}, ...],
+/// "nets": [{"net": "<node name>", "ports": [{"blocks": [...], "port": "<port id>"}, ...]},
+/// ...]}}`. Raises a
 /// `ValueError` whose message is keyword-prefixed the same way the builder errors are
-/// (`unknown-type:`, `unknown-target:`, `floating-port:`, `unconnected-ref:`,
+/// (`duplicate-name:`, `unknown-type:`, `unknown-target:`, `floating-port:`, `unconnected-ref:`,
 /// `missing-param:`, `unknown-subckt-def:`, `unconnected-subckt-port:`, `unknown-variant:`, `vector-output-port:`,
 /// `indexed-ref-arity:`, `unresolved-from-tag:`, `ambiguous-from-tag:`, `cyclic-from-tag:`,
 /// `routing-kind-unsupported:`),
@@ -255,6 +265,7 @@ fn compile(model_json: &str, target: &str) -> PyResult<String> {
     to_json(&CompileResult {
         netlist: out.netlist,
         notes: out.notes,
+        provenance: out.provenance,
     })
 }
 

@@ -86,6 +86,9 @@ impl NetlistTarget for GeneralSimulatorTarget {
         Ok(CompileOutput {
             netlist: lines.join("\n"),
             notes,
+            // Filled in by `compile`, which owns the document-to-netlist map: it is the same for
+            // every target, so no emitter builds its own.
+            provenance: Default::default(),
         })
     }
 }
@@ -700,7 +703,7 @@ fn emit_field(
 
 /// The emitted `X`-card name for an instance id: real SPICE dispatches subcircuit instances on
 /// the leading `X`, the same way [`spec::element_name`] handles element device letters.
-fn x_card_name(id: &str) -> String {
+pub(super) fn x_card_name(id: &str) -> String {
     match id.chars().next() {
         Some('X') | Some('x') => id.to_string(),
         _ => format!("X{id}"),

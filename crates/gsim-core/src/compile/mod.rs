@@ -21,6 +21,7 @@
 pub mod capabilities;
 pub mod library;
 pub mod nets;
+pub mod provenance;
 pub mod routing;
 pub mod spec;
 
@@ -28,6 +29,7 @@ mod general_simulator;
 
 pub use general_simulator::GeneralSimulatorTarget;
 pub use nets::{NetScope, ScopeOptions};
+pub use provenance::{CardRole, ElementOrigin, NetOrigin, PortOrigin, Provenance};
 pub use spec::{lookup, TypeSpec};
 
 use crate::document::{Block, Endpoint, Model, SubcktDef, Wire};
@@ -129,6 +131,35 @@ pub enum CompileError {
         peer_block: String,
         peer_port: String,
     },
+    /// Two document objects compile to one netlist name.
+    ///
+    /// Possible because [`spec::element_name`] prefixes the device letter only onto an id that
+    /// does not already start with it, so blocks `load` and `Rload` both become element `Rload`
+    /// — and because a name is the *only* handle everything downstream has on a device: a
+    /// rating on the device line, a `kind=rule` card's `target=`, a `kind=measure`, a
+    /// controlling branch, a front end mapping an event back to the symbol the user drew. A
+    /// name that means two devices means none of those can be resolved. See [`provenance`].
+    ///
+    /// Boxed because it carries five names and `CompileError` is returned by every function in
+    /// this module — clippy's `result_large_err` is right that the common path should not pay
+    /// for the rare one.
+    DuplicateName(Box<NameCollision>),
+}
+
+/// Which two document objects claimed one netlist name — see [`CompileError::DuplicateName`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NameCollision {
+    /// The netlist name both produced.
+    pub name: String,
+    /// Dotted block path of the object that claimed it first.
+    pub first: String,
+    /// What that object is, in words: `an element card`, `a kind= card`, `an X card`, ...
+    pub first_role: String,
+    /// Dotted block path of the object that collided with it.
+    pub second: String,
+    pub second_role: String,
+    /// The `.SUBCKT` name whose body both sit in, or `None` at the top level.
+    pub def: Option<String>,
 }
 
 impl std::fmt::Display for CompileError {
@@ -220,6 +251,24 @@ impl std::fmt::Display for CompileError {
                 f,
                 "port '{block}.{port}' must reference a block output, but the wire on it lands on '{peer_block}.{peer_port}', which drives nothing -- fan out from the driving block's own output port instead of chaining from another consumer's input"
             ),
+            CompileError::DuplicateName(collision) => {
+                let NameCollision {
+                    name,
+                    first,
+                    first_role,
+                    second,
+                    second_role,
+                    def,
+                } = collision.as_ref();
+                let where_ = match def {
+                    Some(def) => format!(" inside .subckt '{def}'"),
+                    None => String::new(),
+                };
+                write!(
+                    f,
+                    "netlist name '{name}'{where_} is claimed twice: by '{first}' as {first_role}, and by '{second}' as {second_role} -- rename one block. A netlist name identifies exactly one device, so a rating, a rule, a measurement or a schematic highlight on '{name}' would be ambiguous (note that a block id is prefixed with its device letter only when it does not already start with it, so 'load' and 'Rload' both compile to 'Rload')"
+                )
+            }
         }
     }
 }
@@ -234,6 +283,11 @@ pub struct CompileOutput {
     /// "if no `is_reference` net is declared ... the compiler selects one heuristically and
     /// emits an info-level note".
     pub notes: Vec<String>,
+    /// Which drawn object every emitted name came from — see [`provenance`]. The compiler chose
+    /// these names, so the compiler is the only honest source of the map back; a consumer that
+    /// re-derives it from the block ids gets the wrong answer whenever two ids differ only by a
+    /// device-letter prefix.
+    pub provenance: Provenance,
 }
 
 /// A netlist backend. One implementation per simulator dialect; the pipeline above
@@ -589,7 +643,11 @@ pub fn compile(model: &Model, target: &str) -> Result<CompileOutput, CompileErro
         defs,
         notes,
     };
+    // Before emission: a name claimed twice is a property of the document, and reporting it
+    // from a half-written netlist would bury it under whatever the emitter tripped over next.
+    let provenance = provenance::build(&ctx)?;
     let mut out = target.emit(&ctx)?;
     out.notes.extend(ctx.notes.iter().cloned());
+    out.provenance = provenance;
     Ok(out)
 }

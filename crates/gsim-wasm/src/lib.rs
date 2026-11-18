@@ -174,14 +174,22 @@ pub fn add_block(model_json: &str, spec_json: &str) -> Result<String, JsValue> {
 fn compile_impl(model_json: &str, target: &str) -> Result<String, String> {
     let model: Model = parse_json(model_json, "model")?;
     let out = compile::compile(&model, target).map_err(|e| e.to_string())?;
-    respond_json(&serde_json::json!({"netlist": out.netlist, "notes": out.notes}))
+    respond_json(&serde_json::json!({
+        "netlist": out.netlist,
+        "notes": out.notes,
+        // The front end's half of the bridge: which drawn block each netlist name came from.
+        // Not derivable here -- see `gsim_core::compile::provenance`.
+        "provenance": out.provenance,
+    }))
 }
 
 /// Compiles a `Model` into netlist text for `target` (currently only `"general-simulator"`).
 ///
 /// **Shared JSON contract** (identical to `gsim-py`'s `compile`): returns
-/// `{"netlist": "<text>", "notes": [...]}`; throws a real JS `Error` carrying the compiler's
-/// own message on failure.
+/// `{"netlist": "<text>", "notes": [...], "provenance": {"elements": [...], "nets": [...]}}`;
+/// throws a real JS `Error` carrying the compiler's own message on failure. See
+/// `gsim_core::compile::provenance` for the provenance shape and why it is carried rather than
+/// re-derived on the JS side.
 #[wasm_bindgen(js_name = compile)]
 pub fn compile(model_json: &str, target: &str) -> Result<String, JsValue> {
     compile_impl(model_json, target).map_err(js_err)
