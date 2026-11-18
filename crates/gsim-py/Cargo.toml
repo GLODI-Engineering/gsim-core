@@ -1,19 +1,22 @@
 [package]
 name = "gsim-py"
-version = "0.4.0"
+version = "0.5.0"
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
 repository.workspace = true
 homepage.workspace = true
+readme = "README.md"
 description = "PyO3 bindings exposing gsim-core to Python. Intended to become the implementation behind (and a drop-in successor for) general-simulator-gui's existing packages/gsim-model."
+keywords = ["python", "bindings", "schematic", "circuit-simulation", "electronics"]
+categories = ["science", "simulation", "api-bindings"]
 
 [lib]
 name = "gsim_py"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-gsim-core = { path = "../gsim-core" }
+gsim-core = { path = "../gsim-core", version = "0.5.0" }
 # `extension-module` avoids linking against libpython (the symbols are provided at runtime by
 # whatever Python interpreter dlopen's this as a module, e.g. via `maturin develop`) -- which is
 # exactly what a real `.so` extension module needs, but also exactly what makes `cargo test`'s own
