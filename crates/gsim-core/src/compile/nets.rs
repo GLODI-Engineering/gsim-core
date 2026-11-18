@@ -66,6 +66,21 @@ impl NetScope {
     pub fn names(&self) -> impl Iterator<Item = &str> {
         self.names.iter().map(String::as_str)
     }
+
+    /// Every port this scope placed on a net, with the net's emitted name.
+    ///
+    /// Ordered by endpoint so a caller building a document-to-netlist map (see
+    /// [`super::provenance`]) gets the same list for the same document every time;
+    /// the underlying map is a `HashMap`, whose own order is not stable.
+    pub fn entries(&self) -> Vec<(&Endpoint, &str)> {
+        let mut out: Vec<(&Endpoint, &str)> = self
+            .net_of
+            .iter()
+            .map(|(ep, name)| (ep, name.as_str()))
+            .collect();
+        out.sort_by(|a, b| (&a.0.block, &a.0.port).cmp(&(&b.0.block, &b.0.port)));
+        out
+    }
 }
 
 struct UnionFind {

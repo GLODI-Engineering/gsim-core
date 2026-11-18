@@ -41,7 +41,15 @@ docs/journal/        chronological continuity log, one file per month
 5. **No half-finished implementations.** This repo starts from an explicit audit of what
    already exists (`packages/gsim-model` in `general-simulator-gui`) — do not re-guess scope
    that audit already settled; read `docs/decisions/` first.
-6. **Nothing derived from private/internal sources may ever land in this repo — not in a
+6. **One netlist name per drawn object, and the map back is output, not a guess.** `element_name`
+   prefixes the device letter onto a block id only when the id does not already start with it,
+   so `load` and `Rload` both compile to `Rload`. Two objects claiming one name is refused
+   (`CompileError::DuplicateName`) because a name is the only handle a rating, a `kind=rule`
+   card, a `kind=measure`, a controlling branch and a front end's highlight have on a device.
+   The reverse map — block id to netlist name, block port to net — is emitted in
+   `CompileOutput.provenance` and crosses both bindings. **Do not re-derive it downstream**: it
+   cannot be re-derived, which is the whole point. See `crates/gsim-core/src/compile/provenance.rs`.
+7. **Nothing derived from private/internal sources may ever land in this repo — not in a
    commit, not transiently, not as an "example."** This repo is meant for eventual public
    release. Never reproduce, adapt, or validate against a real-world, vendor, or proprietary
    design, or anything sourced from a private, non-public project — even when the reproduction
