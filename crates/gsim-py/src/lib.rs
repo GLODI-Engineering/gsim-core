@@ -89,6 +89,7 @@ fn compile_err_to_py(e: CompileError) -> PyErr {
         CompileError::RoutingKindUnsupported { .. } => "routing-kind-unsupported",
         CompileError::RefNotAnOutput { .. } => "ref-not-an-output",
         CompileError::DuplicateName(_) => "duplicate-name",
+        CompileError::DuplicateNet(_) => "duplicate-net",
     };
     PyErr::new::<PyValueError, _>(format!("{keyword}: {e}"))
 }
@@ -253,7 +254,7 @@ struct CompileResult {
 /// "nets": [{"net": "<node name>", "ports": [{"blocks": [...], "port": "<port id>"}, ...]},
 /// ...]}}`. Raises a
 /// `ValueError` whose message is keyword-prefixed the same way the builder errors are
-/// (`duplicate-name:`, `unknown-type:`, `unknown-target:`, `floating-port:`, `unconnected-ref:`,
+/// (`duplicate-name:`, `duplicate-net:`, `unknown-type:`, `unknown-target:`, `floating-port:`, `unconnected-ref:`,
 /// `missing-param:`, `unknown-subckt-def:`, `unconnected-subckt-port:`, `unknown-variant:`, `vector-output-port:`,
 /// `indexed-ref-arity:`, `unresolved-from-tag:`, `ambiguous-from-tag:`, `cyclic-from-tag:`,
 /// `routing-kind-unsupported:`),

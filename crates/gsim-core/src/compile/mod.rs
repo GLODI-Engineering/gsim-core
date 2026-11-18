@@ -144,6 +144,26 @@ pub enum CompileError {
     /// this module — clippy's `result_large_err` is right that the common path should not pay
     /// for the rare one.
     DuplicateName(Box<NameCollision>),
+    /// Two distinct nets would be emitted under one node name, merging them.
+    ///
+    /// Worse than [`Self::DuplicateName`]: two separate nodes become one node, which is a short
+    /// circuit nobody drew, and the solved numbers are then wrong rather than merely
+    /// unattributable. Reachable because three sources share one net namespace — a `.SUBCKT`
+    /// boundary port, a user's `wire.net`, and the generated `n_<block>_<port>` — and because
+    /// [`nets`]'s own sanitisation is lossy: every non-alphanumeric character becomes `_`, so
+    /// `V-OUT` and `V_OUT` are one name.
+    DuplicateNet(Box<NetCollision>),
+}
+
+/// Which two nets claimed one node name — see [`CompileError::DuplicateNet`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NetCollision {
+    /// The node name both would be emitted as.
+    pub name: String,
+    /// `block.port` of every drawn port on the first net. A net has no id of its own, so its
+    /// ports are the only thing a reader can look for on the sheet.
+    pub first: Vec<String>,
+    pub second: Vec<String>,
 }
 
 /// Which two document objects claimed one netlist name — see [`CompileError::DuplicateName`].
@@ -267,6 +287,19 @@ impl std::fmt::Display for CompileError {
                 write!(
                     f,
                     "netlist name '{name}'{where_} is claimed twice: by '{first}' as {first_role}, and by '{second}' as {second_role} -- rename one block. A netlist name identifies exactly one device, so a rating, a rule, a measurement or a schematic highlight on '{name}' would be ambiguous (note that a block id is prefixed with its device letter only when it does not already start with it, so 'load' and 'Rload' both compile to 'Rload')"
+                )
+            }
+            CompileError::DuplicateNet(collision) => {
+                let NetCollision {
+                    name,
+                    first,
+                    second,
+                } = collision.as_ref();
+                write!(
+                    f,
+                    "node name '{name}' is claimed by two separate nets -- one reaching {}, the other reaching {} -- so they would be emitted as one node and shorted together. Rename one net (a net name's non-alphanumeric characters each become '_', so 'V-OUT' and 'V_OUT' are the same name, and a hand-written net name shares its namespace with the generated 'n_<block>_<port>' form)",
+                    first.join(", "),
+                    second.join(", ")
                 )
             }
         }
@@ -528,9 +561,9 @@ fn build_scope<'a>(
             reference_endpoints: &refs,
             boundary_block: def.map(|d| d.id.as_str()),
         },
-    );
+    )?;
     if refs.is_empty() && def.is_none() {
-        nets = heuristic_reference(wires, &nets);
+        nets = heuristic_reference(wires, &nets)?;
     }
 
     let mut outputs = Outputs::default();
@@ -598,7 +631,7 @@ fn resolve_from_sources(scope: &Scope<'_>) -> Result<BTreeMap<String, Endpoint>,
 /// §9: "If no `is_reference` net is declared for an acausal sub-network, the compiler selects
 /// one heuristically." The heuristic is the net with the most endpoints (ties broken by name,
 /// so it is deterministic) — in practice the ground rail of any real circuit.
-fn heuristic_reference(wires: &[Wire], scope: &NetScope) -> NetScope {
+fn heuristic_reference(wires: &[Wire], scope: &NetScope) -> Result<NetScope, CompileError> {
     let mut counts: BTreeMap<&str, usize> = BTreeMap::new();
     for w in wires {
         for ep in [&w.from, &w.to] {
@@ -608,7 +641,7 @@ fn heuristic_reference(wires: &[Wire], scope: &NetScope) -> NetScope {
         }
     }
     let Some((&winner, _)) = counts.iter().max_by_key(|(name, count)| (**count, *name)) else {
-        return scope.clone();
+        return Ok(scope.clone());
     };
     let refs: Vec<Endpoint> = wires
         .iter()

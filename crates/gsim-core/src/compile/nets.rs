@@ -21,6 +21,7 @@
 //!   `docs/specs/gsim-sch-format.md` §9's `^[A-Za-z_][A-Za-z0-9_]*$` net-name rule (a `Block`
 //!   id may contain `-`, which is not legal in a net name, so it is mapped to `_`).
 
+use super::{CompileError, NetCollision};
 use crate::document::{Endpoint, Wire};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
@@ -102,6 +103,15 @@ impl UnionFind {
         x
     }
 
+    /// `find` without the path compression, for a caller that only has `&self` — the reporting
+    /// path, which runs once and only when the compile is already failing.
+    fn find_const(&self, mut x: usize) -> usize {
+        while self.parent[x] != x {
+            x = self.parent[x];
+        }
+        x
+    }
+
     fn union(&mut self, a: usize, b: usize) {
         let (ra, rb) = (self.find(a), self.find(b));
         if ra != rb {
@@ -126,7 +136,7 @@ pub struct ScopeOptions<'a> {
 ///
 /// Naming priority, highest first: the reference net; a `.SUBCKT` boundary port name; an
 /// explicit `wire.net` (§9's user-named nets); else the deterministic `n_<block>_<port>` form.
-pub fn resolve_scope(wires: &[Wire], opts: &ScopeOptions<'_>) -> NetScope {
+pub fn resolve_scope(wires: &[Wire], opts: &ScopeOptions<'_>) -> Result<NetScope, CompileError> {
     let physical: Vec<&Wire> = wires.iter().filter(|w| is_physical_kind(&w.kind)).collect();
 
     let mut index: HashMap<Endpoint, usize> = HashMap::new();
@@ -203,13 +213,48 @@ pub fn resolve_scope(wires: &[Wire], opts: &ScopeOptions<'_>) -> NetScope {
         name_of_root.insert(root, name);
     }
 
+    // Two *distinct* nets must not emit under one name. Nothing above guarantees it: the names
+    // come from three sources sharing one namespace (a boundary port, a user's `wire.net`, the
+    // generated `n_<block>_<port>`) and `sanitize` is lossy, mapping every non-alphanumeric
+    // character to `_`, so `V-OUT` and `V_OUT` are the same emitted name. A collision here is
+    // worse than the element-name one this file's sibling `provenance` module refuses: two
+    // separate nodes become one node, which is a short circuit the author never drew, and the
+    // numbers that come out are wrong rather than merely unattributable.
+    //
+    // The reference net is excluded, and only it: several independent grounds legitimately carry
+    // node `0`, because being the reference *is* being the same node.
+    let mut roots_by_name: BTreeMap<&str, Vec<usize>> = BTreeMap::new();
+    for (root, name) in &name_of_root {
+        if name == REFERENCE_NET {
+            continue;
+        }
+        roots_by_name.entry(name.as_str()).or_default().push(*root);
+    }
+    if let Some((name, roots)) = roots_by_name.iter().find(|(_, roots)| roots.len() > 1) {
+        let ports_of = |root: usize| -> Vec<String> {
+            let mut out: Vec<String> = endpoints
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| uf.find_const(*i) == root)
+                .map(|(_, ep)| format!("{}.{}", ep.block, ep.port))
+                .collect();
+            out.sort();
+            out
+        };
+        return Err(CompileError::DuplicateNet(Box::new(NetCollision {
+            name: (*name).to_string(),
+            first: ports_of(roots[0]),
+            second: ports_of(roots[1]),
+        })));
+    }
+
     let mut scope = NetScope::default();
     for (i, ep) in endpoints.iter().enumerate() {
         let name = name_of_root[&uf.find(i)].clone();
         scope.names.insert(name.clone());
         scope.net_of.insert(ep.clone(), name);
     }
-    scope
+    Ok(scope)
 }
 
 #[cfg(test)]
@@ -235,7 +280,7 @@ mod tests {
             wire("w1", "r1", "p2", "r2", "p1", "physical-electrical"),
             wire("w2", "r2", "p1", "r3", "p1", "physical-electrical"),
         ];
-        let scope = resolve_scope(&wires, &ScopeOptions::default());
+        let scope = resolve_scope(&wires, &ScopeOptions::default()).unwrap();
         let a = scope.net_of(&Endpoint::new("r1", "p2")).unwrap();
         let b = scope.net_of(&Endpoint::new("r3", "p1")).unwrap();
         assert_eq!(a, b);
@@ -245,7 +290,7 @@ mod tests {
     #[test]
     fn signal_wires_never_become_nets() {
         let wires = vec![wire("w1", "c1", "out", "g1", "in", "signal")];
-        let scope = resolve_scope(&wires, &ScopeOptions::default());
+        let scope = resolve_scope(&wires, &ScopeOptions::default()).unwrap();
         assert!(scope.net_of(&Endpoint::new("c1", "out")).is_none());
     }
 
@@ -253,7 +298,7 @@ mod tests {
     fn an_explicit_wire_net_name_wins_over_the_generated_one() {
         let mut wires = vec![wire("w1", "r1", "p2", "r2", "p1", "physical-electrical")];
         wires[0].net = Some("VOUT".to_string());
-        let scope = resolve_scope(&wires, &ScopeOptions::default());
+        let scope = resolve_scope(&wires, &ScopeOptions::default()).unwrap();
         assert_eq!(scope.net_of(&Endpoint::new("r1", "p2")).unwrap(), "VOUT");
     }
 
@@ -267,7 +312,7 @@ mod tests {
             wire("w3", "r0", "p1", "r1", "p1", "physical-electrical"),
         ];
         wires[0].net = Some("VOUT".to_string());
-        let scope = resolve_scope(&wires, &ScopeOptions::default());
+        let scope = resolve_scope(&wires, &ScopeOptions::default()).unwrap();
         for ep in [
             Endpoint::new("r0", "p1"),
             Endpoint::new("r1", "p1"),
@@ -291,7 +336,8 @@ mod tests {
                 reference_endpoints: &refs,
                 boundary_block: None,
             },
-        );
+        )
+        .unwrap();
         assert_eq!(scope.net_of(&Endpoint::new("r2", "p1")).unwrap(), "0");
     }
 
@@ -307,7 +353,8 @@ mod tests {
                 reference_endpoints: &[],
                 boundary_block: Some("leaf"),
             },
-        );
+        )
+        .unwrap();
         assert_eq!(scope.net_of(&Endpoint::new("Rsnub", "p1")).unwrap(), "d");
     }
 
@@ -321,8 +368,8 @@ mod tests {
             wire("w2", "r3", "p1", "r2", "p1", "physical-electrical"),
             wire("w1", "r2", "p1", "r1", "p2", "physical-electrical"),
         ];
-        let a = resolve_scope(&forward, &ScopeOptions::default());
-        let b = resolve_scope(&reversed, &ScopeOptions::default());
+        let a = resolve_scope(&forward, &ScopeOptions::default()).unwrap();
+        let b = resolve_scope(&reversed, &ScopeOptions::default()).unwrap();
         let ep = Endpoint::new("r2", "p1");
         assert_eq!(a.net_of(&ep).unwrap(), b.net_of(&ep).unwrap());
     }
@@ -330,10 +377,97 @@ mod tests {
     #[test]
     fn a_block_id_with_a_dash_is_sanitized_into_a_legal_net_name() {
         let wires = vec![wire("w1", "r-1", "p2", "r2", "p1", "physical-electrical")];
-        let scope = resolve_scope(&wires, &ScopeOptions::default());
+        let scope = resolve_scope(&wires, &ScopeOptions::default()).unwrap();
         assert_eq!(
             scope.net_of(&Endpoint::new("r2", "p1")).unwrap(),
             "n_r_1_p2"
         );
+    }
+
+    // --- Two nets must not share a node name ---------------------------------------------
+    //
+    // The bug these exist for: nothing compared the number of nets with the number of names.
+    // Two roots resolving to one name simply wrote the same string into both maps, the set
+    // absorbed the duplicate, and every endpoint of both nets reported the same node -- a short
+    // circuit nobody drew, with wrong numbers rather than merely unattributable ones.
+
+    fn named(id: &str, fb: &str, fp: &str, tb: &str, tp: &str, net: &str) -> Wire {
+        let mut w = wire(id, fb, fp, tb, tp, "physical-electrical");
+        w.net = Some(net.to_string());
+        w
+    }
+
+    #[test]
+    fn two_user_named_nets_that_sanitize_to_one_name_are_refused() {
+        // `sanitize` maps every non-alphanumeric character to `_`, so these two names are one
+        // emitted name -- and the two nets have no port in common.
+        let wires = vec![
+            named("w1", "R1", "p2", "C1", "p1", "V-OUT"),
+            named("w2", "R2", "p2", "C2", "p1", "V_OUT"),
+        ];
+        let error = resolve_scope(&wires, &ScopeOptions::default()).unwrap_err();
+        let message = error.to_string();
+        assert!(
+            message.starts_with("node name 'V_OUT' is claimed by two separate nets"),
+            "{message}"
+        );
+        // Both nets are identified by their ports, because a net has no id of its own.
+        assert!(message.contains("C1.p1, R1.p2"), "{message}");
+        assert!(message.contains("C2.p1, R2.p2"), "{message}");
+        // And the message says why two different spellings became one name.
+        assert!(
+            message.contains("'V-OUT' and 'V_OUT' are the same name"),
+            "{message}"
+        );
+    }
+
+    #[test]
+    fn a_hand_written_net_name_cannot_take_the_generated_form_of_another_net() {
+        // The generated name is `n_<block>_<port>` and shares the namespace with `wire.net`.
+        let wires = vec![
+            wire("w1", "R1", "p1", "R2", "p1", "physical-electrical"),
+            named("w2", "R3", "p1", "R4", "p1", "n_R1_p1"),
+        ];
+        let error = resolve_scope(&wires, &ScopeOptions::default()).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .starts_with("node name 'n_R1_p1' is claimed by two separate nets"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn several_independent_grounds_are_all_node_zero_and_that_is_not_a_collision() {
+        // The one name many nets may share. Being the reference *is* being the same node, so
+        // excluding it is not an exception to the rule -- it is the rule.
+        let wires = vec![
+            wire("w1", "R1", "p2", "gnd1", "p", "physical-electrical"),
+            wire("w2", "R2", "p2", "gnd2", "p", "physical-electrical"),
+        ];
+        let refs = vec![Endpoint::new("gnd1", "p"), Endpoint::new("gnd2", "p")];
+        let scope = resolve_scope(
+            &wires,
+            &ScopeOptions {
+                reference_endpoints: &refs,
+                boundary_block: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(scope.net_of(&Endpoint::new("R1", "p2")), Some("0"));
+        assert_eq!(scope.net_of(&Endpoint::new("R2", "p2")), Some("0"));
+    }
+
+    #[test]
+    fn one_net_reaching_many_ports_is_still_one_net() {
+        // The false positive to avoid: a star net has many endpoints and one root.
+        let wires = vec![
+            wire("w1", "R1", "p1", "R2", "p1", "physical-electrical"),
+            wire("w2", "R2", "p1", "R3", "p1", "physical-electrical"),
+            wire("w3", "R3", "p1", "R4", "p1", "physical-electrical"),
+        ];
+        let scope = resolve_scope(&wires, &ScopeOptions::default()).unwrap();
+        let names: Vec<&str> = scope.names().collect();
+        assert_eq!(names, vec!["n_R1_p1"]);
     }
 }
