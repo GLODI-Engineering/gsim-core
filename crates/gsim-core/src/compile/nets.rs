@@ -1,9 +1,9 @@
 //! Net resolution — union-find over a `Model`'s physical-network wires, assigning each
 //! connected group of ports one net name.
 //!
-//! Ported in spirit from `general-simulator-gui`'s
-//! `packages/gsim-model/src/gsim_model/connectivity.py` (there was no Rust port before this),
-//! including the **two-pass named-net fix that file documents as a real bug it hit**: a name
+//! Ported in spirit from the editor's Python model package (`gsim_model`), whose own
+//! connectivity module had no Rust port before this one, including the **two-pass named-net fix
+//! that module documents as a real bug it hit**: a name
 //! recorded against `find(from)` mid-loop can go stale, because a later `union` may fold that
 //! very root under a new parent. Names are therefore collected first and re-resolved through
 //! the *final* structure once every wire has been processed.

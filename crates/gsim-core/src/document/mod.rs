@@ -1,6 +1,6 @@
 //! The `.gsim_sch` document/builder model — Phase 1's second deliverable (alongside GSF v2 in
-//! [`crate::contract`]). Supersedes `general-simulator-gui`'s Python-only
-//! `packages/gsim-model`'s `document.py`/`block.py`/`wire.py`/`builder.py`.
+//! [`crate::contract`]). Supersedes the editor's Python-only model package (`gsim_model`) —
+//! its document, block, wire and builder modules.
 //!
 //! **Deliberately out of scope this phase**, matching the same boundary `packages/gsim-model`
 //! already drew (not a new gap introduced here):

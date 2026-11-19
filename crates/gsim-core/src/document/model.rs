@@ -20,7 +20,7 @@ fn default_grid() -> i64 {
 /// schematic omit them. Absent on `Model::role` means `Schematic`, matching every other
 /// forward-compatible field in this struct (`subckt_defs` included) — an invalid string value is
 /// rejected by `serde`'s own enum deserialization, the same practical effect as
-/// `general-simulator-gui`'s `gsim_sch_loader.py::_check_role`, achieved by typing rather than a
+/// the editor's own `_check_role` in its `.gsim_sch` loader, achieved by typing rather than a
 /// hand-written check.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]

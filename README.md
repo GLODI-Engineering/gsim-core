@@ -118,8 +118,8 @@ Worked schematics, each with the netlist it compiles to, are in
 │                               compile target
 ├── general-mna/              symbolic MNA + converter averaging (general-simulator's dependency)
 ├── spice-lsp/                general-spice-core: the ngspice/Xyce netlist parser
-└── general-simulator-gui-for-vscode/
-                              the schematic editor, a VS Code extension; consumes gsim-wasm
+└── omni-schematics/          Omni Schematics, the schematic editor as a VS Code extension;
+                              consumes gsim-wasm
 ```
 
 `gsim-core` does not depend on any of these; it is a leaf dependency they consume.

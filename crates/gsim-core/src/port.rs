@@ -1,6 +1,5 @@
 //! The resolved port shape, matching the `side`/`offset`/`kind`/`direction` convention already
-//! used by `general-simulator-gui`'s GSF v1 (`gsim_model.symbol.SymbolBuilder.port()` /
-//! `gsim_model.layout.PortGeometry`) — GSF v2 does not introduce a new port-positioning scheme,
+//! used by the editor's GSF v1 (`gsim_model`'s `SymbolBuilder.port()` / `PortGeometry`) — GSF v2 does not introduce a new port-positioning scheme,
 //! only a way to generate a *list* of these dynamically (see `crate::resolve`).
 
 use serde::{Deserialize, Serialize};
@@ -39,8 +38,8 @@ pub struct Port {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
     /// Resolved signal dimension, e.g. `[3]` for a 3-wide vector signal or `[2, 3]` for a
-    /// matrix — the same `number[]` shape `general-simulator-gui`'s `PortDesc.dim` carries
-    /// (`apps/frontend/src/canvas/port-compat.ts`), and what its `dim-mismatch` rule compares.
+    /// matrix — the same `number[]` shape the editor's front-end `PortDesc.dim` carries, and
+    /// what its `dim-mismatch` rule compares.
     ///
     /// Optional, and absent means *unknown*, never "scalar": a contract that declares no `dim`
     /// makes the dimension check skip that endpoint rather than assume `[1]`, matching
