@@ -96,9 +96,9 @@ def build():
                 comment_before=K_BEFORE)
     model = add(model, "U1", "source.const", "signal-flow", (-80, 160), {"value": 1.0})
 
-    model = connect(model, ("Vin", "p"), ("R1", "p1"), "physical-electrical")
-    model = connect(model, ("R1", "p2"), ("C1", "p1"), "physical-electrical")
-    model = connect(model, ("C1", "p2"), ("gnd", "p"), "physical-electrical")
+    model = connect(model, ("Vin", "p"), ("R1", "p"), "physical-electrical")
+    model = connect(model, ("R1", "n"), ("C1", "p"), "physical-electrical")
+    model = connect(model, ("C1", "n"), ("gnd", "p"), "physical-electrical")
     model = connect(model, ("Vin", "n"), ("gnd", "p"), "physical-electrical")
     model = connect(model, ("U1", "out"), ("K1", "in"), "signal")
     return model

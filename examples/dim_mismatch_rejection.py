@@ -105,8 +105,8 @@ CONTRACTS = {
         # No `dim` anywhere: a conserving port has no signal width. Both dim checks against
         # this block must therefore skip rather than guess.
         "ports": [
-            {"id": "p1", "side": "left", "kind": "physical-electrical", "direction": "inout"},
-            {"id": "p2", "side": "right", "kind": "physical-electrical", "direction": "inout"},
+            {"id": "p", "side": "left", "kind": "physical-electrical", "direction": "inout"},
+            {"id": "n", "side": "right", "kind": "physical-electrical", "direction": "inout"},
         ],
         "geometry": {"bbox": [60, 20], "primitives": []},
     },
@@ -233,8 +233,8 @@ def check_the_correct_wiring_still_compiles(model):
     """The other half of the proof: a fully valid chain, built with the registry active."""
     model = connect(model, ("C1", "out"), ("K1", "in"), "signal")
     model = connect(model, ("K1", "out"), ("S2P", "in"), "signal")
-    model = connect(model, ("S2P", "out"), ("R1", "p1"), "physical-electrical")
-    model = connect(model, ("R1", "p2"), ("gnd", "p"), "physical-electrical")
+    model = connect(model, ("S2P", "out"), ("R1", "p"), "physical-electrical")
+    model = connect(model, ("R1", "n"), ("gnd", "p"), "physical-electrical")
     assert len(json.loads(model)["wires"]) == 4
 
     # It round-trips through real schema validation...

@@ -641,7 +641,7 @@ const TFF: &[&str] = &["tff"];
 const JKFF: &[&str] = &["jkff"];
 const UNBOUNDED_MODULUS: &[&str] = &["0"];
 
-const TWO_PIN: &[&str] = &["p1", "p2"];
+const TWO_PIN: &[&str] = &["p", "n"];
 const SOURCE_PINS: &[&str] = &["p", "n"];
 const ABC: &[&str] = &["a", "b", "c"];
 const ALPHA_BETA_ZERO: &[&str] = &["alpha", "beta", "zero"];

@@ -121,11 +121,11 @@ def build():
     model = wire(model, ("Vdc", "n"), ("gnd", "p"), e)
     model = wire(model, ("DSW", "s"), ("Dfw", "k"), e, net="SW")
     model = wire(model, ("Dfw", "a"), ("gnd", "p"), e)
-    model = wire(model, ("DSW", "s"), ("Lf", "p1"), e)
-    model = wire(model, ("Lf", "p2"), ("Cf", "p1"), e, net="VOUT")
-    model = wire(model, ("Cf", "p2"), ("gnd", "p"), e)
-    model = wire(model, ("Lf", "p2"), ("Rload", "p1"), e)
-    model = wire(model, ("Rload", "p2"), ("gnd", "p"), e)
+    model = wire(model, ("DSW", "s"), ("Lf", "p"), e)
+    model = wire(model, ("Lf", "n"), ("Cf", "p"), e, net="VOUT")
+    model = wire(model, ("Cf", "n"), ("gnd", "p"), e)
+    model = wire(model, ("Lf", "n"), ("Rload", "p"), e)
+    model = wire(model, ("Rload", "n"), ("gnd", "p"), e)
 
     # -- control loop ---------------------------------------------------------
     model = add(model, "VSENSE", "converter.phys2sig", "converter", (460, 60),

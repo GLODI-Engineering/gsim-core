@@ -1142,7 +1142,7 @@ mod tests {
             r#"{"type":"routing.ground","paradigm":"physical-network","domain":"electrical","position":[0,0],"rotation":0,"id":"gnd"}"#,
         );
         let mut model = model;
-        for port in ["p1", "p2"] {
+        for port in ["p", "n"] {
             model = serde_json::from_str::<Value>(
                 &connect_impl(
                     &model,

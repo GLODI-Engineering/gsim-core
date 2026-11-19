@@ -117,8 +117,8 @@ def power_stage_and_control(model):
                 {"R": RLOAD})
     model = wire(model, ("Vdc", "p"), ("DSW", "d"), e, net="VDCP")
     model = wire(model, ("Vdc", "n"), ("gnd", "p"), e)
-    model = wire(model, ("DSW", "s"), ("Rload", "p1"), e, net="SW")
-    model = wire(model, ("Rload", "p2"), ("gnd", "p"), e)
+    model = wire(model, ("DSW", "s"), ("Rload", "p"), e, net="SW")
+    model = wire(model, ("Rload", "n"), ("gnd", "p"), e)
 
     model = add(model, "CMD", "source.const", "signal-flow", (-200, 0), {"value": GATE_CMD})
     model = add(model, "KGATE", "control.gain", "signal-flow", (-100, 0), {"k": 1.0})

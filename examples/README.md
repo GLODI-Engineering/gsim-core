@@ -173,9 +173,9 @@ since they are separate code paths: `R1`/`C1` are element cards, `K1` is a `kind
 ```
 * series element of the RC low-pass
 * 1 kohm with C1 -> f_c = 159 Hz
-R1 n_R1_p1 n_C1_p1 1000
+R1 n_R1_p n_C1_p 1000
 * (tolerance is not modeled here)
-C1 n_C1_p1 0 1e-6
+C1 n_C1_p 0 1e-6
 * storage element -- ic defaults to 0 V
 * loop gain
 * re-tuned after the step test
@@ -235,11 +235,11 @@ thermal mass) in the same document, plus two signal sources and two gains. Three
 are raised for real through `gsim_py.connect`, each with its own stable keyword prefix:
 
 ```
-port-kind-mismatch: cannot connect 'R1.p2' to 'Rth.a' as a 'physical-electrical' wire:
+port-kind-mismatch: cannot connect 'R1.n' to 'Rth.a' as a 'physical-electrical' wire:
     kind-mismatch -- port 'Rth.a' is declared 'thermal'
 port-fan-in-on-signal: cannot connect 'U2.out' to 'K1.in' as a 'signal' wire:
     fan-in-on-signal -- causal port 'K1.in' is already driven by wire 'wire1' ...
-port-reserved-kind: cannot connect 'R1.p2' to 'C1.p1' as a 'reserved.physical-magnetic'
+port-reserved-kind: cannot connect 'R1.n' to 'C1.p' as a 'reserved.physical-magnetic'
     wire: reserved-kind -- port kind 'reserved.physical-magnetic' is reserved ...
 ```
 

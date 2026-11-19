@@ -865,19 +865,19 @@ mod tests {
             Paradigm::PhysicalNetwork,
             json!({}),
         );
-        elec(&mut b, "Vin", "p", "R1", "p1");
-        elec(&mut b, "R1", "p2", "R2", "p1");
-        elec(&mut b, "R2", "p2", "gnd", "p");
+        elec(&mut b, "Vin", "p", "R1", "p");
+        elec(&mut b, "R1", "n", "R2", "p");
+        elec(&mut b, "R2", "n", "gnd", "p");
         elec(&mut b, "Vin", "n", "gnd", "p");
 
         let out = compile(&b.into_model(), "general-simulator").unwrap();
         assert!(
-            out.netlist.contains("R1 n_R1_p1 n_R1_p2 1000"),
+            out.netlist.contains("R1 n_R1_p n_R1_n 1000"),
             "{}",
             out.netlist
         );
-        assert!(out.netlist.contains("R2 n_R1_p2 0 2000"), "{}", out.netlist);
-        assert!(out.netlist.contains("Vin n_R1_p1 0 5"), "{}", out.netlist);
+        assert!(out.netlist.contains("R2 n_R1_n 0 2000"), "{}", out.netlist);
+        assert!(out.netlist.contains("Vin n_R1_p 0 5"), "{}", out.netlist);
         // A ground block itself emits no card.
         assert!(!out.netlist.contains("gnd "), "{}", out.netlist);
         assert!(out.notes.is_empty(), "{:?}", out.notes);
@@ -914,12 +914,12 @@ mod tests {
             json!({}),
         );
         // Three resistors meet on the junction; their far ends go to ground.
-        elec(&mut b, "R1", "p1", "J1", "node");
-        elec(&mut b, "R2", "p1", "J1", "node");
-        elec(&mut b, "R3", "p1", "J1", "node");
-        elec(&mut b, "R1", "p2", "gnd", "p");
-        elec(&mut b, "R2", "p2", "gnd", "p");
-        elec(&mut b, "R3", "p2", "gnd", "p");
+        elec(&mut b, "R1", "p", "J1", "node");
+        elec(&mut b, "R2", "p", "J1", "node");
+        elec(&mut b, "R3", "p", "J1", "node");
+        elec(&mut b, "R1", "n", "gnd", "p");
+        elec(&mut b, "R2", "n", "gnd", "p");
+        elec(&mut b, "R3", "n", "gnd", "p");
 
         let out = compile(&b.into_model(), "general-simulator").unwrap();
         // The junction emits no card of its own.
@@ -976,8 +976,8 @@ mod tests {
         elec(&mut b, "VIN", "p", "T1", "p1");
         elec(&mut b, "VIN", "n", "gnd", "p");
         elec(&mut b, "T1", "n1", "gnd", "p");
-        elec(&mut b, "T1", "p2", "CO", "p1"); // secondary: only a capacitor, which blocks DC
-        elec(&mut b, "T1", "n2", "CO", "p2");
+        elec(&mut b, "T1", "p2", "CO", "p"); // secondary: only a capacitor, which blocks DC
+        elec(&mut b, "T1", "n2", "CO", "n");
         let out = compile(&b.into_model(), "general-simulator").unwrap();
         assert!(
             out.netlist.contains("Rgsim_dcref_1"),
@@ -1023,8 +1023,8 @@ mod tests {
             Paradigm::PhysicalNetwork,
             json!({}),
         );
-        elec(&mut b, "VIN", "p", "R1", "p1");
-        elec(&mut b, "R1", "p2", "gnd", "p");
+        elec(&mut b, "VIN", "p", "R1", "p");
+        elec(&mut b, "R1", "n", "gnd", "p");
         elec(&mut b, "VIN", "n", "gnd", "p");
         let out = compile(&b.into_model(), "general-simulator").unwrap();
         assert!(!out.netlist.contains("dcref"), "{}", out.netlist);
@@ -1061,8 +1061,8 @@ mod tests {
                 Paradigm::PhysicalNetwork,
                 json!({"R": 1.0}),
             );
-            elec(&mut b, "T1", port, &r, "p1");
-            elec(&mut b, &r, "p2", "gnd", "p");
+            elec(&mut b, "T1", port, &r, "p");
+            elec(&mut b, &r, "n", "gnd", "p");
         }
         let out = compile(&b.into_model(), "general-simulator").unwrap();
         let net = |blk: &str| {
@@ -1142,8 +1142,8 @@ mod tests {
             Paradigm::PhysicalNetwork,
             json!({}),
         );
-        elec(&mut b, "load", "p1", "gnd", "p");
-        elec(&mut b, "load", "p2", "gnd", "p");
+        elec(&mut b, "load", "p", "gnd", "p");
+        elec(&mut b, "load", "n", "gnd", "p");
         let out = compile(&b.into_model(), "general-simulator").unwrap();
         // general-mna dispatches on the first character; "load" would be an unsupported device.
         assert!(out.netlist.contains("Rload 0 0 50"), "{}", out.netlist);
@@ -1314,8 +1314,8 @@ mod tests {
                 Paradigm::PhysicalNetwork,
                 json!({"R": 1000.0}),
             );
-            elec(&mut body, "leaf", "a", "Rin", "p1");
-            elec(&mut body, "Rin", "p2", "leaf", "b");
+            elec(&mut body, "leaf", "a", "Rin", "p");
+            elec(&mut body, "Rin", "n", "leaf", "b");
             let m = body.into_model();
             def.blocks = m.blocks;
             def.wires = m.wires;
@@ -1413,8 +1413,8 @@ mod tests {
             Paradigm::PhysicalNetwork,
             json!({}),
         );
-        elec(&mut b, "R1", "p1", "gnd", "p");
-        elec(&mut b, "R1", "p2", "gnd", "p");
+        elec(&mut b, "R1", "p", "gnd", "p");
+        elec(&mut b, "R1", "n", "gnd", "p");
         let err = compile(&b.into_model(), "general-simulator").unwrap_err();
         assert_eq!(
             err,
@@ -1442,8 +1442,8 @@ mod tests {
             Paradigm::PhysicalNetwork,
             json!({"R": 2.0}),
         );
-        elec(&mut b, "R1", "p2", "R2", "p1");
-        elec(&mut b, "R1", "p1", "R2", "p2");
+        elec(&mut b, "R1", "n", "R2", "p");
+        elec(&mut b, "R1", "p", "R2", "n");
         let out = compile(&b.into_model(), "general-simulator").unwrap();
         assert!(out.netlist.contains(" 0 "), "{}", out.netlist);
         assert!(
@@ -1948,8 +1948,8 @@ mod tests {
                 Paradigm::PhysicalNetwork,
                 json!({"R": 100.0}),
             );
-            elec(&mut body, "inner", "a", "Rin", "p1");
-            elec(&mut body, "Rin", "p2", "inner", "b");
+            elec(&mut body, "inner", "a", "Rin", "p");
+            elec(&mut body, "Rin", "n", "inner", "b");
             let m = body.into_model();
             inner.blocks = m.blocks;
             inner.wires = m.wires;
@@ -2048,16 +2048,16 @@ mod tests {
             Paradigm::PhysicalNetwork,
             json!({}),
         );
-        elec(&mut b, "R1", "p1", "R2", "p1");
-        elec(&mut b, "R1", "p2", "gnd", "p");
-        elec(&mut b, "R2", "p2", "gnd", "p");
+        elec(&mut b, "R1", "p", "R2", "p");
+        elec(&mut b, "R1", "n", "gnd", "p");
+        elec(&mut b, "R2", "n", "gnd", "p");
 
         let out = compile(&b.into_model(), "general-simulator").unwrap();
         assert!(
             out.netlist.contains(
                 "* upper divider leg\n\
                  * sized for 5 mA bias\n\
-                 R1 n_R1_p1 0 1000\n\
+                 R1 n_R1_p 0 1000\n\
                  * measured 1k02 on the bench\n"
             ),
             "{}",
@@ -2065,7 +2065,7 @@ mod tests {
         );
         // The uncommented sibling is untouched -- no stray comment leaks onto it.
         assert!(
-            out.netlist.contains("\nR2 n_R1_p1 0 2000\n"),
+            out.netlist.contains("\nR2 n_R1_p 0 2000\n"),
             "{}",
             out.netlist
         );
@@ -2212,8 +2212,8 @@ mod tests {
                 &["inside the def"],
                 &["after the def body card"],
             );
-            elec(&mut body, "leaf", "a", "Rin", "p1");
-            elec(&mut body, "Rin", "p2", "leaf", "b");
+            elec(&mut body, "leaf", "a", "Rin", "p");
+            elec(&mut body, "Rin", "n", "leaf", "b");
             let m = body.into_model();
             def.blocks = m.blocks;
             def.wires = m.wires;
@@ -2457,7 +2457,7 @@ mod tests {
             ..Default::default()
         })
         .unwrap();
-        elec(&mut b, "R1", "p2", "Grail", "in");
+        elec(&mut b, "R1", "n", "Grail", "in");
         let err = compile(&b.into_model(), "general-simulator").unwrap_err();
         assert_eq!(
             err,
@@ -2640,8 +2640,8 @@ mod tests {
             Paradigm::PhysicalNetwork,
             json!({"R": 1000.0}),
         );
-        elec(&mut b, "V1", "p", "R1", "p1");
-        elec(&mut b, "R1", "p2", "GND", "p");
+        elec(&mut b, "V1", "p", "R1", "p");
+        elec(&mut b, "R1", "n", "GND", "p");
         elec(&mut b, "V1", "n", "GND", "p");
         let netlist = compile(&b.into_model(), "general-simulator")
             .unwrap_or_else(|e| panic!("{e}"))
@@ -2680,8 +2680,8 @@ mod tests {
             Paradigm::PhysicalNetwork,
             json!({"R": 1000.0}),
         );
-        elec(&mut b, "V1", "p", "R1", "p1");
-        elec(&mut b, "R1", "p2", "GND", "p");
+        elec(&mut b, "V1", "p", "R1", "p");
+        elec(&mut b, "R1", "n", "GND", "p");
         elec(&mut b, "V1", "n", "GND", "p");
         assert!(compile(&b.into_model(), "general-simulator").is_err());
     }
@@ -2710,8 +2710,8 @@ mod tests {
             Paradigm::PhysicalNetwork,
             json!({"R": 1000.0}),
         );
-        elec(&mut b, "EA", "p", "R1", "p1");
-        elec(&mut b, "R1", "p2", "GND", "p");
+        elec(&mut b, "EA", "p", "R1", "p");
+        elec(&mut b, "R1", "n", "GND", "p");
         elec(&mut b, "EA", "n", "GND", "p");
         let netlist = compile(&b.into_model(), "general-simulator")
             .unwrap_or_else(|e| panic!("{e}"))
@@ -3061,8 +3061,8 @@ mod tests {
         // a load across the rail so no terminal is left floating.
         elec(&mut b, "DS1A", "d", "DS1B", "s");
         elec(&mut b, "Vdc", "p", "DS1B", "d");
-        elec(&mut b, "DS1A", "s", "Rload", "p1");
-        elec(&mut b, "Rload", "p2", "gnd", "p");
+        elec(&mut b, "DS1A", "s", "Rload", "p");
+        elec(&mut b, "Rload", "n", "gnd", "p");
         elec(&mut b, "Vdc", "n", "gnd", "p");
         sig(&mut b, "PWM", "out", "GATE", "in");
         elec(&mut b, "GATE", "out", "DS1B", "g");
