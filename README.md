@@ -109,6 +109,38 @@ Module map: `expr` and `template` (the closed-grammar expression language), `res
 Worked schematics, each with the netlist it compiles to, are in
 [`examples/`](examples/README.md); they drive the crate through its `gsim-py` binding.
 
+## Fidelity tiers
+
+A component in the library does not declare one parameter list. It declares one **per fidelity
+tier**, under `fidelities`, and each tier carries its own `ports` and `params`:
+
+```jsonc
+// passive.capacitor
+{ "tier": "ideal",      "params": ["C", "IC"], "ports": ["p", "n"] }
+{ "tier": "behavioral", "params": ["C"],       "ports": ["p", "n"] }
+{ "tier": "spice",      "params": ["C"],       "ports": ["p", "n"] }
+```
+
+Four tiers are in use across the 239 components: `ideal` (189), `n_a` (50), `behavioral` (31)
+and `spice` (17). `n_a` means the question does not apply — a bus assignment or a ground has no
+fidelity. 208 components offer exactly one tier, 14 offer two and 17 offer three.
+
+**A block records its tier.** `Block::fidelity` is a plain string on the document and defaults
+to `"ideal"`; a `.gsim_sch` written by an older tool with no `fidelity` field loads as `ideal`.
+
+**Changing a block's tier changes what the block contains.** The front end's `fidelity-swap`
+computes the delta and *removes* every parameter the target tier does not list, so a capacitor
+moved off `ideal` loses its `IC` — the initial condition is not hidden, it is gone from the
+document. That is the behaviour to design against: a tier is not a view over one parameter list.
+
+**The compiler does not branch on the tier.** `compile::spec` asks for the parameters a card
+needs, and they either are on the block or they are not. So a component whose non-default tier
+omits a parameter the registry requires is a component that compiles until the user touches the
+fidelity dropdown, and then stops. `tests/library_compiles_at_every_tier.rs` is the guard: it
+builds a one-block document per (component, tier) from that tier's own ports and defaults and
+asserts it compiles. **Adding a tier to a component, or removing a parameter from one, is a
+change that test has to stay green across.**
+
 ## Relationship to the sibling repos
 
 ```
