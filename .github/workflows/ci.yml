@@ -126,3 +126,86 @@ jobs:
             exit 1
           fi
           echo "Both lists: $(tr '\n' ' ' < ours.txt)"
+
+  # The editor owns how a component is *described* -- `block-metadata.schema.json` in
+  # omni-schematics -- while this repository owns which components exist. Its catalogue
+  # generator refuses to write a catalogue containing a component that fails that contract, so a
+  # bad declaration here has twice surfaced over there instead: in a repository that cannot fix
+  # it, as a message about JSON Schema keywords, on an unrelated pull request.
+  #
+  # This validates the same bytes against the same schema, here. Two details make it the real
+  # check rather than an approximation of one:
+  #
+  #   * it validates `catalog()`'s output, not `component-library.json`, because that is what
+  #     the editor consumes and the two genuinely differ -- derived fields are added and absent
+  #     optionals are dropped. Validating the raw file reports failures the editor never sees.
+  #   * the schema is fetched from omni-schematics' default branch rather than copied, for the
+  #     same reason `rating-vocabulary-drift` above fetches the engine's own list: a copy of
+  #     someone else's contract is a second thing to keep in step, and the fields nobody thought
+  #     to copy are exactly the ones that broke.
+  #
+  # Verified both ways before being committed: against a build carrying the defect it reports
+  # `1 of 240`, naming the component and the field, and against the fix, `all 240`.
+  library-matches-the-editor-contract:
+    name: Every component satisfies the block-metadata contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build gsim_py and dump the catalogue
+        run: |
+          python -m pip install --upgrade maturin
+          maturin build --release --manifest-path crates/gsim-py/Cargo.toml --out wheels
+          python -m pip install wheels/gsim_py-*.whl
+          python -c "import gsim_py; open('catalog.json', 'w').write(gsim_py.catalog())"
+
+      - name: Fetch the contract and validate every component
+        run: |
+          set -euo pipefail
+          curl -fsSL -o schema.json \
+            https://raw.githubusercontent.com/GLODI-Engineering/omni-schematics/main/packages/schemas/definitions/blocks/block-metadata.schema.json
+          test -s schema.json || { echo "could not read the editor's block-metadata schema"; exit 1; }
+          npm install --no-save --silent ajv@8.17.1
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs'
+          import Ajv from 'ajv/dist/2020.js'
+
+          const schema = JSON.parse(readFileSync('schema.json', 'utf8'))
+          const catalog = JSON.parse(readFileSync('catalog.json', 'utf8'))
+          // The same options the editor's own generator compiles this schema with, so a
+          // disagreement here is about the data and never about how it was read.
+          const validate = new Ajv({ strict: false, allErrors: true }).compile(schema)
+
+          const broken = []
+          for (const component of catalog.components) {
+            if (validate(component)) continue
+            const why = (validate.errors ?? [])
+              .slice(0, 4)
+              .map((e) => `${e.instancePath || '/'} ${e.message}`)
+              .join('; ')
+            broken.push(`  ${component.id}: ${why}`)
+          }
+          if (broken.length) {
+            console.error(`${broken.length} of ${catalog.components.length} components do not satisfy the contract:`)
+            console.error(broken.join('\n'))
+            console.error('')
+            console.error('The editor owns how a component is described. Fix the declaration in')
+            console.error('crates/gsim-core/data/component-library.json, or widen the schema in')
+            console.error('omni-schematics if the contract itself should.')
+            process.exit(1)
+          }
+          console.log(`all ${catalog.components.length} components satisfy the contract`)
+          NODE

@@ -30126,10 +30126,10 @@
         "text": "FILE"
       },
       "behavior": {
-        "causality": "causal",
+        "causality": "source",
         "domain": "signal",
         "equation_template": "source.file",
-        "state_count": "0"
+        "state_count": 0
       },
       "paradigm": "signal-flow",
       "domain": "signal",
