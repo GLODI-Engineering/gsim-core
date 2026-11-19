@@ -71,6 +71,33 @@ pub enum ElementTail {
         pw: &'static str,
         per: &'static str,
     },
+    /// `EXP(V1 V2 TD1 TAU1 TD2 TAU2)` -- SPICE's exponential source, six tokens with the
+    /// parens riding on the first and last, exactly as [`Self::Sin`] and [`Self::Pulse`] do.
+    Exp {
+        v1: &'static str,
+        v2: &'static str,
+        td1: &'static str,
+        tau1: &'static str,
+        td2: &'static str,
+        tau2: &'static str,
+    },
+    /// `SFFM(VO VA FC MDI FS)` -- SPICE's single-frequency FM source, five tokens, same
+    /// convention.
+    Sffm {
+        vo: &'static str,
+        va: &'static str,
+        fc: &'static str,
+        mdi: &'static str,
+        fs: &'static str,
+    },
+    /// `PWL(T1 V1 T2 V2 ...)` -- SPICE's piecewise-linear source, rendered from one array
+    /// parameter of `[time, value]` pairs: the catalogue's `points` is `[[0, 0], [1e-3, 5]]`
+    /// and the card is `PWL(0 0 1e-3 5)`. Two tokens per pair, parens riding on the first and
+    /// last, so `general-mna`'s whitespace tokenizer sees what it expects.
+    ///
+    /// This is the one transient shape that cannot be described by a fixed field list, which
+    /// is why it needs its own variant rather than another `n`-field tuple.
+    Pwl { points: &'static str },
     /// Nothing after the nodes.
     None,
 }
@@ -795,6 +822,107 @@ pub const REGISTRY: &[TypeSpec] = &[
             per: "PER",
         },
         ..TypeSpec::empty("source.voltage.pulse")
+    },
+    // The remaining transient source shapes the netlist grammar accepts. `general-mna`'s own
+    // parser error names the full set -- `device V accepts SIN/PULSE/EXP/PWL/SFFM` -- and
+    // `transient_source.rs` implements every one, but only DC, SIN and PULSE had a type here,
+    // so three shapes the engine can solve could not be drawn and two that existed for `V` had
+    // no `I` counterpart. Parameter names are the catalogue's own throughout, which is why the
+    // current sources' levels are `I1`/`I2` while the voltage sources' are `V1`/`V2`.
+    //
+    // PWL first, because it is the one that cannot be substituted: a measured waveform, a
+    // datasheet curve or a recorded gate pattern has no other way into a drawn schematic.
+    TypeSpec {
+        device_letter: Some('V'),
+        node_ports: SOURCE_PINS,
+        tail: ElementTail::Pwl { points: "points" },
+        ..TypeSpec::empty("source.voltage.pwl")
+    },
+    TypeSpec {
+        device_letter: Some('I'),
+        node_ports: SOURCE_PINS,
+        tail: ElementTail::Pwl { points: "points" },
+        ..TypeSpec::empty("source.current.pwl")
+    },
+    TypeSpec {
+        device_letter: Some('V'),
+        node_ports: SOURCE_PINS,
+        tail: ElementTail::Exp {
+            v1: "V1",
+            v2: "V2",
+            td1: "TD1",
+            tau1: "TAU1",
+            td2: "TD2",
+            tau2: "TAU2",
+        },
+        ..TypeSpec::empty("source.voltage.exp")
+    },
+    TypeSpec {
+        device_letter: Some('I'),
+        node_ports: SOURCE_PINS,
+        tail: ElementTail::Exp {
+            v1: "I1",
+            v2: "I2",
+            td1: "TD1",
+            tau1: "TAU1",
+            td2: "TD2",
+            tau2: "TAU2",
+        },
+        ..TypeSpec::empty("source.current.exp")
+    },
+    TypeSpec {
+        device_letter: Some('V'),
+        node_ports: SOURCE_PINS,
+        tail: ElementTail::Sffm {
+            vo: "VO",
+            va: "VA",
+            fc: "FC",
+            mdi: "MDI",
+            fs: "FS",
+        },
+        ..TypeSpec::empty("source.voltage.sffm")
+    },
+    TypeSpec {
+        device_letter: Some('I'),
+        node_ports: SOURCE_PINS,
+        tail: ElementTail::Sffm {
+            vo: "VO",
+            va: "VA",
+            fc: "FC",
+            mdi: "MDI",
+            fs: "FS",
+        },
+        ..TypeSpec::empty("source.current.sffm")
+    },
+    // The two `I` counterparts of shapes `V` already had. `I` takes the same time functions as
+    // `V` in the grammar, so a current source being DC-only was a gap in this registry rather
+    // than in the engine.
+    TypeSpec {
+        device_letter: Some('I'),
+        node_ports: SOURCE_PINS,
+        tail: ElementTail::Sin {
+            v0: "VO",
+            va: "VA",
+            freq: "FREQ",
+            td: "TD",
+            theta: "THETA",
+            phase: "PHASE",
+        },
+        ..TypeSpec::empty("source.current.sin")
+    },
+    TypeSpec {
+        device_letter: Some('I'),
+        node_ports: SOURCE_PINS,
+        tail: ElementTail::Pulse {
+            v1: "I1",
+            v2: "I2",
+            td: "TD",
+            tr: "TR",
+            tf: "TF",
+            pw: "PW",
+            per: "PER",
+        },
+        ..TypeSpec::empty("source.current.pulse")
     },
     // -- composites: emitted inline as several ordinary cards ----------------
     //
