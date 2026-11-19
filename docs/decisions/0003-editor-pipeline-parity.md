@@ -1,18 +1,39 @@
-# 0003 — What parity with `general-simulator-gui`'s live pipeline actually requires
+# 0003 — What parity with the editor's live Python pipeline actually required
 
-**Status:** accepted (2026-09-04). Findings, not a plan — this records what was measured, so the
-roadmap is argued from numbers rather than from an assumption about how close the two sides are.
+**Status:** **superseded** (2026-11-19) by the direction the editor took instead. Originally
+accepted 2026-09-04 as findings, not a plan — a record of what was measured, so the roadmap
+could be argued from numbers rather than from an assumption about how close the two sides were.
+
+**What superseded it.** The parallel Python compiler this document measured against is no longer
+what the editor runs: the VS Code extension invokes the `general-simulator` CLI directly, and the
+engine itself declares what compiles (`compile::capabilities`), so the editor asks rather than
+keeping its own list. The consolidation this document was written to assess therefore happened by
+the other route, and its **ordered prerequisites below are not a backlog** — they were costed
+against a Python pipeline that no longer runs.
+
+`NgspiceTarget` and `XyceTarget` are **deferred, not in progress**. The owner's stated direction
+(2026-11-19) is that the schematic editor will support other engines in time, so a second target
+is expected eventually; nothing is started, and when it starts it gets its own decision record
+with its own measurements rather than inheriting this document's prerequisite list.
+
+**Renamed** (2026-11-19) from `0003-general-simulator-gui-pipeline-parity.md`, for the same
+reason as the next paragraph. `docs/journal/2026-09.md` records the old filename, as journal
+entries record what was true when they were written.
+
+**Names neutralised** (2026-11-19) per
+[`0002-no-private-content.md`](0002-no-private-content.md): this record cited a private
+repository and quoted internal source paths. The measurements, numbers and reasoning are
+unchanged — only the names of files the reader cannot open are replaced by what they are.
 
 ## Context
 
-`gsim-core` was built to become the one implementation behind `general-simulator-gui`'s schematic
-tooling, with Phase 2 (`compile/`) targeting `general-simulator`'s netlist grammar. A request came
-in to *consolidate*: route `general-simulator-gui`'s live "Run" path through `gsim_py.compile()`
-and stop maintaining the parallel Python compiler in
-`general-simulator-gui/packages/simulator/src/simulator/compiler/`.
+`gsim-core` was built to become the one implementation behind the schematic editor's tooling,
+with Phase 2 (`compile/`) targeting `general-simulator`'s netlist grammar. A request came in to
+*consolidate*: route the editor's live "Run" path through `gsim_py.compile()` and stop
+maintaining the parallel Python compiler it carried.
 
 Before doing that, the Python pipeline was read in full and the gap was **measured with a built
-`gsim-py` wheel against that repo's own real fixtures**, not estimated. The result is that the
+`gsim-py` wheel against the editor's own real fixtures**, not estimated. The result is that the
 swap is not currently possible at all, for a reason more structural than "some block types are
 missing." This document records why, and what the ordered prerequisites are.
 
@@ -24,7 +45,7 @@ This is the blocker that subsumes every other one.
 returns `CompileError::UnknownTarget` for anything else. `AGENTS.md` invariant 2 already says
 ngspice/Xyce targets are unstarted.
 
-`general-simulator-gui`'s live simulate path — `apps/kernel-sidecar/src/kernel_sidecar/ipc/handlers/simulate.py`
+the editor's live simulate path — its kernel-sidecar IPC handler
 — dispatches to exactly three backends, and **none of them is `general-simulator`**:
 
 | Model class | Compiler | Solver |
@@ -50,7 +71,7 @@ below is downstream of that.
 ## Finding 2 — the type vocabularies are disjoint, measured
 
 A `gsim-py` wheel was built (`maturin build --release`) and run against all three `.gsim_sch`
-documents that exist in `general-simulator-gui`. Every one **loads** and **none compiles**:
+documents that existed in the editor. Every one **loads** and **none compiles**:
 
 | Fixture | `load_document` | `compile(model, "general-simulator")` |
 |---|---|---|
@@ -109,7 +130,7 @@ new dimension on the lookup.
 
 ## Finding 4 — the Python pipeline has six load-time passes with no `gsim-core` equivalent
 
-These run *before* netlist writing in `general-simulator-gui`, and are the substantive part of what
+These ran *before* netlist writing in the editor's pipeline, and are the substantive part of what
 "the logic" means in "I want all the logic in one place". None exists in `gsim-core` today:
 
 1. **`gsim_sch_flatten.py`** (401 lines) — inlines `hierarchy.subsystem.*` blocks into one flat
@@ -248,18 +269,18 @@ consumes — has no counterpart. Two things to carry across when this is closed:
 6. Only then, separately, the `scipy_compiler` question (Finding 6) — which is a block-library port
    and a numerics decision, not part of this line of work.
 
-Until (1) and (2) land, no call site in `general-simulator-gui`'s live pipeline can be routed
+Until (1) and (2) land, no call site in that live pipeline can be routed
 through `gsim_py.compile()`, and none was.
 
 ## Method
 
-Reproducible from this repo plus a checkout of `general-simulator-gui`, and kept runnable there as
-`scripts/gsim-py-parity-probe.py`:
+Reproducible from this repo plus a checkout of the editor, whose own parity-probe script it
+was kept runnable against:
 
 ```bash
 python3 -m venv .venv && . .venv/bin/activate
 maturin build --release -m crates/gsim-py/Cargo.toml --out wheels && pip install wheels/*.whl
-python3 <general-simulator-gui>/scripts/gsim-py-parity-probe.py
+python3 <editor-checkout>/scripts/gsim-py-parity-probe.py
 ```
 
 Note `compile()` takes a **`Model`** JSON, not a whole `{"schema_version": 2, "model": ...}`
