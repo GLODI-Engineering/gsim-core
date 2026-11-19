@@ -8,9 +8,13 @@ could be argued from numbers rather than from an assumption about how close the 
 what the editor runs: the VS Code extension invokes the `general-simulator` CLI directly, and the
 engine itself declares what compiles (`compile::capabilities`), so the editor asks rather than
 keeping its own list. The consolidation this document was written to assess therefore happened by
-the other route, and its **ordered prerequisites below are not a backlog**. In particular,
-`NgspiceTarget` and `XyceTarget` are **declined, not pending**: this project has one backend by
-decision. Adding another is a new decision with its own record, not a gap someone should fill.
+the other route, and its **ordered prerequisites below are not a backlog** — they were costed
+against a Python pipeline that no longer runs.
+
+`NgspiceTarget` and `XyceTarget` are **deferred, not in progress**. The owner's stated direction
+(2026-11-19) is that the schematic editor will support other engines in time, so a second target
+is expected eventually; nothing is started, and when it starts it gets its own decision record
+with its own measurements rather than inheriting this document's prerequisite list.
 
 **Renamed** (2026-11-19) from `0003-general-simulator-gui-pipeline-parity.md`, for the same
 reason as the next paragraph. `docs/journal/2026-09.md` records the old filename, as journal
