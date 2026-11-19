@@ -100,7 +100,18 @@ pub enum Arity {
 impl Arity {
     pub fn count(&self, block: &Block) -> Option<usize> {
         match self {
-            Arity::ParamLen(p) => block.params.get(*p)?.as_array().map(Vec::len),
+            Arity::ParamLen(p) => match block.params.get(*p)? {
+                Value::Array(items) => Some(items.len()),
+                // `control.sum`'s `signs` is declared `type: string` in the component library,
+                // "Sequence of `+` or `-` characters, one per input port", and defaults to
+                // `"++"`. A sum dropped from the palette with its own default untouched
+                // therefore had **no readable arity at all**, and the emitter reported
+                // `needs 0 driver(s) for its 'inputs=' list` -- a message about a hole in a
+                // positional list, when the real problem was that the list's length could not
+                // be read. One character is one input, the same count the array spelling gives.
+                Value::String(s) => Some(s.chars().filter(|c| !c.is_whitespace()).count()),
+                _ => None,
+            },
             Arity::ParamCount(p) => {
                 let n = block.params.get(*p)?.as_f64()?;
                 (n >= 0.0).then_some(n as usize)
@@ -711,6 +722,19 @@ pub const REGISTRY: &[TypeSpec] = &[
     TypeSpec {
         structural: true,
         ..TypeSpec::empty("routing.junction")
+    },
+    // A scope is a display concern: it has no netlist spelling and needs none, because the
+    // trace already carries every signal the run produced. Structural like a ground, so that
+    // dropping a scope on an output -- the ordinary thing to do -- compiles instead of failing
+    // the whole document with `unknown-type`. Both catalogue spellings are here: the palette
+    // carries `sinks.scope` and `signal-flow.sink.scope`, and a sheet can hold either.
+    TypeSpec {
+        structural: true,
+        ..TypeSpec::empty("sinks.scope")
+    },
+    TypeSpec {
+        structural: true,
+        ..TypeSpec::empty("signal-flow.sink.scope")
     },
     // Goto/From are pure connectivity annotations: `structural` keeps both out of the emitted
     // netlist entirely, and `super::routing` rewrites every reference that lands on a
@@ -1801,6 +1825,49 @@ pub const REGISTRY: &[TypeSpec] = &[
             opt("td", "td"),
             opt("theta", "theta"),
             opt("phase", "phase"),
+        ]
+    ),
+    // A step is a pulse whose period outlasts the run, so it maps onto `kind=pulsewave`
+    // rather than needing a `kind=step` the engine does not have: `before`/`after` are the
+    // pulse's two levels, `t_step` its delay, and `pw`/`per` are pinned at the same
+    // "effectively never" sentinel `source.pulsewave`'s own catalogue defaults use, so the
+    // level never comes back down.
+    //
+    // This mapping was impossible until GLODI-Engineering/general-mna#39: `PULSE` answered
+    // with the *pulsed* value before its own delay whenever `tr == 0`, so a step built this
+    // way would have been high from t = 0. Both catalogue spellings are here.
+    signal_block!(
+        "signal.step",
+        KindName::Fixed("pulsewave"),
+        [
+            req("v1", "before"),
+            req("v2", "after"),
+            opt("td", "t_step"),
+            FieldSpec::Literal {
+                field: "pw",
+                value: "1e30",
+            },
+            FieldSpec::Literal {
+                field: "per",
+                value: "1e30",
+            },
+        ]
+    ),
+    signal_block!(
+        "signal-flow.source.step",
+        KindName::Fixed("pulsewave"),
+        [
+            req("v1", "before"),
+            req("v2", "after"),
+            opt("td", "t_step"),
+            FieldSpec::Literal {
+                field: "pw",
+                value: "1e30",
+            },
+            FieldSpec::Literal {
+                field: "per",
+                value: "1e30",
+            },
         ]
     ),
     signal_block!(

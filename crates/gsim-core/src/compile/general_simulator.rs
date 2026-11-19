@@ -524,6 +524,23 @@ fn emit_block_card(
 /// Recursive, because [`FieldSpec::Guarded`] wraps another spec: a family whose *field set*
 /// (not just its `kind=` string) depends on a selector parameter — `logic.gate`, `logic.flip_flop`
 /// — is expressed as guarded variants of the ordinary specs rather than as a bespoke arm each.
+/// A list parameter as the catalogue may spell it: a real JSON array, or `control.sum`'s
+/// documented `signs` string -- "Sequence of `+` or `-` characters, one per input port" --
+/// where each character is one entry. Returns owned values so both spellings can flow through
+/// one renderer.
+fn as_list(v: &serde_json::Value) -> Option<Vec<serde_json::Value>> {
+    match v {
+        serde_json::Value::Array(items) => Some(items.clone()),
+        serde_json::Value::String(s) => Some(
+            s.chars()
+                .filter(|c| !c.is_whitespace())
+                .map(|c| serde_json::Value::String(c.to_string()))
+                .collect(),
+        ),
+        _ => None,
+    }
+}
+
 fn emit_field(
     scope: &Scope<'_>,
     block: &Block,
@@ -562,7 +579,7 @@ fn emit_field(
             field,
             param: p,
             required,
-        } => match param(block, p).and_then(serde_json::Value::as_array) {
+        } => match param(block, p).and_then(as_list) {
             Some(items) => {
                 // `control.sum`'s own metadata (the only caller of this field variant today —
                 // see the "summation and product" comment above its TypeSpec) declares

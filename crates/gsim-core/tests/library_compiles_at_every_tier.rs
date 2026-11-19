@@ -198,11 +198,17 @@ fn compile_at_tier(
 /// means the number can only go down by a fix, and a *new* disagreement fails the build on the
 /// commit that introduces it rather than on the day someone draws it.
 const KNOWN_BROKEN: &[(&str, &str, &str)] = &[
-    // GLODI-Engineering/gsim-core#15 item 2 -- `signs`/`inputs` arity. These two carry variadic
-    // inputs whose count comes from a parameter, and the tier lists only `out`, so the sweep
-    // has nothing to drive and the emitter reports a hole in a positional list. The fix is for
-    // the tier to carry the expanded pins (as `control.sum`'s own `n_a` tier used to, with
-    // `in0`/`in1`), which is the same `for_each` expansion the contract already does.
+    // GLODI-Engineering/gsim-core#15 item 2, the half that is the sweep's own limitation
+    // rather than a user-facing defect. Both of these carry variadic inputs, and a tier
+    // declares only `out` -- the input pins come from the GSF v2 contract's `for_each`
+    // expansion, which this structural sweep does not run -- so the sweep has nothing to
+    // drive and the emitter correctly reports a hole in a positional list.
+    //
+    // The user-facing half *is* fixed: `signs` is declared `type: string` ("++"), the arity
+    // could not be read from it at all, and a sum dropped from the palette reported "needs 0
+    // driver(s)". `Arity::ParamLen` and the `ParamList` emitter accept that spelling now, so a
+    // placed sum compiles. Closing the sweep's gap needs the contract expansion here, which is
+    // a different piece of work.
     (
         "control.sum",
         "ideal",

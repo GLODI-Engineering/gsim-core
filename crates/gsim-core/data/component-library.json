@@ -21425,7 +21425,8 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Step input — outputs `before` for t < t_step, `after` afterwards."
+      "description": "Step input — outputs `before` for t < t_step, `after` afterwards.",
+      "compiles_to": "signal.step"
     },
     {
       "id": "signal-flow.attributes.ic",
@@ -24779,7 +24780,8 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Signal scope sink."
+      "description": "Signal scope sink.",
+      "compiles_to": "signal-flow.sink.scope"
     },
     {
       "id": "signal-flow.sink.terminator",
@@ -25301,7 +25303,8 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Step signal source."
+      "description": "Step signal source.",
+      "compiles_to": "signal-flow.source.step"
     },
     {
       "id": "signal-flow.transform.alpha_beta",
@@ -26044,7 +26047,8 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Captures the input signal for display in the waveform viewer."
+      "description": "Captures the input signal for display in the waveform viewer.",
+      "compiles_to": "sinks.scope"
     },
     {
       "id": "source.behavioral",
