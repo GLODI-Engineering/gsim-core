@@ -363,6 +363,99 @@ mod tests {
         );
     }
 
+    /// Every parameter the registry **requires** is offered by the tier a user actually gets.
+    ///
+    /// The level below the port guard above, and the other half of #15. Two of its four items
+    /// were this: `control.pid` required `n`, `clamp_lo` and `clamp_hi` while the `ideal` tier
+    /// offered `anti_windup`, and `control.sum`'s `signs` was a string where the emitter read
+    /// an array. A block dropped from the palette with its own defaults untouched then failed
+    /// at Run with `missing-param` or `indexed-ref-arity`, naming something the user never
+    /// chose.
+    ///
+    /// Only `kind=` card fields are checked, because that is where a required parameter is
+    /// declared per type; an element card's value comes from [`ElementTail`], whose own
+    /// parameter is checked by the compile sweep in
+    /// `tests/library_compiles_at_every_tier.rs`.
+    #[test]
+    fn every_required_parameter_is_offered_by_every_tier() {
+        fn required_params(spec: &crate::compile::TypeSpec) -> Vec<&'static str> {
+            let Some(kind) = spec.kind.as_ref() else {
+                return Vec::new();
+            };
+            kind.fields
+                .iter()
+                .filter_map(|f| match f {
+                    crate::compile::spec::FieldSpec::Param {
+                        param,
+                        required: true,
+                        ..
+                    }
+                    | crate::compile::spec::FieldSpec::ParamList {
+                        param,
+                        required: true,
+                        ..
+                    } => Some(*param),
+                    _ => None,
+                })
+                .collect()
+        }
+
+        let mut missing: Vec<String> = Vec::new();
+        for component in library() {
+            let Some(type_name) = component.compiles_to.as_deref() else {
+                continue;
+            };
+            let Some(spec) = crate::compile::lookup(type_name) else {
+                continue;
+            };
+            let wanted = required_params(spec);
+            if wanted.is_empty() {
+                continue;
+            }
+
+            let Some(tiers) = component
+                .presentation
+                .get("fidelities")
+                .and_then(|f| f.as_array())
+            else {
+                continue;
+            };
+            for tier in tiers {
+                let name = tier
+                    .get("tier")
+                    .and_then(|t| t.as_str())
+                    .unwrap_or("<unnamed>");
+                let offered: Vec<String> = tier
+                    .get("params")
+                    .and_then(|p| p.as_array())
+                    .map(|list| {
+                        list.iter()
+                            .filter_map(|p| p.get("id")?.as_str().map(str::to_string))
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                for want in &wanted {
+                    if !offered.iter().any(|o| o == want) {
+                        missing.push(format!(
+                            "{} @ {}: emitter requires '{}', tier offers [{}]",
+                            component.id,
+                            name,
+                            want,
+                            offered.join(", ")
+                        ));
+                    }
+                }
+            }
+        }
+
+        assert!(
+            missing.is_empty(),
+            "{} required parameters a tier does not offer:\n  {}",
+            missing.len(),
+            missing.join("\n  ")
+        );
+    }
+
     #[test]
     fn compilable_is_derived_from_the_registry_not_stored() {
         let catalog = catalog();
