@@ -2,7 +2,7 @@
 //! subcircuit **once**, instantiate it **many** times, each instance with its own distinct
 //! external connections.
 //!
-//! Ported from `general-simulator-gui`'s `packages/gsim-model/src/gsim_model/subckt.py`
+//! Ported from the editor's Python model package (`gsim_model`) and its own `subckt` module
 //! (read in full before writing this), with two deliberate, documented divergences.
 //!
 //! # Divergence 1 — structured body, not opaque text

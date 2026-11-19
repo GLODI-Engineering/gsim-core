@@ -1,8 +1,7 @@
 //! The resolved (post-`for_each`/`when`/`${{ }}`) drawing primitive vocabulary. Field-for-field
-//! identical to the `Primitive` union in `general-simulator-gui`'s
-//! `apps/frontend/src/canvas/nodes/primitive-renderer.ts` (the frozen vocabulary GSF v1 already
-//! committed to and GSF v2 does not change) — no new primitive kinds, so the existing frontend
-//! renderer needs no changes to consume GSF v2 output.
+//! identical to the `Primitive` union the editor's front-end primitive renderer accepts (the
+//! frozen vocabulary GSF v1 already committed to and GSF v2 does not change) — no new primitive
+//! kinds, so that renderer needs no changes to consume GSF v2 output.
 
 use serde::{Deserialize, Serialize};
 

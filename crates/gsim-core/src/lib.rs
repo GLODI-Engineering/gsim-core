@@ -1,5 +1,6 @@
-//! `gsim-core` — Phase 1 of the shared Rust implementation behind `general-simulator-gui`'s
-//! schematic tooling. See `README.md` and `docs/decisions/0001-scope-and-naming.md` for full
+//! `gsim-core` — Phase 1 of the shared Rust implementation behind the schematic editor
+//! ([Omni Schematics](https://github.com/GLODI-Engineering/omni-schematics)) and the Python
+//! automation library. See `README.md` and `docs/decisions/0001-scope-and-naming.md` for full
 //! scope and rationale. Two of Phase 1's three deliverables are implemented:
 //!
 //! - [`expr`] — the closed-grammar `${{ ... }}` expression language (lexer/parser/AST/eval).

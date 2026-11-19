@@ -4,9 +4,8 @@
 //!
 //! # What this is ported from
 //!
-//! The reference implementation is `general-simulator-gui`'s
-//! `apps/frontend/src/canvas/port-compat.ts` (`canConnect(src, dst)`), read in full before
-//! writing this — not the spec prose, which has diverged from real code in this project before.
+//! The reference implementation is the editor's front-end port-compatibility module
+//! (`canConnect(src, dst)`), read in full before writing this — not the spec prose, which has diverged from real code in this project before.
 //! Its four rules, in its own order, are `reserved-kind`, `kind-mismatch`, `fan-in-on-signal`
 //! and `dim-mismatch`. (It has **no** `direction-mismatch` rule; §8.2's direction wording is
 //! realised there purely as the fan-in check.)

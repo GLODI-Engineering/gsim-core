@@ -3,7 +3,7 @@
 `connect()` has always enforced the *block-level* cross-paradigm boundary
 (`docs/specs/gsim-sch-format.md` §8.3). This example exercises the finer **per-port** rules
 (§8.1/§8.2) that `crates/gsim-core/src/document/port_compat.rs` adds, ported from
-`general-simulator-gui`'s `apps/frontend/src/canvas/port-compat.ts`.
+the editor's own front-end port-compatibility module.
 
 Three rejections are proven end to end, each surfacing a distinct keyword-prefixed
 `ValueError` in Python:

@@ -4,7 +4,7 @@
 //! ports become nodes, which block parameters the card consumes, and which of those are
 //! required. Until this module existed none of it left the binary, so a GUI had to keep its
 //! own copy of the same list — and the copy drifted. It was measured drifting: of 143 types in
-//! `general-simulator-gui`'s catalogue, **zero** matched its hand-written "supported" list,
+//! the editor's catalogue, **zero** matched its hand-written "supported" list,
 //! because that list spelled types the way this registry does and a schematic spells them the
 //! way the catalogue does. Every block on every sheet reported "not supported by the
 //! simulator".

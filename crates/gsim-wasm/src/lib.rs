@@ -1,4 +1,4 @@
-//! wasm-bindgen bindings for `gsim-core`, exposed to `general-simulator-gui`'s frontend.
+//! wasm-bindgen bindings for `gsim-core`, exposed to the schematic editor's front end.
 //!
 //! **Interface design**: stateless, JSON-in/JSON-out free functions -- deliberately not a
 //! stateful `#[wasm_bindgen]` struct wrapping a `ModelBuilder` across the FFI boundary. A
