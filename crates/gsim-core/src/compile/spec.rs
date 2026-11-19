@@ -1591,6 +1591,39 @@ pub const REGISTRY: &[TypeSpec] = &[
     // parse it, so it is not emitted for them. `ts=` is optional throughout (`ts=variable` is
     // accepted by the stateful three and rejected by the stateless two -- a distinction the
     // simulator enforces on the value, which passes through here verbatim).
+    // A file-backed source: structurally a script block with no inputs at all. It locates a
+    // file and declares its own outputs, one per column the document says the capture has.
+    //
+    // `output_names` is what makes the symbol drawable **without the file**. The column count
+    // is a property of a file on disk, which no other type in this registry depends on, and a
+    // schematic whose ports appear only when its data file happens to be present is a schematic
+    // nobody can review. So the document carries the names the user chose, the ports come from
+    // those, and a file that no longer matches is the engine's diagnostic -- not a sheet that
+    // silently redraws itself.
+    TypeSpec {
+        kind: Some(KindSpec {
+            kind: KindName::Fixed("filewave"),
+            fields: &[
+                req("path", "path"),
+                opt("time", "time"),
+                opt("cols", "cols"),
+                opt("interp", "interp"),
+                opt("after", "after"),
+                opt("tshift", "tshift"),
+                opt("scale", "scale"),
+                opt("offset", "offset"),
+                opt("skip", "skip"),
+                opt("delim", "delim"),
+                FieldSpec::Outputs { field: "outputs" },
+            ],
+        }),
+        dynamic_outputs: Some(DynamicOutputs {
+            prefix: "out",
+            arity: Arity::ParamLen("output_names"),
+            names_param: Some("output_names"),
+        }),
+        ..TypeSpec::empty("source.file")
+    },
     script_block!(
         "extensibility.cscript",
         "cscript",
