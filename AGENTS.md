@@ -29,10 +29,13 @@ docs/journal/        chronological continuity log, one file per month
    libraries; arbitrary code execution in a loaded definition is not an acceptable risk. See
    `docs/decisions/0001-scope-and-naming.md`.
 2. **Netlist compilation is now in scope (Phase 2, `crates/gsim-core/src/compile/`)** —
-   `general-simulator` is the first real `NetlistTarget`. ngspice/Xyce targets are still
-   unstarted; don't assume `general-simulator`'s dual grammar (SPICE-element syntax for
-   `physical-network` blocks, `kind=` block-graph syntax for `signal-flow`/`converter` blocks)
-   generalizes to them without checking.
+   `general-simulator` is the one `NetlistTarget`, and the only one planned: `compile::compile()`
+   matches that name and returns `UnknownTarget` for everything else. ngspice and Xyce targets are
+   **declined, not pending** — adding a second backend is a new decision with its own record, not
+   a gap to fill (see `docs/decisions/0003-editor-pipeline-parity.md`, superseded). Don't assume
+   `general-simulator`'s dual grammar (SPICE-element syntax for `physical-network` blocks,
+   `kind=` block-graph syntax for `signal-flow`/`converter` blocks) would generalize to any
+   other backend, should one ever be decided on.
 3. **Stable port ids.** A generated port's id is index-based and never reassigned when other
    ports are added/removed. Removing a connected port leaves its wire dangling with an error
    marker in the consuming frontend — it must never silently reattach to a different port.
