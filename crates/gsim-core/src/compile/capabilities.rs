@@ -257,6 +257,60 @@ fn params_of(spec: &TypeSpec) -> Vec<ParamCapability> {
                 });
             }
         }
+        ElementTail::Exp {
+            v1,
+            v2,
+            td1,
+            tau1,
+            td2,
+            tau2,
+        } => {
+            for (param, field) in [
+                (v1, "EXP.v1"),
+                (v2, "EXP.v2"),
+                (td1, "EXP.td1"),
+                (tau1, "EXP.tau1"),
+                (td2, "EXP.td2"),
+                (tau2, "EXP.tau2"),
+            ] {
+                params.push(ParamCapability {
+                    param: param.to_string(),
+                    field: field.to_string(),
+                    required: true,
+                    form: ParamForm::SourceFunctionField,
+                });
+            }
+        }
+        ElementTail::Sffm {
+            vo,
+            va,
+            fc,
+            mdi,
+            fs,
+        } => {
+            for (param, field) in [
+                (vo, "SFFM.vo"),
+                (va, "SFFM.va"),
+                (fc, "SFFM.fc"),
+                (mdi, "SFFM.mdi"),
+                (fs, "SFFM.fs"),
+            ] {
+                params.push(ParamCapability {
+                    param: param.to_string(),
+                    field: field.to_string(),
+                    required: true,
+                    form: ParamForm::SourceFunctionField,
+                });
+            }
+        }
+        // The one source function whose parameter is a list rather than a field set: a front
+        // end has to offer a `[[t, v], ...]` editor for it, which is why the form matters.
+        ElementTail::Pwl { points } => params.push(ParamCapability {
+            param: points.to_string(),
+            field: "PWL.points".to_string(),
+            required: true,
+            form: ParamForm::List,
+        }),
         // A model token names a `.MODEL` card; the parameters live on the `kind=` card below.
         ElementTail::Model(_) | ElementTail::None => {}
     }

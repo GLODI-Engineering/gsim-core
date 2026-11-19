@@ -26656,7 +26656,8 @@
       "paradigm": "physical-network",
       "domain": "physical-electrical",
       "version": 1,
-      "description": "Exponential current source. SPICE element I with EXP waveform."
+      "description": "Exponential current source. SPICE element I with EXP waveform.",
+      "compiles_to": "source.current.exp"
     },
     {
       "id": "source.current.pulse",
@@ -26834,7 +26835,8 @@
       "paradigm": "physical-network",
       "domain": "physical-electrical",
       "version": 1,
-      "description": "Pulsed current source. SPICE element I with PULSE waveform."
+      "description": "Pulsed current source. SPICE element I with PULSE waveform.",
+      "compiles_to": "source.current.pulse"
     },
     {
       "id": "source.current.pwl",
@@ -26934,7 +26936,8 @@
       "paradigm": "physical-network",
       "domain": "physical-electrical",
       "version": 1,
-      "description": "Piecewise-linear current source. SPICE element I with PWL waveform."
+      "description": "Piecewise-linear current source. SPICE element I with PWL waveform.",
+      "compiles_to": "source.current.pwl"
     },
     {
       "id": "source.current.sffm",
@@ -27087,7 +27090,8 @@
       "paradigm": "physical-network",
       "domain": "physical-electrical",
       "version": 1,
-      "description": "Single-frequency FM current source. SPICE element I with SFFM waveform."
+      "description": "Single-frequency FM current source. SPICE element I with SFFM waveform.",
+      "compiles_to": "source.current.sffm"
     },
     {
       "id": "source.current.sin",
@@ -27253,7 +27257,8 @@
       "paradigm": "physical-network",
       "domain": "physical-electrical",
       "version": 1,
-      "description": "Sinusoidal current source. SPICE element I with SIN waveform."
+      "description": "Sinusoidal current source. SPICE element I with SIN waveform.",
+      "compiles_to": "source.current.sin"
     },
     {
       "id": "source.dependent.cccs",
@@ -28970,7 +28975,8 @@
       "paradigm": "physical-network",
       "domain": "physical-electrical",
       "version": 1,
-      "description": "Exponential voltage source. SPICE element V with EXP waveform."
+      "description": "Exponential voltage source. SPICE element V with EXP waveform.",
+      "compiles_to": "source.voltage.exp"
     },
     {
       "id": "source.voltage.noise",
@@ -29366,7 +29372,8 @@
       "paradigm": "physical-network",
       "domain": "physical-electrical",
       "version": 1,
-      "description": "Piecewise-linear voltage source. SPICE element V with PWL waveform."
+      "description": "Piecewise-linear voltage source. SPICE element V with PWL waveform.",
+      "compiles_to": "source.voltage.pwl"
     },
     {
       "id": "source.voltage.random",
@@ -29799,7 +29806,8 @@
       "paradigm": "physical-network",
       "domain": "physical-electrical",
       "version": 1,
-      "description": "Single-frequency FM voltage source. SPICE element V with SFFM waveform."
+      "description": "Single-frequency FM voltage source. SPICE element V with SFFM waveform.",
+      "compiles_to": "source.voltage.sffm"
     },
     {
       "id": "source.voltage.sin",

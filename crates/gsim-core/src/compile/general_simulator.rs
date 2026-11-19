@@ -485,6 +485,112 @@ fn emit_element(scope: &Scope<'_>, block: &Block, spec: &TypeSpec) -> Result<Str
             tokens.push(pw);
             tokens.push(format!("{per})"));
         }
+        ElementTail::Exp {
+            v1,
+            v2,
+            td1,
+            tau1,
+            td2,
+            tau2,
+        } => {
+            // V1/V2 hard-fail for the same reason as Pulse's: an exponential between two
+            // unstated levels is not a source. The timings default to 0, except TAU1/TAU2 --
+            // a zero time constant is a division by zero in `general-mna`'s own evaluator
+            // (it clamps with `max(f64::EPSILON)`, so it would produce a step rather than an
+            // exponential), and silently turning one shape into another is worse than asking.
+            let v1 = required_param(block, v1)?;
+            let v2 = required_param(block, v2)?;
+            let td1 = param_or(block, td1, "0");
+            let tau1 = required_param(block, tau1)?;
+            let td2 = param_or(block, td2, "1e30");
+            let tau2 = required_param(block, tau2)?;
+            tokens.push(format!("EXP({v1}"));
+            tokens.push(v2);
+            tokens.push(td1);
+            tokens.push(tau1);
+            tokens.push(td2);
+            tokens.push(format!("{tau2})"));
+        }
+        ElementTail::Sffm {
+            vo,
+            va,
+            fc,
+            mdi,
+            fs,
+        } => {
+            // Carrier and modulation frequency hard-fail: an FM source with either at zero is
+            // not modulating anything. VO defaults to 0 and MDI to 0 (no deviation), which is
+            // what an omitted field means in SPICE.
+            let vo = param_or(block, vo, "0");
+            let va = required_param(block, va)?;
+            let fc = required_param(block, fc)?;
+            let mdi = param_or(block, mdi, "0");
+            let fs = required_param(block, fs)?;
+            tokens.push(format!("SFFM({vo}"));
+            tokens.push(va);
+            tokens.push(fc);
+            tokens.push(mdi);
+            tokens.push(format!("{fs})"));
+        }
+        ElementTail::Pwl { points } => {
+            // The catalogue spells `points` as a **string** of space-separated pairs --
+            // `"0 0 1u 1 2u 0"`, which is already the token sequence the card needs, SPICE
+            // suffixes included (`general-mna` parses each token with its own
+            // `parse_spice_number`, so `1u` is a microsecond there as it is everywhere else).
+            // A programmatic caller naturally reaches for `[[t, v], ...]` instead, so both
+            // spellings are accepted and normalised to the same token list -- the same
+            // decision `control.sum`'s `signs` got, and for the same reason: the authoring
+            // spelling is the catalogue's to choose, not the emitter's.
+            let raw = param(block, points).ok_or_else(|| CompileError::MissingParam {
+                block: block.id.clone(),
+                param: (*points).to_string(),
+            })?;
+            let flat: Vec<String> = match raw {
+                serde_json::Value::String(s) => s.split_whitespace().map(str::to_string).collect(),
+                serde_json::Value::Array(items) => {
+                    let mut out = Vec::with_capacity(items.len() * 2);
+                    for item in items {
+                        match item {
+                            // `[[t, v], ...]`
+                            serde_json::Value::Array(pair) if pair.len() == 2 => {
+                                out.push(spec::render_value(&pair[0]));
+                                out.push(spec::render_value(&pair[1]));
+                            }
+                            // A flat `[t, v, t, v]` list.
+                            other if !other.is_array() => out.push(spec::render_value(other)),
+                            _ => {
+                                return Err(CompileError::MissingParam {
+                                    block: block.id.clone(),
+                                    param: (*points).to_string(),
+                                })
+                            }
+                        }
+                    }
+                    out
+                }
+                _ => {
+                    return Err(CompileError::MissingParam {
+                        block: block.id.clone(),
+                        param: (*points).to_string(),
+                    })
+                }
+            };
+            // Two points is the minimum that defines a segment, and an odd token count means
+            // a pair lost its partner. Refused rather than truncated: a PWL whose last point
+            // was silently dropped is a different waveform that still simulates.
+            if flat.len() < 4 || !flat.len().is_multiple_of(2) {
+                return Err(CompileError::MissingParam {
+                    block: block.id.clone(),
+                    param: (*points).to_string(),
+                });
+            }
+            let mut flat = flat;
+            let last = flat.pop().expect("checked non-empty");
+            let first = flat.remove(0);
+            tokens.push(format!("PWL({first}"));
+            tokens.extend(flat);
+            tokens.push(format!("{last})"));
+        }
         ElementTail::None => {}
     }
     Ok(tokens.join(" "))
@@ -2626,6 +2732,109 @@ mod tests {
         assert!(
             netlist.contains("DELAY kind=sum inputs=prev:K0 signs=1"),
             "{netlist}"
+        );
+    }
+
+    #[test]
+    fn pwl_source_emits_its_points_as_paired_tokens() {
+        // The catalogue's own spelling: a string of space-separated pairs, suffixes included.
+        let mut b = ModelBuilder::new("m", "M", 10);
+        add(
+            &mut b,
+            "VPWL",
+            "source.voltage.pwl",
+            Paradigm::PhysicalNetwork,
+            json!({"points": "0 0 1u 1 2u 0"}),
+        );
+        add(
+            &mut b,
+            "R1",
+            "passive.resistor",
+            Paradigm::PhysicalNetwork,
+            json!({"R": 1000.0}),
+        );
+        add(
+            &mut b,
+            "gnd",
+            "routing.ground",
+            Paradigm::PhysicalNetwork,
+            json!({}),
+        );
+        elec(&mut b, "VPWL", "p", "R1", "p");
+        elec(&mut b, "R1", "n", "gnd", "p");
+        elec(&mut b, "VPWL", "n", "gnd", "p");
+
+        let out = compile(&b.into_model(), "general-simulator").unwrap();
+        assert!(
+            out.netlist.contains("PWL(0 0 1u 1 2u 0)"),
+            "{}",
+            out.netlist
+        );
+    }
+
+    #[test]
+    fn pwl_source_also_takes_a_list_of_pairs() {
+        // What a programmatic caller writes. Same card either way.
+        let mut b = ModelBuilder::new("m", "M", 10);
+        add(
+            &mut b,
+            "IPWL",
+            "source.current.pwl",
+            Paradigm::PhysicalNetwork,
+            json!({"points": [[0, 0], [1e-6, 1], [2e-6, 0]]}),
+        );
+        add(
+            &mut b,
+            "R1",
+            "passive.resistor",
+            Paradigm::PhysicalNetwork,
+            json!({"R": 1000.0}),
+        );
+        add(
+            &mut b,
+            "gnd",
+            "routing.ground",
+            Paradigm::PhysicalNetwork,
+            json!({}),
+        );
+        elec(&mut b, "IPWL", "p", "R1", "p");
+        elec(&mut b, "R1", "n", "gnd", "p");
+        elec(&mut b, "IPWL", "n", "gnd", "p");
+
+        let out = compile(&b.into_model(), "general-simulator").unwrap();
+        assert!(
+            out.netlist.contains("PWL(0 0 1e-6 1 2e-6 0)"),
+            "{}",
+            out.netlist
+        );
+    }
+
+    #[test]
+    fn a_pwl_point_that_lost_its_partner_is_refused() {
+        // An odd token count means a pair is incomplete. Truncating it would simulate a
+        // different waveform than the one that was drawn.
+        let mut b = ModelBuilder::new("m", "M", 10);
+        add(
+            &mut b,
+            "VPWL",
+            "source.voltage.pwl",
+            Paradigm::PhysicalNetwork,
+            json!({"points": "0 0 1u"}),
+        );
+        add(
+            &mut b,
+            "gnd",
+            "routing.ground",
+            Paradigm::PhysicalNetwork,
+            json!({}),
+        );
+        elec(&mut b, "VPWL", "p", "gnd", "p");
+        elec(&mut b, "VPWL", "n", "gnd", "p");
+
+        let err = compile(&b.into_model(), "general-simulator").unwrap_err();
+        assert!(
+            matches!(err, CompileError::MissingParam { ref param, .. } if param == "points"),
+            "{err:?}"
         );
     }
 
