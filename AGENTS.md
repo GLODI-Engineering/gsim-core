@@ -1,7 +1,8 @@
 # Agent Guidelines
 
-`gsim-core` is the shared Rust implementation behind `general-simulator-gui`'s schematic
-tooling. See `README.md` for scope and `docs/decisions/` for why it exists and what was ruled
+`gsim-core` is the one implementation of what a valid schematic is and what it compiles to,
+shared by the schematic editor, the Python automation library and the engine's catalogue. See
+`README.md` for scope and `docs/decisions/` for why it exists and what was ruled
 out before writing code. This file lists only what mechanical checks cannot enforce.
 
 ## Authority order
@@ -16,7 +17,7 @@ out before writing code. This file lists only what mechanical checks cannot enfo
 ```
 crates/gsim-core/   schema types, expression-DSL interpreter, .gsim_sch document model, autolayout
 crates/gsim-py/      PyO3 bindings (Python automation library)
-crates/gsim-wasm/    wasm-bindgen bindings (general-simulator-gui frontend)
+crates/gsim-wasm/    wasm-bindgen bindings (the editor's front end)
 docs/decisions/      why, not what -- read before changing settled scope
 docs/journal/        chronological continuity log, one file per month
 ```
@@ -39,8 +40,8 @@ docs/journal/        chronological continuity log, one file per month
    validation, or layout logic. If a binding needs to duplicate logic to be ergonomic, that
    logic belongs in `gsim-core`, exposed through a cleaner API — not copied.
 5. **No half-finished implementations.** This repo starts from an explicit audit of what
-   already exists (`packages/gsim-model` in `general-simulator-gui`) — do not re-guess scope
-   that audit already settled; read `docs/decisions/` first.
+   already existed — the editor's own TypeScript and Python implementations — so do not
+   re-guess scope that audit already settled; read `docs/decisions/` first.
 6. **One netlist name per drawn object, and the map back is output, not a guess.** `element_name`
    prefixes the device letter onto a block id only when the id does not already start with it,
    so `load` and `Rload` both compile to `Rload`. Two objects claiming one name is refused

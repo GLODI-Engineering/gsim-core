@@ -11,4 +11,3 @@ edition = "2021"
 license = "MIT"
 publish = true
 repository = "https://github.com/GLODI-Engineering/gsim-core"
-homepage = "https://github.com/GLODI-Engineering/gsim-core"
