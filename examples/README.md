@@ -227,8 +227,8 @@ pinned at 0, so the run is a real end-to-end proof that the tag carried a live s
 
 Proves the **per-port** compatibility rules (`docs/specs/gsim-sch-format.md` §8.1/§8.2) that
 `crates/gsim-core/src/document/port_compat.rs` adds below `connect()`'s older block-level
-cross-paradigm check (§8.3), ported from `general-simulator-gui`'s
-`apps/frontend/src/canvas/port-compat.ts`.
+cross-paradigm check (§8.3), ported from the editor's own front-end port-compatibility
+module.
 
 A textbook-generic RC low-pass with an independent thermal branch (a thermal resistance to a
 thermal mass) in the same document, plus two signal sources and two gains. Three rejections
