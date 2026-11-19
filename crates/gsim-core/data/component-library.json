@@ -30060,8 +30060,8 @@
           "description": "How the value between two samples is found. 'linear' interpolates, 'hold' keeps the last sample.",
           "label": "Interpolation",
           "name": "interp",
-          "type": "string",
-          "options": [
+          "type": "enum",
+          "choices": [
             "linear",
             "hold"
           ]
@@ -30071,8 +30071,8 @@
           "description": "What the source does past the capture's last sample. 'error' refuses a run that would outlast the data.",
           "label": "Past the end",
           "name": "after",
-          "type": "string",
-          "options": [
+          "type": "enum",
+          "choices": [
             "hold",
             "repeat",
             "zero",
@@ -30170,8 +30170,8 @@
               "default": "linear",
               "doc": "How the value between two samples is found. 'linear' interpolates, 'hold' keeps the last sample.",
               "id": "interp",
-              "type": "string",
-              "options": [
+              "type": "enum",
+              "choices": [
                 "linear",
                 "hold"
               ]
@@ -30180,8 +30180,8 @@
               "default": "hold",
               "doc": "What the source does past the capture's last sample. 'error' refuses a run that would outlast the data.",
               "id": "after",
-              "type": "string",
-              "options": [
+              "type": "enum",
+              "choices": [
                 "hold",
                 "repeat",
                 "zero",
