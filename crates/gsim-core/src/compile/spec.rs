@@ -30,6 +30,49 @@
 use crate::document::Block;
 use serde_json::Value;
 
+/// Every field name a **rating** may use on a device line, in the order they are emitted.
+///
+/// A rating is a datasheet limit written where the component is declared — `Ls a b 36u i_max=60`
+/// — and `general-simulator` compiles it to exactly the [rule] a `kind=rule` card would
+/// produce, so the event log, the hold times, the summary table and `stop` all behave
+/// identically whichever way the limit was written.
+///
+/// [rule]: https://github.com/GLODI-Engineering/general-simulator
+///
+/// This list is the engine's `RATING_FIELDS` (`general-simulator-cli/src/rules.rs`), which that
+/// crate also registers with `general-mna::BuildOptions::annotate` so a deck carrying these
+/// names is valid for any consumer that opts in. It is duplicated here rather than imported
+/// because this crate does not depend on the engine — and
+/// [`crate::compile::capabilities`] exports it, so the front end reads it from the manifest and
+/// never holds a third copy.
+///
+/// The order is fixed so a document compiles to one byte-identical netlist every time: a
+/// `serde_json::Map` iterates in insertion or key order depending on how it was built, and
+/// neither is a contract a diff should depend on.
+pub const RATING_FIELDS: &[&str] = &[
+    "i_max",
+    "i_sat",
+    "v_max",
+    "hold",
+    "on_violation",
+    "severity",
+];
+
+/// The rating fields that *are* a limit, as opposed to a modifier of one.
+///
+/// The split is load-bearing: `on_violation=stop` written alone reads exactly like a guarded
+/// deck and guards nothing, so the engine refuses a modifier with no limit beside it and the
+/// `general-simulator` emitter refuses it at compile time, before a run is even started.
+pub const RATING_LIMITS: &[&str] = &["i_max", "i_sat", "v_max"];
+
+/// The device letters whose branch current the solver actually solves for.
+///
+/// Verified against the engine's own `branch_current` (`general-simulator-cli/src/rules.rs`): a
+/// resistor's or a switch's current is *computed from* the solution rather than solved for, so
+/// `I(R1)` is not a quantity a rule can watch and `i_max` on a resistor is a netlist the engine
+/// rejects. Refusing it here means the editor says so while the schematic is open.
+pub const BRANCH_CURRENT_LETTERS: &[char] = &['V', 'L', 'E', 'H'];
+
 /// What follows an element card's positional nodes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ElementTail {
@@ -324,6 +367,31 @@ pub struct TypeSpec {
 }
 
 impl TypeSpec {
+    /// The rating fields a block of this type may carry, in emission order.
+    ///
+    /// Derived, never stored: a current rating needs a branch current the solver solves for
+    /// (see [`BRANCH_CURRENT_LETTERS`]) and a voltage rating needs exactly two terminals to be
+    /// *across*, so both answers are already in this spec and a second list would only drift
+    /// from it. A type that emits no element card at all carries no ratings: there is no device
+    /// line to write them on.
+    pub fn ratings(&self) -> Vec<&'static str> {
+        let Some(letter) = self.device_letter else {
+            return Vec::new();
+        };
+        let current = BRANCH_CURRENT_LETTERS.contains(&letter);
+        let voltage = self.node_ports.len() == 2;
+        RATING_FIELDS
+            .iter()
+            .copied()
+            .filter(|field| match *field {
+                "i_max" | "i_sat" => current,
+                "v_max" => voltage,
+                // A modifier is offered exactly when there is some limit for it to modify.
+                _ => current || voltage,
+            })
+            .collect()
+    }
+
     pub const fn empty(type_name: &'static str) -> TypeSpec {
         TypeSpec {
             type_name,
@@ -2076,6 +2144,7 @@ mod tests {
                 mirror: crate::document::Mirror::default(),
                 params: params.as_object().cloned().unwrap_or_default(),
                 ic: Default::default(),
+                ratings: Default::default(),
                 label: None,
                 comment_before: Vec::new(),
                 comment_after: Vec::new(),

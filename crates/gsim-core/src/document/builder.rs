@@ -101,6 +101,9 @@ pub struct NewBlockSpec {
     pub params: Map<String, Value>,
     #[serde(default)]
     pub ic: Map<String, Value>,
+    /// Datasheet limits on this component — see [`Block::ratings`].
+    #[serde(default)]
+    pub ratings: Map<String, Value>,
     #[serde(default)]
     pub label: Option<String>,
     /// Comment lines emitted above this block's card(s) by a [`crate::compile::NetlistTarget`] —
@@ -126,6 +129,7 @@ impl Default for NewBlockSpec {
             mirror: Mirror::None,
             params: Map::new(),
             ic: Map::new(),
+            ratings: Map::new(),
             label: None,
             comment_before: Vec::new(),
             comment_after: Vec::new(),
@@ -342,6 +346,7 @@ impl ModelBuilder {
             mirror: spec.mirror,
             params: spec.params,
             ic: spec.ic,
+            ratings: spec.ratings,
             label: spec.label,
             comment_before: spec.comment_before,
             comment_after: spec.comment_after,
@@ -423,6 +428,9 @@ impl ModelBuilder {
             position: spec.position,
             rotation: spec.rotation,
             mirror: spec.mirror,
+            // A subckt instance is a whole sheet, not one device: there is no element card to
+            // write a limit on, so there is nowhere for a rating to go.
+            ratings: Map::new(),
             params: spec.params,
             ic: Map::new(),
             label: spec.label,

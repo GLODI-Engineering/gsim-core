@@ -25,10 +25,10 @@
 
 use serde::Serialize;
 
-use super::spec::{ElementTail, FieldSpec, KindName, SubTail, TypeSpec, REGISTRY};
+use super::spec::{self, ElementTail, FieldSpec, KindName, SubTail, TypeSpec, REGISTRY};
 
 /// The manifest's own version, so a consumer can refuse one it does not understand.
-pub const CAPABILITIES_SCHEMA_VERSION: u32 = 1;
+pub const CAPABILITIES_SCHEMA_VERSION: u32 = 2;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Capabilities {
@@ -36,6 +36,30 @@ pub struct Capabilities {
     /// The crate version that produced this.
     pub generator: String,
     pub types: Vec<TypeCapability>,
+    /// The rating vocabulary, once, for the whole manifest — see [`RatingsCapability`].
+    pub ratings: RatingsCapability,
+}
+
+/// What a **rating** is, as data: a datasheet limit written on the component itself rather than
+/// as a separate rule card.
+///
+/// Carried at the top level because the vocabulary is the engine's, not any one type's: the
+/// per-type answer is which of these fields that type can take, which is
+/// [`TypeCapability::ratings`]. A front end renders a *Ratings* section in its inspector from
+/// the two together, and holds no list of its own — the same reason the rest of this manifest
+/// exists.
+#[derive(Debug, Clone, Serialize)]
+pub struct RatingsCapability {
+    /// Every rating field, in the order a device line emits them.
+    pub fields: Vec<String>,
+    /// Those that are a limit; the rest modify one, and are refused without a limit beside
+    /// them (a `on_violation=stop` that guards nothing reads exactly like a document that is
+    /// guarded).
+    pub limits: Vec<String>,
+    /// What to do when a limit is crossed — the closed set `on_violation` may take.
+    pub on_violation: Vec<String>,
+    /// How loud it is — the closed set `severity` may take, quietest first.
+    pub severity: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -54,6 +78,11 @@ pub struct TypeCapability {
     pub vector_output: bool,
     /// Parameters this type reads, in the order the card consumes them.
     pub params: Vec<ParamCapability>,
+    /// The rating fields a block of this type may carry — a subset of
+    /// [`RatingsCapability::fields`], derived from this type's device letter and terminal
+    /// count. Empty for every type that emits no device line to write one on.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub ratings: Vec<String>,
     /// For a family whose `kind=` is chosen by a parameter, the values that parameter may
     /// take. Empty otherwise.
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -372,6 +401,28 @@ pub fn capabilities() -> Capabilities {
     Capabilities {
         schema_version: CAPABILITIES_SCHEMA_VERSION,
         generator: format!("gsim-core {}", env!("CARGO_PKG_VERSION")),
+        ratings: RatingsCapability {
+            fields: spec::RATING_FIELDS
+                .iter()
+                .map(|f| (*f).to_string())
+                .collect(),
+            limits: spec::RATING_LIMITS
+                .iter()
+                .map(|f| (*f).to_string())
+                .collect(),
+            // Both closed sets are the engine's own, read off `ratings_of`'s match arms
+            // (`general-simulator-cli/src/rules.rs`): a value outside them is a hard error
+            // there, so offering a fifth action in a dropdown would offer a document that
+            // cannot run.
+            on_violation: ["log", "console", "stop", "pause"]
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+            severity: ["info", "warning", "error", "fatal"]
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+        },
         types: REGISTRY
             .iter()
             .map(|spec| {
@@ -388,6 +439,7 @@ pub fn capabilities() -> Capabilities {
                     dynamic_outputs: spec.dynamic_outputs.is_some(),
                     vector_output: spec.vector_output,
                     params,
+                    ratings: spec.ratings().iter().map(|f| (*f).to_string()).collect(),
                     choices: kind.map(|(_, _, c)| c).unwrap_or_default(),
                 }
             })

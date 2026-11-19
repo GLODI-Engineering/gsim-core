@@ -125,6 +125,9 @@ struct NewBlockSpecJson {
     params: Map<String, Value>,
     #[serde(default)]
     ic: Map<String, Value>,
+    /// Datasheet limits on this component — see `gsim_core::document::Block::ratings`.
+    #[serde(default)]
+    ratings: Map<String, Value>,
     #[serde(default)]
     label: Option<String>,
     #[serde(default, deserialize_with = "deserialize_comment")]
@@ -147,6 +150,7 @@ impl From<NewBlockSpecJson> for NewBlockSpec {
             mirror: spec.mirror,
             params: spec.params,
             ic: spec.ic,
+            ratings: spec.ratings,
             label: spec.label,
             comment_before: spec.comment_before,
             comment_after: spec.comment_after,

@@ -95,6 +95,21 @@ pub struct Block {
     pub params: Map<String, Value>,
     #[serde(default)]
     pub ic: Map<String, Value>,
+    /// Datasheet limits written on this component, emitted as trailing `key=value` tokens on
+    /// its element card: `i_max`, `i_sat`, `v_max` and the `hold` / `on_violation` / `severity`
+    /// modifiers (`crate::compile::spec::RATING_FIELDS`).
+    ///
+    /// **A sibling of `params`, not an entry in it.** A rating is not a model parameter: it is
+    /// what the part is rated for, and it stays true when the model under it changes. Switching
+    /// a component's fidelity tier *removes* the parameters the target tier does not declare,
+    /// so a rating stored in `params` would silently vanish the first time someone moved an
+    /// inductor from `ideal` to `spice` — losing a limit without saying so, which is worse than
+    /// never having offered it.
+    ///
+    /// Validated at compile time, not here: whether a given device can carry a current rating
+    /// depends on the registry (`TypeSpec::ratings`), which `Block` has no access to.
+    #[serde(default, skip_serializing_if = "Map::is_empty")]
+    pub ratings: Map<String, Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
     /// Free-text authoring comment emitted *above* this block's card(s) in a compiled netlist.
@@ -139,6 +154,8 @@ pub struct NewBlock {
     pub mirror: Mirror,
     pub params: Map<String, Value>,
     pub ic: Map<String, Value>,
+    /// See [`Block::ratings`]. Empty is the overwhelmingly common case.
+    pub ratings: Map<String, Value>,
     pub label: Option<String>,
     pub comment_before: Vec<String>,
     pub comment_after: Vec<String>,
@@ -170,6 +187,7 @@ impl Block {
             mirror: spec.mirror,
             params: spec.params,
             ic: spec.ic,
+            ratings: spec.ratings,
             label: spec.label,
             comment_before: spec.comment_before,
             comment_after: spec.comment_after,
@@ -194,6 +212,7 @@ mod tests {
             mirror: Mirror::None,
             params: Map::new(),
             ic: Map::new(),
+            ratings: Map::new(),
             label: None,
             comment_before: Vec::new(),
             comment_after: Vec::new(),

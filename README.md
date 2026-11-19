@@ -41,6 +41,16 @@ hand-written "supported" list, because the list spelled types the way the regist
 schematics spell them the way the catalogue does. Generating the manifest makes the drift
 impossible rather than merely discouraged.
 
+A drawn component can also carry a **rating** — a datasheet limit written where the part is
+declared (`Ls a b 36u i_max=60 i_sat=70`), which `general-simulator` compiles to exactly the
+rule a `kind=rule` card would produce. `Block::ratings` is a sibling of `params`, not an entry
+in it: a rating stays true when the model under it changes, and a tier switch strips the
+parameters the target tier does not declare. Which ratings a type can take is derived from its
+device letter and terminal count, so there is no second list to drift. What a drawing can and
+cannot express is tabulated in
+[`docs/decisions/0004`](docs/decisions/0004-how-a-drawn-schematic-carries-a-rule.md) — the rules
+that span two devices are a panel, not a palette block, and are not built yet.
+
 Full rationale and everything settled before writing code: [`docs/decisions/`](docs/decisions/).
 
 ## Why one implementation
