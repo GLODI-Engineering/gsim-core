@@ -189,9 +189,26 @@ jobs:
           // disagreement here is about the data and never about how it was read.
           const validate = new Ajv({ strict: false, allErrors: true }).compile(schema)
 
+          // The contract describes the metadata the editor *builds*, not the catalogue row
+          // verbatim: `toCatalogEntries` in omni-schematics' scripts/gen-engine-catalog.mjs
+          // drops `id`/`compilable`/`compiles_to` and adds `name`/`engineId`/`engineType`.
+          // Validating the row as-is reports "must NOT have additional properties" for most of
+          // the library -- failures the editor never sees. Mirrored here rather than copied
+          // wholesale, because it is six lines and the schema is the part worth not copying.
+          const asEditorMetadata = (component) => {
+            const { id, compilable, compiles_to: compilesTo, ...rest } = component
+            return {
+              ...rest,
+              name: rest.name ?? id,
+              engineId: id,
+              engineType: compilesTo ?? null,
+              compilable: compilable ?? true,
+            }
+          }
+
           const broken = []
           for (const component of catalog.components) {
-            if (validate(component)) continue
+            if (validate(asEditorMetadata(component))) continue
             const why = (validate.errors ?? [])
               .slice(0, 4)
               .map((e) => `${e.instancePath || '/'} ${e.message}`)
