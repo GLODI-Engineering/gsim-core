@@ -1103,6 +1103,97 @@ mod tests {
         .unwrap();
     }
 
+    /// A measured waveform placed on a sheet. Two things are asserted that nothing else in this
+    /// registry needs:
+    ///
+    /// 1. **The ports come from the document, not from the file.** The column count is a
+    ///    property of a file on disk; a schematic whose pins appeared only when its data file
+    ///    happened to be present would be a schematic nobody could review, and a file swapped
+    ///    for one with fewer columns would silently change the drawing. So `output_names` is
+    ///    carried in the document and the card is emitted from it, with no file in sight — this
+    ///    test compiles one without creating any.
+    /// 2. **The path is emitted exactly as written.** Not resolved, not made absolute: the
+    ///    engine resolves a relative path against the process's working directory, so a
+    ///    compiled netlist is meant to be run from the document's own directory. Rewriting the
+    ///    path here would be this crate guessing where the engine will be run from.
+    #[test]
+    fn a_drawn_file_source_compiles_without_its_file_being_present() {
+        let mut b = ModelBuilder::new("m", "Measured", 10);
+        b.add_block(NewBlockSpec {
+            r#type: "source.file".to_string(),
+            paradigm: Paradigm::SignalFlow,
+            domain: "signal".to_string(),
+            id: Some("SCOPE".to_string()),
+            params: json!({
+                "path": "capture.csv",
+                "output_names": ["VGS", "VOUT"],
+                "interp": "linear",
+                "after": "error",
+                "tshift": "auto",
+            })
+            .as_object()
+            .cloned()
+            .unwrap(),
+            ..Default::default()
+        })
+        .unwrap();
+
+        let out = compile(&b.into_model(), "general-simulator").unwrap();
+        assert!(
+            out.netlist.contains("SCOPE kind=filewave path=capture.csv"),
+            "{}",
+            out.netlist
+        );
+        // The second channel's name reaches the card, which is what makes it addressable at
+        // all -- `outputs=` is how the engine learns there are two.
+        //
+        // `SCOPE,SCOPE_VOUT`, not `VGS,VOUT`: a multi-output block's channels past the first
+        // are **top-level signal names** in the engine, so a bare `VOUT` off a drawn capture
+        // would claim that name globally and collide with anything else called `VOUT`. The
+        // registry's existing `names_param` convention prefixes each one with its own block,
+        // which a drawn document gets for free and a hand-written netlist opts into by
+        // spelling `outputs=` itself. The first is the block's own name, as it is for every
+        // other multi-output kind.
+        assert!(
+            out.netlist.contains("outputs=SCOPE,SCOPE_VOUT"),
+            "{}",
+            out.netlist
+        );
+        assert!(out.netlist.contains("after=error"), "{}", out.netlist);
+        assert!(
+            !out.netlist
+                .contains(&std::env::current_dir().unwrap().display().to_string()),
+            "the path must be emitted as written, not resolved: {}",
+            out.netlist
+        );
+    }
+
+    /// One column is the common case, and it must not need a dotted name or an `outputs=` list:
+    /// a single-channel capture is addressable as the block's own name.
+    #[test]
+    fn a_single_column_file_source_emits_no_outputs_list() {
+        let mut b = ModelBuilder::new("m", "Measured", 10);
+        b.add_block(NewBlockSpec {
+            r#type: "source.file".to_string(),
+            paradigm: Paradigm::SignalFlow,
+            domain: "signal".to_string(),
+            id: Some("SCOPE".to_string()),
+            params: json!({"path": "one.csv", "output_names": ["y"]})
+                .as_object()
+                .cloned()
+                .unwrap(),
+            ..Default::default()
+        })
+        .unwrap();
+        let out = compile(&b.into_model(), "general-simulator").unwrap();
+        assert!(
+            out.netlist.contains("SCOPE kind=filewave"),
+            "{}",
+            out.netlist
+        );
+        assert!(!out.netlist.contains("outputs="), "{}", out.netlist);
+    }
+
     /// `add`, plus the ratings slot — the thing an inspector writes into.
     fn add_rated(
         b: &mut ModelBuilder,

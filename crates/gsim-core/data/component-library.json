@@ -29977,6 +29977,264 @@
       "compiles_to": "source.voltage.sin"
     },
     {
+      "id": "source.file",
+      "name": "source.file",
+      "label": "File Source",
+      "category": "sources",
+      "aliases": [
+        "filewave",
+        "file source",
+        "capture",
+        "measured waveform",
+        "scope",
+        "csv source"
+      ],
+      "tags": [
+        "source",
+        "signal",
+        "file",
+        "measurement",
+        "general-simulator"
+      ],
+      "ports": {
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "out0",
+            "kind": {
+              "dims": "scalar",
+              "domain": "signal"
+            },
+            "label": "y",
+            "offset": 20,
+            "side": "right"
+          }
+        ],
+        "variadic_outputs": {
+          "count_from": "output_names",
+          "template": {
+            "id": "out",
+            "kind": {
+              "dims": "scalar",
+              "domain": "signal"
+            },
+            "label": "y",
+            "offset": 20,
+            "side": "right"
+          }
+        }
+      },
+      "params": [
+        {
+          "default": "",
+          "description": "Path to the capture: a CSV, TSV or whitespace-separated text table. Resolved from the directory the simulation is run in.",
+          "label": "File",
+          "name": "path",
+          "type": "string"
+        },
+        {
+          "default": [
+            "y"
+          ],
+          "description": "One output port per entry, in the order the file's value columns appear. These are the names the netlist and any measurement use, so they are kept in the document and the symbol draws them whether the file is present or not.",
+          "label": "Output names",
+          "name": "output_names",
+          "type": "list"
+        },
+        {
+          "default": "",
+          "description": "Which column holds time: a 1-based position, or a name from the file's header. Empty means the first column.",
+          "label": "Time column",
+          "name": "time",
+          "type": "string"
+        },
+        {
+          "default": "",
+          "description": "Which value columns to read, comma-separated, by position or header name. Empty means every column but the time column.",
+          "label": "Columns",
+          "name": "cols",
+          "type": "string"
+        },
+        {
+          "default": "linear",
+          "description": "How the value between two samples is found. 'linear' interpolates, 'hold' keeps the last sample.",
+          "label": "Interpolation",
+          "name": "interp",
+          "type": "string",
+          "options": [
+            "linear",
+            "hold"
+          ]
+        },
+        {
+          "default": "hold",
+          "description": "What the source does past the capture's last sample. 'error' refuses a run that would outlast the data.",
+          "label": "Past the end",
+          "name": "after",
+          "type": "string",
+          "options": [
+            "hold",
+            "repeat",
+            "zero",
+            "error"
+          ]
+        },
+        {
+          "default": "auto",
+          "description": "'auto' moves the capture to start at t = 0, which is what a scope export centred on its trigger needs. 'none' keeps the file's own times. A number shifts by that many seconds.",
+          "label": "Time shift",
+          "name": "tshift",
+          "type": "string"
+        },
+        {
+          "default": 1,
+          "description": "Every value is scaled by this, for a x10 probe.",
+          "label": "Scale",
+          "name": "scale",
+          "type": "number"
+        },
+        {
+          "default": 0,
+          "description": "Added to every value after scaling, to remove a DC offset.",
+          "label": "Offset",
+          "name": "offset",
+          "type": "number"
+        },
+        {
+          "default": 0,
+          "description": "Header lines to skip. 0 detects them: any leading line whose first field is not a number.",
+          "label": "Skip lines",
+          "min": 0,
+          "name": "skip",
+          "type": "integer"
+        },
+        {
+          "default": "",
+          "description": "Field separator. Empty detects it. A word is accepted: comma, semicolon, tab, space.",
+          "label": "Separator",
+          "name": "delim",
+          "type": "string"
+        }
+      ],
+      "main_param": "path",
+      "symbol": {
+        "bbox": [
+          70,
+          40
+        ],
+        "shape": "rect",
+        "text": "FILE"
+      },
+      "behavior": {
+        "causality": "causal",
+        "domain": "signal",
+        "equation_template": "source.file",
+        "state_count": "0"
+      },
+      "paradigm": "signal-flow",
+      "domain": "signal",
+      "version": 1,
+      "description": "A measured waveform read from a file: one output per value column, interpolated or held between samples.",
+      "compiles_to": "source.file",
+      "fidelities": [
+        {
+          "doc": "A measured waveform read from a text table.",
+          "params": [
+            {
+              "default": "",
+              "doc": "Path to the capture: a CSV, TSV or whitespace-separated text table. Resolved from the directory the simulation is run in.",
+              "id": "path",
+              "type": "string"
+            },
+            {
+              "default": [
+                "y"
+              ],
+              "doc": "One output port per entry, in the order the file's value columns appear. These are the names the netlist and any measurement use, so they are kept in the document and the symbol draws them whether the file is present or not.",
+              "id": "output_names",
+              "type": "list"
+            },
+            {
+              "default": "",
+              "doc": "Which column holds time: a 1-based position, or a name from the file's header. Empty means the first column.",
+              "id": "time",
+              "type": "string"
+            },
+            {
+              "default": "",
+              "doc": "Which value columns to read, comma-separated, by position or header name. Empty means every column but the time column.",
+              "id": "cols",
+              "type": "string"
+            },
+            {
+              "default": "linear",
+              "doc": "How the value between two samples is found. 'linear' interpolates, 'hold' keeps the last sample.",
+              "id": "interp",
+              "type": "string",
+              "options": [
+                "linear",
+                "hold"
+              ]
+            },
+            {
+              "default": "hold",
+              "doc": "What the source does past the capture's last sample. 'error' refuses a run that would outlast the data.",
+              "id": "after",
+              "type": "string",
+              "options": [
+                "hold",
+                "repeat",
+                "zero",
+                "error"
+              ]
+            },
+            {
+              "default": "auto",
+              "doc": "'auto' moves the capture to start at t = 0, which is what a scope export centred on its trigger needs. 'none' keeps the file's own times. A number shifts by that many seconds.",
+              "id": "tshift",
+              "type": "string"
+            },
+            {
+              "default": 1,
+              "doc": "Every value is scaled by this, for a x10 probe.",
+              "id": "scale",
+              "type": "number"
+            },
+            {
+              "default": 0,
+              "doc": "Added to every value after scaling, to remove a DC offset.",
+              "id": "offset",
+              "type": "number"
+            },
+            {
+              "default": 0,
+              "doc": "Header lines to skip. 0 detects them: any leading line whose first field is not a number.",
+              "id": "skip",
+              "type": "integer",
+              "min": 0
+            },
+            {
+              "default": "",
+              "doc": "Field separator. Empty detects it. A word is accepted: comma, semicolon, tab, space.",
+              "id": "delim",
+              "type": "string"
+            }
+          ],
+          "ports": [
+            {
+              "direction": "out",
+              "id": "out0",
+              "kind": "signal",
+              "label": "y",
+              "offset": 20,
+              "side": "right"
+            }
+          ],
+          "tier": "ideal"
+        }
+      ]
+    },
+    {
       "id": "tline.linear_device",
       "name": "tline.linear_device",
       "label": "S-Param Device (Xyce)",
