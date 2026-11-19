@@ -198,56 +198,6 @@ fn compile_at_tier(
 /// means the number can only go down by a fix, and a *new* disagreement fails the build on the
 /// commit that introduces it rather than on the day someone draws it.
 const KNOWN_BROKEN: &[(&str, &str, &str)] = &[
-    // GLODI-Engineering/gsim-core#4 -- the registry names a two-terminal passive's pins
-    // `p1`/`p2` (`TWO_PIN` in compile::spec) while the library names them `p`/`n`, as every
-    // source already does. One document, two answers: the netlist is right and the drawing is
-    // missing its wires. Which spelling wins is a breaking change for stored documents either
-    // way, so it is the owner's call, not this test's.
-    (
-        "passive.resistor",
-        "ideal",
-        "#4: registry p1/p2 vs library p/n",
-    ),
-    (
-        "passive.resistor",
-        "behavioral",
-        "#4: registry p1/p2 vs library p/n",
-    ),
-    (
-        "passive.resistor",
-        "spice",
-        "#4: registry p1/p2 vs library p/n",
-    ),
-    (
-        "passive.capacitor",
-        "ideal",
-        "#4: registry p1/p2 vs library p/n",
-    ),
-    (
-        "passive.capacitor",
-        "behavioral",
-        "#4: registry p1/p2 vs library p/n",
-    ),
-    (
-        "passive.capacitor",
-        "spice",
-        "#4: registry p1/p2 vs library p/n",
-    ),
-    (
-        "passive.inductor",
-        "ideal",
-        "#4: registry p1/p2 vs library p/n",
-    ),
-    (
-        "passive.inductor",
-        "behavioral",
-        "#4: registry p1/p2 vs library p/n",
-    ),
-    (
-        "passive.inductor",
-        "spice",
-        "#4: registry p1/p2 vs library p/n",
-    ),
     // GLODI-Engineering/gsim-core#15 item 2 -- `signs`/`inputs` arity. These two carry variadic
     // inputs whose count comes from a parameter, and the tier lists only `out`, so the sweep
     // has nothing to drive and the emitter reports a hole in a positional list. The fix is for

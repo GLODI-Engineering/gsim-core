@@ -4,7 +4,7 @@
 //! # Why this exists
 //!
 //! Everything downstream of a run identifies a device by its **netlist name**. An engine event
-//! says `target: "DSW"`; a rule card's `target=` says `Rload`; a waveform is `V(n_Rload_p2)`.
+//! says `target: "DSW"`; a rule card's `target=` says `Rload`; a waveform is `V(n_Rload_n)`.
 //! Everything *upstream* identifies it by the **block id** the editor assigned when the user
 //! dropped the symbol. A front end showing a rule violation on the schematic has to cross that
 //! gap, and it is the compiler that chose the names, so it is the compiler that has to say what
@@ -21,8 +21,8 @@
 //! element name `Rload`. Before this module, a sheet holding both produced
 //!
 //! ```text
-//! Rload n_Rload_p1 n_Rload_p2 10
-//! Rload n_Rload_p2 0 20
+//! Rload n_Rload_p n_Rload_n 10
+//! Rload n_Rload_n 0 20
 //! ```
 //!
 //! with no error and no note — and `general-mna` accepted it, because a duplicate name was
@@ -525,9 +525,9 @@ mod tests {
         resistor(&mut b, "Rload", 10.0);
         resistor(&mut b, "load", 20.0);
         add(&mut b, "gnd", "routing.ground", json!({}));
-        elec(&mut b, "Vdc", "p", "Rload", "p1");
-        elec(&mut b, "Rload", "p2", "load", "p1");
-        elec(&mut b, "load", "p2", "gnd", "p");
+        elec(&mut b, "Vdc", "p", "Rload", "p");
+        elec(&mut b, "Rload", "n", "load", "p");
+        elec(&mut b, "load", "n", "gnd", "p");
         elec(&mut b, "Vdc", "n", "gnd", "p");
         b
     }
@@ -560,9 +560,9 @@ mod tests {
         resistor(&mut b, "Rtop", 10.0);
         resistor(&mut b, "Rbot", 20.0);
         add(&mut b, "gnd", "routing.ground", json!({}));
-        elec(&mut b, "Vdc", "p", "Rtop", "p1");
-        elec(&mut b, "Rtop", "p2", "Rbot", "p1");
-        elec(&mut b, "Rbot", "p2", "gnd", "p");
+        elec(&mut b, "Vdc", "p", "Rtop", "p");
+        elec(&mut b, "Rtop", "n", "Rbot", "p");
+        elec(&mut b, "Rbot", "n", "gnd", "p");
         elec(&mut b, "Vdc", "n", "gnd", "p");
         let out = compile(&b.into_model(), "general-simulator").unwrap();
         assert!(out.netlist.contains("Rtop "), "{}", out.netlist);
@@ -578,9 +578,9 @@ mod tests {
         resistor(&mut b, "Rload", 10.0);
         resistor(&mut b, "rload", 20.0);
         add(&mut b, "gnd", "routing.ground", json!({}));
-        elec(&mut b, "Vdc", "p", "Rload", "p1");
-        elec(&mut b, "Rload", "p2", "rload", "p1");
-        elec(&mut b, "rload", "p2", "gnd", "p");
+        elec(&mut b, "Vdc", "p", "Rload", "p");
+        elec(&mut b, "Rload", "n", "rload", "p");
+        elec(&mut b, "rload", "n", "gnd", "p");
         elec(&mut b, "Vdc", "n", "gnd", "p");
         let message = compile(&b.into_model(), "general-simulator")
             .unwrap_err()
@@ -594,8 +594,8 @@ mod tests {
         add(&mut b, "Vdc", "source.voltage.dc", json!({"V": 10.0}));
         resistor(&mut b, "load", 20.0);
         add(&mut b, "gnd", "routing.ground", json!({}));
-        elec(&mut b, "Vdc", "p", "load", "p1");
-        elec(&mut b, "load", "p2", "gnd", "p");
+        elec(&mut b, "Vdc", "p", "load", "p");
+        elec(&mut b, "load", "n", "gnd", "p");
         elec(&mut b, "Vdc", "n", "gnd", "p");
         let out = compile(&b.into_model(), "general-simulator").unwrap();
 
@@ -628,8 +628,8 @@ mod tests {
         add(&mut b, "Vdc", "source.voltage.dc", json!({"V": 10.0}));
         resistor(&mut b, "R1", 20.0);
         add(&mut b, "gnd", "routing.ground", json!({}));
-        elec(&mut b, "Vdc", "p", "R1", "p1");
-        elec(&mut b, "R1", "p2", "gnd", "p");
+        elec(&mut b, "Vdc", "p", "R1", "p");
+        elec(&mut b, "R1", "n", "gnd", "p");
         elec(&mut b, "Vdc", "n", "gnd", "p");
         let out = compile(&b.into_model(), "general-simulator").unwrap();
 
@@ -647,13 +647,13 @@ mod tests {
                 .any(|p| p.blocks == ["gnd"] && p.port == "p"),
             "{reference:?}"
         );
-        // And the live node names the ports that sit on it, so a waveform `V(n_R1_p1)` can be
+        // And the live node names the ports that sit on it, so a waveform `V(n_R1_p)` can be
         // pointed at the two terminals the user drew.
         let live = out
             .provenance
             .nets
             .iter()
-            .find(|n| n.net == "n_R1_p1")
+            .find(|n| n.net == "n_R1_p")
             .expect("the live net is in the map");
         let mut ports: Vec<(&[String], &str)> = live
             .ports
@@ -664,7 +664,7 @@ mod tests {
         assert_eq!(
             ports,
             vec![
-                (&["R1".to_string()][..], "p1"),
+                (&["R1".to_string()][..], "p"),
                 (&["Vdc".to_string()][..], "p")
             ]
         );
@@ -752,8 +752,8 @@ mod tests {
         for (i, port) in ["p1", "n1", "p2", "n2"].iter().enumerate() {
             let r = format!("R{i}");
             resistor(&mut b, &r, 1.0);
-            elec(&mut b, "T1", port, &r, "p1");
-            elec(&mut b, &r, "p2", "gnd", "p");
+            elec(&mut b, "T1", port, &r, "p");
+            elec(&mut b, &r, "n", "gnd", "p");
         }
 
         let out = compile(&b.into_model(), "general-simulator").unwrap();
@@ -799,8 +799,8 @@ mod tests {
                 json!({}),
             );
             resistor(&mut body, "in", 1000.0);
-            elec(&mut body, "leaf", "a", "in", "p1");
-            elec(&mut body, "in", "p2", "leaf", "b");
+            elec(&mut body, "leaf", "a", "in", "p");
+            elec(&mut body, "in", "n", "leaf", "b");
             let m = body.into_model();
             def.blocks = m.blocks;
             def.wires = m.wires;
@@ -865,10 +865,10 @@ mod tests {
             on_it,
             vec![
                 "X1.b",
-                "X1.in.p2",
+                "X1.in.n",
                 "X1.leaf.b",
                 "X2.a",
-                "X2.in.p1",
+                "X2.in.p",
                 "X2.leaf.a"
             ],
             "{middle:?}"

@@ -118,12 +118,12 @@ def build():
         model = add(model, f"Lload{leg}", "passive.inductor", "physical-network", "electrical",
                     (i * 150, DC_PLUS_Y + 480), {"L": 2e-3})
         model = connect_elec(model, boundary[f"phase_{leg}"],
-                             {"block": f"Rload{leg}", "port": "p1"})
-        model = connect_elec(model, {"block": f"Rload{leg}", "port": "p2"},
-                             {"block": f"Lload{leg}", "port": "p1"})
+                             {"block": f"Rload{leg}", "port": "p"})
+        model = connect_elec(model, {"block": f"Rload{leg}", "port": "n"},
+                             {"block": f"Lload{leg}", "port": "p"})
         # star point: chained onto leg a's inductor, the same fan-out convention the stamp uses
-        model = connect_elec(model, {"block": f"Lload{leg}", "port": "p2"},
-                             {"block": "Lloada", "port": "p2"})
+        model = connect_elec(model, {"block": f"Lload{leg}", "port": "n"},
+                             {"block": "Lloada", "port": "n"})
 
     return model
 

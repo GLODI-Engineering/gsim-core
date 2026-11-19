@@ -86,19 +86,19 @@ def build():
     model = add(model, "Cf", "passive.capacitor", (460, 60), {"C": CSNUB})
 
     # TOP -- source positive, the series resistor, the snubber's capacitor return.
-    model = elec(model, ("Vsrc", "p"), ("Ra", "p1"), net="TOP")
-    model = elec(model, ("Cf", "p2"), ("Vsrc", "p"))
+    model = elec(model, ("Vsrc", "p"), ("Ra", "p"), net="TOP")
+    model = elec(model, ("Cf", "n"), ("Vsrc", "p"))
     # MID -- Ra's far end fans out to every branch.
-    model = elec(model, ("Ra", "p2"), ("Rb", "p1"), net="MID")
+    model = elec(model, ("Ra", "n"), ("Rb", "p"), net="MID")
     for rid in branches[1:]:
-        model = elec(model, ("Ra", "p2"), (rid, "p1"))
+        model = elec(model, ("Ra", "n"), (rid, "p"))
     # RAIL -- every branch return, the source's own negative terminal, the snubber leg.
     # No ground block, and no nets[] entry marked is_reference: this is the whole point.
-    model = elec(model, ("Rb", "p2"), ("Vsrc", "n"), net="RAIL")
+    model = elec(model, ("Rb", "n"), ("Vsrc", "n"), net="RAIL")
     for rid in branches[1:]:
-        model = elec(model, (rid, "p2"), ("Vsrc", "n"))
-    model = elec(model, ("Rf", "p1"), ("Vsrc", "n"))
-    model = elec(model, ("Rf", "p2"), ("Cf", "p1"), net="SNUB")
+        model = elec(model, (rid, "n"), ("Vsrc", "n"))
+    model = elec(model, ("Rf", "p"), ("Vsrc", "n"))
+    model = elec(model, ("Rf", "n"), ("Cf", "p"), net="SNUB")
     return model
 
 

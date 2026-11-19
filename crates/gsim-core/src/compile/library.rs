@@ -265,6 +265,104 @@ mod tests {
         }
     }
 
+    /// Every node port a `TypeSpec` asks for is a port the component actually declares.
+    ///
+    /// This is the guard the `p1`/`p2` versus `p`/`n` split got through (#27, #4): the library
+    /// said a resistor's pins are `p` and `n`, `TWO_PIN` in `compile::spec` said `p1` and `p2`,
+    /// and nothing compared the two — so a sheet wired as the palette invited failed with
+    /// `floating-port: port 'R1.p1' needs a node`, naming a port the sheet never used. The type
+    /// lists are guarded in both directions above; this is the level below them, the port names
+    /// inside one component.
+    ///
+    /// Checked against the component's own `ports` and against **every fidelity tier's** ports,
+    /// because a tier carries its own port list and is what a placed block is an instance of.
+    #[test]
+    fn every_node_port_a_spec_requires_is_declared_by_its_component() {
+        fn port_ids(value: Option<&serde_json::Value>) -> Vec<String> {
+            let mut ids = Vec::new();
+            match value {
+                // Component level: grouped by direction, `{"inputs": [...], "outputs": [...]}`.
+                Some(serde_json::Value::Object(groups)) => {
+                    for group in groups.values() {
+                        if let Some(list) = group.as_array() {
+                            ids.extend(
+                                list.iter()
+                                    .filter_map(|p| p.get("id")?.as_str().map(str::to_string)),
+                            );
+                        }
+                    }
+                }
+                // Tier level: one flat list.
+                Some(serde_json::Value::Array(list)) => ids.extend(
+                    list.iter()
+                        .filter_map(|p| p.get("id")?.as_str().map(str::to_string)),
+                ),
+                _ => {}
+            }
+            ids
+        }
+
+        let mut missing: Vec<String> = Vec::new();
+        for component in library() {
+            let Some(type_name) = component.compiles_to.as_deref() else {
+                continue;
+            };
+            let Some(spec) = crate::compile::lookup(type_name) else {
+                continue; // guarded by `every_compiles_to_names_a_real_registry_type`
+            };
+            if spec.node_ports.is_empty() {
+                continue;
+            }
+
+            let declared = port_ids(component.presentation.get("ports"));
+            for wanted in spec.node_ports {
+                if !declared.iter().any(|d| d == wanted) {
+                    missing.push(format!(
+                        "{}: spec wants node port '{}', component declares [{}]",
+                        component.id,
+                        wanted,
+                        declared.join(", ")
+                    ));
+                }
+            }
+
+            if let Some(tiers) = component
+                .presentation
+                .get("fidelities")
+                .and_then(|f| f.as_array())
+            {
+                for tier in tiers {
+                    let name = tier
+                        .get("tier")
+                        .and_then(|t| t.as_str())
+                        .unwrap_or("<unnamed>");
+                    let at_tier = port_ids(tier.get("ports"));
+                    if at_tier.is_empty() {
+                        continue;
+                    }
+                    for wanted in spec.node_ports {
+                        if !at_tier.iter().any(|d| d == wanted) {
+                            missing.push(format!(
+                                "{} @ {}: spec wants node port '{}', tier declares [{}]",
+                                component.id,
+                                name,
+                                wanted,
+                                at_tier.join(", ")
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+
+        assert!(
+            missing.is_empty(),
+            "{} component/port disagreements:\n  {}",
+            missing.len(),
+            missing.join("\n  ")
+        );
+    }
+
     #[test]
     fn compilable_is_derived_from_the_registry_not_stored() {
         let catalog = catalog();

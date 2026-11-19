@@ -109,7 +109,7 @@ def check_kind_mismatch(model):
     Both blocks are `physical-network`, so the older block-level cross-paradigm check has
     nothing to say here -- this is exactly the gap the per-port rule closes.
     """
-    msg = rejects(model, ("R1", "p2"), ("Rth", "a"), "physical-electrical")
+    msg = rejects(model, ("R1", "n"), ("Rth", "a"), "physical-electrical")
     assert msg.startswith("port-kind-mismatch: "), msg
     assert "'Rth.a' is declared 'thermal'" in msg, msg
     assert "as a 'physical-electrical' wire" in msg, msg
@@ -117,9 +117,9 @@ def check_kind_mismatch(model):
 
     # The reverse direction is refused just as firmly: the rule is on the pair, not on
     # which endpoint the caller happened to name first.
-    msg = rejects(model, ("Rth", "a"), ("R1", "p2"), "physical-thermal")
+    msg = rejects(model, ("Rth", "a"), ("R1", "n"), "physical-thermal")
     assert msg.startswith("port-kind-mismatch: "), msg
-    assert "'R1.p2' is declared 'electrical'" in msg, msg
+    assert "'R1.n' is declared 'electrical'" in msg, msg
 
 
 def check_fan_in(model):
@@ -136,14 +136,14 @@ def check_fan_in(model):
 
     # And the acausal side has no such rule at all: three electrical wires may meet at one
     # node, which is what makes a net a net.
-    model = connect(model, ("Vin", "p"), ("R1", "p1"), "physical-electrical")
-    model = connect(model, ("C1", "p1"), ("R1", "p1"), "physical-electrical")
+    model = connect(model, ("Vin", "p"), ("R1", "p"), "physical-electrical")
+    model = connect(model, ("C1", "p"), ("R1", "p"), "physical-electrical")
     assert len(json.loads(model)["wires"]) == 4
 
 
 def check_reserved_kind(model):
     """A `reserved.*` kind is catalogued in §8 but not connectable until v3."""
-    msg = rejects(model, ("R1", "p2"), ("C1", "p1"), "reserved.physical-magnetic")
+    msg = rejects(model, ("R1", "n"), ("C1", "p"), "reserved.physical-magnetic")
     assert msg.startswith("port-reserved-kind: "), msg
     assert "reserved.physical-magnetic" in msg, msg
     assert "reserved for a future schema version" in msg, msg
@@ -153,9 +153,9 @@ def check_reserved_kind(model):
 def check_the_correct_wiring_still_compiles(model):
     """The other half of the proof: valid connections are accepted and produce a netlist."""
     # Electrical loop, all one domain.
-    model = connect(model, ("Vin", "p"), ("R1", "p1"), "physical-electrical")
-    model = connect(model, ("R1", "p2"), ("C1", "p1"), "physical-electrical")
-    model = connect(model, ("C1", "p2"), ("gnd", "p"), "physical-electrical")
+    model = connect(model, ("Vin", "p"), ("R1", "p"), "physical-electrical")
+    model = connect(model, ("R1", "n"), ("C1", "p"), "physical-electrical")
+    model = connect(model, ("C1", "n"), ("gnd", "p"), "physical-electrical")
     model = connect(model, ("Vin", "n"), ("gnd", "p"), "physical-electrical")
     # Thermal branch, all one domain -- and note it is a *different* domain in the same
     # document, wired without complaint because it never crosses.

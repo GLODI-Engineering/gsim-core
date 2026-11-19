@@ -78,10 +78,10 @@ def section_def():
                      (40, 0), {"R": RSEC})
     body = add_block(body, "Cs", "passive.capacitor", "physical-network", "electrical",
                      (80, 40), {"C": CSEC})
-    body = elec(body, ("section", "a"), ("Rs", "p1"))
-    body = elec(body, ("Rs", "p2"), ("section", "b"))
-    body = elec(body, ("Rs", "p2"), ("Cs", "p1"))
-    body = elec(body, ("Cs", "p2"), ("section", "g"))
+    body = elec(body, ("section", "a"), ("Rs", "p"))
+    body = elec(body, ("Rs", "n"), ("section", "b"))
+    body = elec(body, ("Rs", "n"), ("Cs", "p"))
+    body = elec(body, ("Cs", "n"), ("section", "g"))
     m = json.loads(body)
     return {
         "id": "section",
@@ -145,8 +145,8 @@ def build():
     model = elec(model, ("Vin", "p"), ("X1", "a"), net="VIN")
     model = elec(model, ("Vin", "n"), ("gnd", "p"))
     model = elec(model, ("X1", "b"), ("X2", "a"), net="MID")
-    model = elec(model, ("X2", "b"), ("Rload", "p1"), net="VOUT")
-    model = elec(model, ("Rload", "p2"), ("gnd", "p"))
+    model = elec(model, ("X2", "b"), ("Rload", "p"), net="VOUT")
+    model = elec(model, ("Rload", "n"), ("gnd", "p"))
     model = elec(model, ("X1", "g"), ("gnd", "p"))
     model = elec(model, ("X2", "g"), ("gnd", "p"))
     return model

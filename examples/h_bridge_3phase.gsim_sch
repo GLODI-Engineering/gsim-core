@@ -19,12 +19,12 @@
         "rotation": 0,
         "mirror": "none",
         "params": {
-          "g_breakdown": 0.0,
-          "g_off": 1e-9,
-          "g_on": 5.0,
-          "r_on": 0.1,
-          "v_breakdown": -100.0,
-          "v_th": 0.6
+          "body_g_breakdown": 0.0,
+          "body_g_off": 1e-9,
+          "body_g_on": 5.0,
+          "body_v_breakdown": -100.0,
+          "body_v_f": 0.6,
+          "r_on": 0.1
         },
         "ic": {}
       },
@@ -41,12 +41,12 @@
         "rotation": 0,
         "mirror": "none",
         "params": {
-          "g_breakdown": 0.0,
-          "g_off": 1e-9,
-          "g_on": 5.0,
-          "r_on": 0.1,
-          "v_breakdown": -100.0,
-          "v_th": 0.6
+          "body_g_breakdown": 0.0,
+          "body_g_off": 1e-9,
+          "body_g_on": 5.0,
+          "body_v_breakdown": -100.0,
+          "body_v_f": 0.6,
+          "r_on": 0.1
         },
         "ic": {}
       },
@@ -63,12 +63,12 @@
         "rotation": 0,
         "mirror": "none",
         "params": {
-          "g_breakdown": 0.0,
-          "g_off": 1e-9,
-          "g_on": 5.0,
-          "r_on": 0.1,
-          "v_breakdown": -100.0,
-          "v_th": 0.6
+          "body_g_breakdown": 0.0,
+          "body_g_off": 1e-9,
+          "body_g_on": 5.0,
+          "body_v_breakdown": -100.0,
+          "body_v_f": 0.6,
+          "r_on": 0.1
         },
         "ic": {}
       },
@@ -85,12 +85,12 @@
         "rotation": 0,
         "mirror": "none",
         "params": {
-          "g_breakdown": 0.0,
-          "g_off": 1e-9,
-          "g_on": 5.0,
-          "r_on": 0.1,
-          "v_breakdown": -100.0,
-          "v_th": 0.6
+          "body_g_breakdown": 0.0,
+          "body_g_off": 1e-9,
+          "body_g_on": 5.0,
+          "body_v_breakdown": -100.0,
+          "body_v_f": 0.6,
+          "r_on": 0.1
         },
         "ic": {}
       },
@@ -107,12 +107,12 @@
         "rotation": 0,
         "mirror": "none",
         "params": {
-          "g_breakdown": 0.0,
-          "g_off": 1e-9,
-          "g_on": 5.0,
-          "r_on": 0.1,
-          "v_breakdown": -100.0,
-          "v_th": 0.6
+          "body_g_breakdown": 0.0,
+          "body_g_off": 1e-9,
+          "body_g_on": 5.0,
+          "body_v_breakdown": -100.0,
+          "body_v_f": 0.6,
+          "r_on": 0.1
         },
         "ic": {}
       },
@@ -129,12 +129,12 @@
         "rotation": 0,
         "mirror": "none",
         "params": {
-          "g_breakdown": 0.0,
-          "g_off": 1e-9,
-          "g_on": 5.0,
-          "r_on": 0.1,
-          "v_breakdown": -100.0,
-          "v_th": 0.6
+          "body_g_breakdown": 0.0,
+          "body_g_off": 1e-9,
+          "body_g_on": 5.0,
+          "body_v_breakdown": -100.0,
+          "body_v_f": 0.6,
+          "r_on": 0.1
         },
         "ic": {}
       }
