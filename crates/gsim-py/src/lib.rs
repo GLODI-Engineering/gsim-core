@@ -90,6 +90,7 @@ fn compile_err_to_py(e: CompileError) -> PyErr {
         CompileError::RefNotAnOutput { .. } => "ref-not-an-output",
         CompileError::DuplicateName(_) => "duplicate-name",
         CompileError::DuplicateNet(_) => "duplicate-net",
+        CompileError::BadRating { .. } => "bad-rating",
     };
     PyErr::new::<PyValueError, _>(format!("{keyword}: {e}"))
 }
@@ -164,8 +165,13 @@ struct AddBlockResult {
 }
 
 /// `spec_json` matches `NewBlockSpec`'s JSON shape (`type`, `paradigm`, `domain`, `fidelity?`,
-/// `position`, `rotation`, `mirror?`, `params?`, `ic?`, `label?`, `comment_before?`,
-/// `comment_after?`, `id?`). `comment_before`/`comment_after` are lists of comment lines (a
+/// `position`, `rotation`, `mirror?`, `params?`, `ic?`, `ratings?`, `label?`,
+/// `comment_before?`, `comment_after?`, `id?`). `ratings` carries datasheet limits on the
+/// component — `{"i_max": 60, "on_violation": "stop"}` — emitted as trailing fields on its
+/// device line; they are a sibling of `params` so that changing a component's fidelity tier
+/// cannot strip them, and `compile` refuses one the engine would (a current limit on a device
+/// with no branch current, a modifier with no limit beside it).
+/// `comment_before`/`comment_after` are lists of comment lines (a
 /// single string containing newlines is split too) emitted as `*`-prefixed SPICE comment lines
 /// immediately above/below this block's card(s) by `compile`. Returns
 /// `{"model": <updated Model JSON>, "block_id": "<assigned id>"}`. Raises with the real
@@ -857,6 +863,56 @@ mod tests {
             let msg = err.value(py).to_string();
             assert!(msg.contains("invalid contract registry JSON"), "got: {msg}");
         });
+    }
+
+    /// `gsim-tools` and any agent building a schematic in code reach this crate, not the Rust
+    /// API, so the rating slot has to survive *this* JSON contract too. A rating dropped here
+    /// would be a limit the author wrote and nothing enforces.
+    #[test]
+    fn add_block_carries_a_rating_and_compile_emits_it() {
+        let mut model = new_model("m1", "M", 10).unwrap();
+        for spec in [
+            r#"{"type":"source.voltage.dc","paradigm":"physical-network","domain":"electrical","position":[0,0],"rotation":0,"id":"Vin","params":{"V":10.0}}"#,
+            r#"{"type":"passive.inductor","paradigm":"physical-network","domain":"electrical","position":[0,0],"rotation":0,"id":"L1","params":{"L":3.6e-5},"ratings":{"i_max":60,"on_violation":"stop"}}"#,
+            r#"{"type":"routing.ground","paradigm":"physical-network","domain":"electrical","position":[0,0],"rotation":0,"id":"gnd"}"#,
+        ] {
+            let add: Value = serde_json::from_str(&add_block(&model, spec).unwrap()).unwrap();
+            model = add["model"].to_string();
+        }
+        let parsed: Value = serde_json::from_str(&model).unwrap();
+        let rated = parsed["blocks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|b| b["id"] == "L1")
+            .unwrap();
+        assert_eq!(rated["ratings"]["i_max"], 60);
+
+        for (from, to) in [
+            (
+                r#"{"block":"Vin","port":"p"}"#,
+                r#"{"block":"L1","port":"p"}"#,
+            ),
+            (
+                r#"{"block":"L1","port":"n"}"#,
+                r#"{"block":"gnd","port":"p"}"#,
+            ),
+            (
+                r#"{"block":"Vin","port":"n"}"#,
+                r#"{"block":"gnd","port":"p"}"#,
+            ),
+        ] {
+            let conn: Value = serde_json::from_str(
+                &connect(&model, from, to, "physical-electrical", "{}", None).unwrap(),
+            )
+            .unwrap();
+            model = conn["model"].to_string();
+        }
+
+        let out = compile(&model, "general-simulator").unwrap();
+        let netlist: Value = serde_json::from_str(&out).unwrap();
+        let netlist = netlist["netlist"].as_str().unwrap();
+        assert!(netlist.contains("i_max=60 on_violation=stop"), "{netlist}");
     }
 
     #[test]

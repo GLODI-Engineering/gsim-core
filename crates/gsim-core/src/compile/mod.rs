@@ -153,6 +153,19 @@ pub enum CompileError {
     /// [`nets`]'s own sanitisation is lossy: every non-alphanumeric character becomes `_`, so
     /// `V-OUT` and `V_OUT` are one name.
     DuplicateNet(Box<NetCollision>),
+    /// A rating on a block the engine would refuse it on, or one that is not a limit at all.
+    ///
+    /// Caught here rather than left to the engine on purpose: a rating is written in the
+    /// editor's inspector, and the moment to say "a resistor has no branch current to limit"
+    /// is while that inspector is open, not after a run the user started and waited for. The
+    /// checks and their wording follow the engine's own (`general-simulator-cli/src/rules.rs`
+    /// `ratings_of`), because disagreeing with it would be worse than not checking: a document
+    /// this crate accepted and the engine then rejected is a drift the user pays for.
+    BadRating {
+        block: String,
+        field: String,
+        reason: String,
+    },
 }
 
 /// Which two nets claimed one node name — see [`CompileError::DuplicateNet`].
@@ -189,6 +202,11 @@ impl std::fmt::Display for CompileError {
                 f,
                 "block '{block}' has type '{type_name}', which no netlist emitter knows -- add a TypeSpec for it in compile::spec::REGISTRY"
             ),
+            CompileError::BadRating {
+                block,
+                field,
+                reason,
+            } => write!(f, "block '{block}': rating '{field}': {reason}"),
             CompileError::UnknownTarget(t) => {
                 write!(f, "unknown netlist target '{t}' (known: general-simulator)")
             }

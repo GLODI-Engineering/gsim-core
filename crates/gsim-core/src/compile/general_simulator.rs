@@ -6,6 +6,7 @@
 use super::spec::{self, ElementTail, FieldSpec, KindName, SubElement, SubNode, SubTail, TypeSpec};
 use super::{CompileContext, CompileError, CompileOutput, NetlistTarget, Scope};
 use crate::document::{Block, Endpoint, SubcktDef};
+use serde_json::Value;
 
 pub struct GeneralSimulatorTarget;
 
@@ -593,7 +594,152 @@ fn emit_element(scope: &Scope<'_>, block: &Block, spec: &TypeSpec) -> Result<Str
         }
         ElementTail::None => {}
     }
+    tokens.extend(rating_tokens(block, spec)?);
     Ok(tokens.join(" "))
+}
+
+/// The `key=value` tokens a block's [ratings](Block::ratings) append to its element card.
+///
+/// # Why they are checked here and not only by the engine
+///
+/// Every check below mirrors the engine's own `ratings_of`
+/// (`general-simulator-cli/src/rules.rs`), down to the reason it gives. That duplication is
+/// deliberate: a rating is typed into the editor's inspector, and the moment to say *"a
+/// resistor has no branch current to limit"* is while that inspector is open — not after a run
+/// the user started, waited for, and got a parse error from. The alternative, accepting
+/// anything and letting the engine refuse it, moves the diagnostic an entire round trip away
+/// from the thing that caused it.
+///
+/// The rule the duplication must obey is **never be laxer than the engine**: a document this
+/// crate accepts and the engine then rejects is drift the user pays for, so the registry's
+/// [`spec::BRANCH_CURRENT_LETTERS`] is the engine's list and the tests below assert on the same
+/// cases its tests do.
+fn rating_tokens(block: &Block, spec: &TypeSpec) -> Result<Vec<String>, CompileError> {
+    if block.ratings.is_empty() {
+        return Ok(Vec::new());
+    }
+    let bad = |field: &str, reason: String| CompileError::BadRating {
+        block: block.id.clone(),
+        field: field.to_string(),
+        reason,
+    };
+    let allowed = spec.ratings();
+
+    // Written-but-unknown first: a misspelled `imax=60` is a limit the author believes is in
+    // force, and silently dropping it is the one outcome worse than refusing the document.
+    for field in block.ratings.keys() {
+        if spec::RATING_FIELDS.contains(&field.as_str()) {
+            continue;
+        }
+        return Err(bad(
+            field,
+            format!("not a rating -- one of {}", spec::RATING_FIELDS.join(", ")),
+        ));
+    }
+
+    let written: Vec<(&str, &Value)> = spec::RATING_FIELDS
+        .iter()
+        .filter_map(|field| {
+            block
+                .ratings
+                .get_key_value(*field)
+                .map(|(k, v)| (k.as_str(), v))
+        })
+        .collect();
+
+    // `hold`, `on_violation` and `severity` modify a limit; with no limit beside them they
+    // modify nothing, and `on_violation=stop` written alone reads exactly like a guarded
+    // document. The engine refuses this, so this must too.
+    if !written
+        .iter()
+        .any(|(field, _)| spec::RATING_LIMITS.contains(field))
+    {
+        let (field, _) = written[0];
+        return Err(bad(
+            field,
+            "modifies a rating, and this block has none -- write a limit (one of i_max, \
+             i_sat, v_max) beside it, or remove it"
+                .to_string(),
+        ));
+    }
+
+    let mut tokens = Vec::with_capacity(written.len());
+    for (field, value) in written {
+        if !allowed.contains(&field) {
+            return Err(bad(field, unsupported_reason(field, spec)));
+        }
+        let rendered = spec::render_value(value);
+        if rendered.trim().is_empty() {
+            return Err(bad(field, "is empty".to_string()));
+        }
+        if spec::RATING_LIMITS.contains(&field) {
+            // A magnitude limit of zero or less is violated at rest, so every step of every
+            // run would report it. It is a typo, not a rule -- the engine's own words.
+            match value.as_f64() {
+                Some(limit) if limit > 0.0 => {}
+                Some(_) => {
+                    return Err(bad(
+                        field,
+                        format!(
+                            "must be greater than zero, not '{rendered}' -- it is a limit on \
+                             magnitude"
+                        ),
+                    ))
+                }
+                // A rating accepts the netlist's own number grammar, so `60m` and `1e-6` are
+                // both valid and both arrive here as `Value::String`. This crate deliberately
+                // does **not** parse that grammar: `general-mna` owns it, the editor already
+                // mirrors it under a parity test, and a third implementation here would be a
+                // third thing to keep in agreement over `M` meaning milli.
+                //
+                // So the check is only the shape no number can have -- it must start like one,
+                // and a magnitude limit is never signed. `i_max=plenty` is caught; anything
+                // the engine's parser would accept passes through to it untouched.
+                None => {
+                    let raw = rendered.trim();
+                    let first = raw.chars().next().unwrap_or(' ');
+                    if first == '-' {
+                        return Err(bad(
+                            field,
+                            format!(
+                                "must be greater than zero, not '{rendered}' -- it is a limit \
+                                 on magnitude"
+                            ),
+                        ));
+                    }
+                    if !(first.is_ascii_digit() || first == '.' || first == '+') {
+                        return Err(bad(field, format!("is not a number: '{rendered}'")));
+                    }
+                }
+            }
+        }
+        tokens.push(format!("{field}={rendered}"));
+    }
+    Ok(tokens)
+}
+
+/// Why a given rating cannot go on a given type — the engine's reason, in its words.
+fn unsupported_reason(field: &str, spec: &TypeSpec) -> String {
+    match field {
+        "i_max" | "i_sat" => format!(
+            "a current rating needs a branch current, and device {} does not have one (only \
+             V, L, E and H do -- a resistor's or a switch's current is computed from the \
+             solution, not solved for). Write a kind=rule card naming a current you do have, \
+             or probe this one first",
+            spec.device_letter
+                .map(|letter| letter.to_string())
+                .unwrap_or_else(|| format!("type '{}'", spec.type_name)),
+        ),
+        "v_max" => format!(
+            "a voltage rating needs two terminals, and this device has {} (write a kind=rule \
+             card naming the voltage you mean)",
+            spec.node_ports.len()
+        ),
+        _ => format!(
+            "type '{}' emits no device line for a rating to go on",
+            spec.type_name
+        ),
+    }
 }
 
 /// `NAME kind=<value> field=value ...` — sub-grammar 2.
@@ -955,6 +1101,254 @@ mod tests {
             ConnectOptions::default(),
         )
         .unwrap();
+    }
+
+    /// `add`, plus the ratings slot — the thing an inspector writes into.
+    fn add_rated(
+        b: &mut ModelBuilder,
+        id: &str,
+        t: &str,
+        params: serde_json::Value,
+        ratings: serde_json::Value,
+    ) {
+        b.add_block(NewBlockSpec {
+            r#type: t.to_string(),
+            paradigm: Paradigm::PhysicalNetwork,
+            domain: "electrical".to_string(),
+            id: Some(id.to_string()),
+            params: params.as_object().cloned().unwrap_or_default(),
+            ratings: ratings.as_object().cloned().unwrap_or_default(),
+            ..Default::default()
+        })
+        .unwrap();
+    }
+
+    /// An `L` across a source and a ground, which is the smallest sheet that compiles and has a
+    /// branch current to rate.
+    fn rated_inductor(ratings: serde_json::Value) -> Result<CompileOutput, CompileError> {
+        let mut b = ModelBuilder::new("m", "Rated", 10);
+        add(
+            &mut b,
+            "Vin",
+            "source.voltage.dc",
+            Paradigm::PhysicalNetwork,
+            json!({"V": 10.0}),
+        );
+        add_rated(
+            &mut b,
+            "L1",
+            "passive.inductor",
+            json!({"L": 36e-6}),
+            ratings,
+        );
+        add(
+            &mut b,
+            "gnd",
+            "routing.ground",
+            Paradigm::PhysicalNetwork,
+            json!({}),
+        );
+        elec(&mut b, "Vin", "p", "L1", "p");
+        elec(&mut b, "L1", "n", "gnd", "p");
+        elec(&mut b, "Vin", "n", "gnd", "p");
+        compile(&b.into_model(), "general-simulator")
+    }
+
+    /// The whole point of #37: a limit typed into the inspector reaches the device line, which
+    /// is the one place `general-simulator` reads a rating from.
+    ///
+    /// The expected line is written out in full rather than probed field by field, because the
+    /// *order* is part of what this emits: a `serde_json::Map` is not ordered the way a user
+    /// typed it, and a netlist whose token order wanders between compiles makes every diff of a
+    /// generated deck unreadable.
+    #[test]
+    fn a_rating_drawn_on_a_component_reaches_its_device_line() {
+        let out = rated_inductor(json!({
+            "severity": "error",
+            "i_max": 60,
+            "on_violation": "console",
+            "i_sat": 70,
+        }))
+        .unwrap();
+        assert!(
+            out.netlist.contains(
+                "L1 n_L1_p 0 3.6e-5 i_max=60 i_sat=70 on_violation=console severity=error"
+            ),
+            "{}",
+            out.netlist
+        );
+    }
+
+    /// A rating accepts the netlist's own number grammar, and `60m` is how a datasheet number is
+    /// actually written. This crate does not parse that grammar (see [`rating_tokens`]) so the
+    /// test that matters is that it passes it through *unchanged* -- `60m` must not become `60`,
+    /// `0.06` or `60e-3` on the way, because only the engine's parser decides what it means.
+    #[test]
+    fn a_suffixed_limit_is_passed_through_verbatim() {
+        let out = rated_inductor(json!({"i_max": "60m"})).unwrap();
+        assert!(out.netlist.contains("i_max=60m"), "{}", out.netlist);
+    }
+
+    /// A voltage rating is across the component, so it needs two terminals -- and a capacitor
+    /// has them, while having no branch current at all. The two ratings are therefore not a
+    /// package: this is the case that proves the per-type answer is really per-type.
+    #[test]
+    fn a_capacitor_takes_a_voltage_rating_and_refuses_a_current_one() {
+        let mut b = ModelBuilder::new("m", "C", 10);
+        add(
+            &mut b,
+            "Vin",
+            "source.voltage.dc",
+            Paradigm::PhysicalNetwork,
+            json!({"V": 10.0}),
+        );
+        add_rated(
+            &mut b,
+            "C1",
+            "passive.capacitor",
+            json!({"C": 1e-6}),
+            json!({"v_max": 400}),
+        );
+        add(
+            &mut b,
+            "gnd",
+            "routing.ground",
+            Paradigm::PhysicalNetwork,
+            json!({}),
+        );
+        elec(&mut b, "Vin", "p", "C1", "p");
+        elec(&mut b, "C1", "n", "gnd", "p");
+        elec(&mut b, "Vin", "n", "gnd", "p");
+        let out = compile(&b.into_model(), "general-simulator").unwrap();
+        assert!(out.netlist.contains("v_max=400"), "{}", out.netlist);
+
+        let spec = spec::lookup("passive.capacitor").expect("the capacitor is in the registry");
+        assert_eq!(
+            spec.ratings(),
+            vec!["v_max", "hold", "on_violation", "severity"]
+        );
+        assert!(!spec.ratings().contains(&"i_max"));
+    }
+
+    /// `i_max` on a resistor is the mistake this check exists for, and it is an easy one to
+    /// make: a resistor obviously carries current, it just is not a current the solver solves
+    /// for. Accepting it would produce a netlist the engine refuses *after* a run was started,
+    /// so the editor has to say so while the inspector is open -- in the engine's own words,
+    /// including what to do instead.
+    #[test]
+    fn a_current_rating_on_a_resistor_says_which_devices_have_a_branch_current() {
+        let mut b = ModelBuilder::new("m", "R", 10);
+        add(
+            &mut b,
+            "Vin",
+            "source.voltage.dc",
+            Paradigm::PhysicalNetwork,
+            json!({"V": 10.0}),
+        );
+        add_rated(
+            &mut b,
+            "R1",
+            "passive.resistor",
+            json!({"R": 10.0}),
+            json!({"i_max": 60}),
+        );
+        add(
+            &mut b,
+            "gnd",
+            "routing.ground",
+            Paradigm::PhysicalNetwork,
+            json!({}),
+        );
+        elec(&mut b, "Vin", "p", "R1", "p");
+        elec(&mut b, "R1", "n", "gnd", "p");
+        elec(&mut b, "Vin", "n", "gnd", "p");
+        let error = compile(&b.into_model(), "general-simulator").unwrap_err();
+        let message = error.to_string();
+        assert!(message.contains("block 'R1'"), "{message}");
+        assert!(message.contains("only V, L, E and H do"), "{message}");
+        assert!(message.contains("kind=rule"), "{message}");
+    }
+
+    /// `on_violation=stop` written alone reads exactly like a guarded document and guards
+    /// nothing. The engine refuses it; so must this, or the editor would show a document that
+    /// cannot run as one that is protected.
+    #[test]
+    fn a_modifier_with_no_limit_beside_it_is_refused() {
+        for lone in ["on_violation", "severity", "hold"] {
+            let ratings = json!({ lone: "stop" });
+            let error = rated_inductor(ratings).unwrap_err();
+            assert!(
+                error.to_string().contains("modifies a rating"),
+                "{lone}: {error}"
+            );
+        }
+    }
+
+    /// A magnitude limit of zero or less is violated at rest, so every step of every run would
+    /// report it. It is a typo, not a rule.
+    #[test]
+    fn a_limit_of_zero_or_less_is_a_typo_not_a_rule() {
+        for raw in [json!(0), json!(-60), json!("-60")] {
+            let error = rated_inductor(json!({"i_max": raw})).unwrap_err();
+            assert!(
+                error.to_string().contains("must be greater than zero"),
+                "{raw}: {error}"
+            );
+        }
+    }
+
+    /// A value that cannot be a number at all is caught. The shape check is deliberately narrow
+    /// -- it must not refuse anything the engine's own parser would accept -- so this asserts
+    /// the obvious typo is refused and the grammar's own spellings are not.
+    #[test]
+    fn a_limit_that_is_not_a_number_says_so() {
+        let error = rated_inductor(json!({"i_max": "plenty"})).unwrap_err();
+        assert!(error.to_string().contains("is not a number"), "{error}");
+        for accepted in ["60", "60m", "6e1", ".5", "+60", "60MEG"] {
+            rated_inductor(json!({"i_max": accepted})).unwrap_or_else(|e| {
+                panic!("'{accepted}' must reach the engine, not be refused here: {e}")
+            });
+        }
+    }
+
+    /// A misspelled rating is the worst case in the set: the author believes a limit is in
+    /// force, and dropping `imax=60` silently would leave the document reading as guarded.
+    #[test]
+    fn a_misspelled_rating_is_refused_rather_than_dropped() {
+        let error = rated_inductor(json!({"imax": 60})).unwrap_err();
+        let message = error.to_string();
+        assert!(message.contains("not a rating"), "{message}");
+        assert!(message.contains("i_max"), "{message}");
+    }
+
+    /// A rating must survive a fidelity-tier switch, which is why it is a sibling of `params`
+    /// and not an entry in it: switching tier removes the parameters the target tier does not
+    /// declare, and a limit that vanished when someone changed a model would be a limit lost
+    /// without a word.
+    #[test]
+    fn a_rating_is_not_a_param_so_a_tier_switch_cannot_strip_it() {
+        let mut b = ModelBuilder::new("m", "Tier", 10);
+        add_rated(
+            &mut b,
+            "L1",
+            "passive.inductor",
+            json!({"L": 36e-6, "IC": 0.0}),
+            json!({"i_max": 60}),
+        );
+        let model = b.into_model();
+        let block = model.blocks.iter().find(|b| b.id == "L1").unwrap();
+        assert!(
+            !block.params.contains_key("i_max"),
+            "a rating must not be stored as a parameter: {:?}",
+            block.params
+        );
+        assert_eq!(block.ratings.get("i_max"), Some(&json!(60)));
+
+        // The round trip a `.gsim_sch` file takes, since that is where the loss would happen.
+        let json = serde_json::to_string(&model).unwrap();
+        let back: crate::document::Model = serde_json::from_str(&json).unwrap();
+        let block = back.blocks.iter().find(|b| b.id == "L1").unwrap();
+        assert_eq!(block.ratings.get("i_max"), Some(&json!(60)));
     }
 
     #[test]

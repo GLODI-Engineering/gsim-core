@@ -206,6 +206,7 @@ mod tests {
             mirror: Mirror::None,
             params,
             ic: Map::new(),
+            ratings: Map::new(),
             label: None,
             comment_before: Vec::new(),
             comment_after: Vec::new(),

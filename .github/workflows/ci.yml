@@ -88,3 +88,41 @@ jobs:
         run: |
           pip install --find-links target/wheels gsim_py
           python -c "import gsim_py; print('gsim_py imports')"
+
+  # The rating vocabulary lives in two repositories by necessity: `general-simulator`
+  # interprets `i_max` and this crate emits it, and neither depends on the other (the engine
+  # would gain a compiler it does not need; this crate would gain a solver). So the agreement
+  # is checked rather than assumed — a field added on one side and not the other is a limit a
+  # user writes in the editor and the engine then refuses, which is the exact failure the
+  # capabilities manifest exists to make impossible.
+  #
+  # Reads the engine's default branch, so it goes red here when the engine changes, which is
+  # when somebody can still act on it.
+  rating-vocabulary-drift:
+    name: The rating vocabulary matches the engine's
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compare both RATING_FIELDS lists
+        run: |
+          set -euo pipefail
+          fields() {
+            # The names inside the `RATING_FIELDS` array literal, one per line, sorted. Both
+            # files spell it the same way, so one extractor serves both.
+            sed -n '/RATING_FIELDS: &\[&str\] = &\[/,/^\];/p' "$1" \
+              | grep -o '"[a-z_]*"' | tr -d '"' | sort
+          }
+          curl -fsSL -o engine-rules.rs \
+            https://raw.githubusercontent.com/GLODI-Engineering/general-simulator/master/crates/general-simulator-cli/src/rules.rs
+          fields engine-rules.rs > engine.txt
+          fields crates/gsim-core/src/compile/spec.rs > ours.txt
+          test -s engine.txt || { echo "could not read the engine's RATING_FIELDS"; exit 1; }
+          if ! diff -u engine.txt ours.txt; then
+            echo
+            echo "The engine's rating fields and this crate's have drifted."
+            echo "Update compile::spec::RATING_FIELDS (and RATING_LIMITS, and the"
+            echo "capabilities manifest's closed sets) to match the engine."
+            exit 1
+          fi
+          echo "Both lists: $(tr '\n' ' ' < ours.txt)"
