@@ -154,19 +154,30 @@ mod tests {
         // truncated-read check while the library held 240 components of which 164 compiled
         // nowhere. Since #59 it holds exactly what this engine compiles, so the size is a
         // consequence of the registry: every type a target emits, plus the universal
-        // components that are *placed from a palette* -- a Goto, a From, a ground, and both
-        // catalogue spellings of a scope.
+        // components a front end has to be *told how to draw* -- a Goto, a From, a ground,
+        // both catalogue spellings of a scope, and the two subsystem boundary ports.
         //
         // Two universals are deliberately absent, which is why this is not simply
-        // `REGISTRY.len()`: `routing.junction` is spliced in by drawing onto a conductor and
-        // `spice-subckt.boundary` marks a def's interface, so neither is something a user
-        // picks up. `the_registry_is_not_drifting_further_from_the_library` exempts every
-        // structural type for that reason; this counts the five that are real palette entries.
-        const PALETTE_UNIVERSALS: usize = 5;
+        // `REGISTRY.len()`, and the line between them and the seven is what a front end needs
+        // rather than who performs the gesture. A `routing.junction` is spliced in by drawing
+        // onto a conductor and is drawn as a dot by the editor's own wire renderer; a
+        // `spice-subckt.boundary` is a pseudo-block this crate invents for a def's interface
+        // and no front end ever sees one. Neither has anything to read out of a catalogue.
+        //
+        // The boundary ports are the case that drew the line (#63). They are not placed by a
+        // user any more than a junction is -- grouping blocks into a subsystem synthesizes one
+        // per crossing wire -- but `group-blocks.ts` builds them with
+        // `createBlockFromMetadata(catalog["hierarchy.inport"])`, so it needs their ports,
+        // their symbol and their `id`/`kind` params from here. Leaving them out made Ctrl+G
+        // return `null` and do nothing at all. See `docs/decisions/0007`.
+        //
+        // `the_registry_is_not_drifting_further_from_the_library` exempts every structural
+        // type for that reason; this counts the seven that a catalogue has to describe.
+        const DESCRIBED_UNIVERSALS: usize = 7;
         let emittable = REGISTRY.iter().filter(|s| !s.structural).count();
         assert_eq!(
             library().len(),
-            emittable + PALETTE_UNIVERSALS,
+            emittable + DESCRIBED_UNIVERSALS,
             "the embedded library did not parse whole, or a type was added on one side only"
         );
     }

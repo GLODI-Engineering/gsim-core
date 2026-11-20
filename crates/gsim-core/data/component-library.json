@@ -4067,6 +4067,228 @@
       "compiles_to": "extensibility.pyfunc"
     },
     {
+      "id": "hierarchy.inport",
+      "name": "hierarchy.inport",
+      "label": "Inport",
+      "category": "subsystems",
+      "aliases": [
+        "inport",
+        "boundary inport"
+      ],
+      "tags": [
+        "hierarchy",
+        "subsystem",
+        "inport",
+        "boundary"
+      ],
+      "ports": {
+        "inputs": [],
+        "outputs": [
+          {
+            "domain_from": "kind",
+            "id": "out",
+            "kind": {
+              "dims": "scalar",
+              "domain": "signal"
+            },
+            "label": "",
+            "offset": 20,
+            "side": "right"
+          }
+        ]
+      },
+      "params": [
+        {
+          "default": "in1",
+          "description": "Port identifier on the parent-side subsystem block.",
+          "label": "Port id",
+          "name": "id",
+          "type": "string"
+        },
+        {
+          "choices": [
+            "signal",
+            "physical-electrical",
+            "physical-thermal",
+            "physical-translational",
+            "physical-rotational"
+          ],
+          "default": "signal",
+          "description": "Port kind domain exposed to the parent.",
+          "label": "Signal kind",
+          "name": "kind",
+          "type": "enum"
+        }
+      ],
+      "fidelities": [
+        {
+          "doc": "Boundary inport — placed inside a subsystem body to define an input port on the parent-side block (spec §11). The `id` param is the port id; `kind` selects the signal domain.",
+          "params": [
+            {
+              "default": "in1",
+              "doc": "Port identifier on the parent-side subsystem block.",
+              "id": "id",
+              "type": "string"
+            },
+            {
+              "choices": [
+                "signal",
+                "physical-electrical",
+                "physical-thermal",
+                "physical-translational",
+                "physical-rotational"
+              ],
+              "default": "signal",
+              "doc": "Port kind domain exposed to the parent.",
+              "id": "kind",
+              "type": "enum"
+            }
+          ],
+          "ports": [
+            {
+              "direction": "out",
+              "id": "out",
+              "kind": "signal",
+              "label": "",
+              "offset": 20,
+              "side": "right"
+            }
+          ],
+          "tier": "ideal"
+        }
+      ],
+      "symbol": {
+        "bbox": [
+          200,
+          40
+        ],
+        "shape": "rect",
+        "text": "In"
+      },
+      "behavior": {
+        "causality": "source",
+        "domain": "signal",
+        "equation_template": "hierarchy.inport",
+        "state_count": 0
+      },
+      "paradigm": "signal-flow",
+      "domain": "signal",
+      "version": 1,
+      "description": "Boundary inport — placed inside a subsystem body to define an input port on the parent-side block (spec §11). The `id` param is the port id; `kind` selects the signal domain.",
+      "compiles_to": "hierarchy.inport"
+    },
+    {
+      "id": "hierarchy.outport",
+      "name": "hierarchy.outport",
+      "label": "Outport",
+      "category": "subsystems",
+      "aliases": [
+        "outport",
+        "boundary outport"
+      ],
+      "tags": [
+        "hierarchy",
+        "subsystem",
+        "outport",
+        "boundary"
+      ],
+      "ports": {
+        "inputs": [
+          {
+            "domain_from": "kind",
+            "id": "in",
+            "kind": {
+              "dims": "scalar",
+              "domain": "signal"
+            },
+            "label": "",
+            "offset": 20,
+            "side": "left"
+          }
+        ],
+        "outputs": []
+      },
+      "params": [
+        {
+          "default": "out1",
+          "description": "Port identifier on the parent-side subsystem block.",
+          "label": "Port id",
+          "name": "id",
+          "type": "string"
+        },
+        {
+          "choices": [
+            "signal",
+            "physical-electrical",
+            "physical-thermal",
+            "physical-translational",
+            "physical-rotational"
+          ],
+          "default": "signal",
+          "description": "Port kind domain exposed to the parent.",
+          "label": "Signal kind",
+          "name": "kind",
+          "type": "enum"
+        }
+      ],
+      "fidelities": [
+        {
+          "doc": "Boundary outport — placed inside a subsystem body to define an output port on the parent-side block (spec §11). The `id` param is the port id; `kind` selects the signal domain.",
+          "params": [
+            {
+              "default": "out1",
+              "doc": "Port identifier on the parent-side subsystem block.",
+              "id": "id",
+              "type": "string"
+            },
+            {
+              "choices": [
+                "signal",
+                "physical-electrical",
+                "physical-thermal",
+                "physical-translational",
+                "physical-rotational"
+              ],
+              "default": "signal",
+              "doc": "Port kind domain exposed to the parent.",
+              "id": "kind",
+              "type": "enum"
+            }
+          ],
+          "ports": [
+            {
+              "direction": "in",
+              "id": "in",
+              "kind": "signal",
+              "label": "",
+              "offset": 20,
+              "side": "left"
+            }
+          ],
+          "tier": "ideal"
+        }
+      ],
+      "symbol": {
+        "bbox": [
+          200,
+          40
+        ],
+        "shape": "rect",
+        "text": "Out"
+      },
+      "behavior": {
+        "causality": "sink",
+        "domain": "signal",
+        "equation_template": "hierarchy.outport",
+        "state_count": 0
+      },
+      "paradigm": "signal-flow",
+      "domain": "signal",
+      "version": 1,
+      "description": "Boundary outport — placed inside a subsystem body to define an output port on the parent-side block (spec §11). The `id` param is the port id; `kind` selects the signal domain.",
+      "compiles_to": "hierarchy.outport"
+    },
+    {
       "id": "logic.flip_flop",
       "name": "logic.flip_flop",
       "label": "Flip-Flop",

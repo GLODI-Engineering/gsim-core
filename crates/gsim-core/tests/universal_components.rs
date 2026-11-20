@@ -6,7 +6,8 @@
 //! cannot model one may legitimately refuse it. A Goto does not. It is not a part anyone could
 //! buy — it is a way of saying *this signal continues over there*, and it means the same thing
 //! on every sheet whatever engine the sheet is bound for. So are a ground symbol, a wire
-//! junction, a scope and a `.SUBCKT` boundary.
+//! junction, a scope, a `.SUBCKT` boundary and the two ports that mark a subsystem's boundary
+//! from the inside.
 //!
 //! Those are the schematic's own vocabulary, the editor owns them, and the consequence this
 //! crate is responsible for is that **every target must support them** — they are not the
@@ -127,6 +128,23 @@ fn sheet_with_every_universal_component() -> gsim_core::document::Model {
         Paradigm::SignalFlow,
         params(&[("tag", json!("CLK"))]),
     );
+    // A subsystem's boundary, from the inside. Grouping blocks synthesizes one of each per
+    // wire that crossed the selection, so a real sheet carries these without anyone placing
+    // one -- and an inport is a driver, so this pair is wired as the pass-through it is.
+    add(
+        &mut b,
+        "in1",
+        "hierarchy.inport",
+        Paradigm::SignalFlow,
+        params(&[("id", json!("in1")), ("kind", json!("signal"))]),
+    );
+    add(
+        &mut b,
+        "out1",
+        "hierarchy.outport",
+        Paradigm::SignalFlow,
+        params(&[("id", json!("out1")), ("kind", json!("signal"))]),
+    );
 
     b.connect(
         Endpoint::new("src", "out"),
@@ -142,6 +160,13 @@ fn sheet_with_every_universal_component() -> gsim_core::document::Model {
         ConnectOptions::default(),
     )
     .expect("wiring the From into the scope");
+    b.connect(
+        Endpoint::new("in1", "out"),
+        Endpoint::new("out1", "in"),
+        "signal",
+        ConnectOptions::default(),
+    )
+    .expect("the boundary inport carries straight through to the outport");
     b.connect(
         Endpoint::new("v1", "p"),
         Endpoint::new("j1", "node"),
@@ -185,6 +210,10 @@ fn the_registry_names_every_universal_component_once() {
     assert!(
         types.contains(&"routing.ground") && types.contains(&"routing.junction"),
         "a ground only names the reference net and a junction only merges conductors: {types:?}"
+    );
+    assert!(
+        types.contains(&"hierarchy.inport") && types.contains(&"hierarchy.outport"),
+        "the subsystem boundary ports only mark an interface, like a .SUBCKT boundary: {types:?}"
     );
 
     let mut sorted = types.clone();
@@ -231,7 +260,7 @@ fn no_target_emits_a_component_the_editor_owns() {
             out.netlist
         );
 
-        for block_id in ["gnd", "scope1", "g1", "f1", "j1"] {
+        for block_id in ["gnd", "scope1", "g1", "f1", "j1", "in1", "out1"] {
             for line in out.netlist.lines() {
                 let card = line.trim();
                 assert!(
@@ -310,7 +339,7 @@ fn a_target_that_filters_nothing_still_emits_no_universal_component() {
             out.netlist
         );
     }
-    for block_id in ["gnd", "scope1", "g1", "f1", "j1"] {
+    for block_id in ["gnd", "scope1", "g1", "f1", "j1", "in1", "out1"] {
         assert!(
             !out.netlist
                 .lines()

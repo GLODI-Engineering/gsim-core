@@ -848,6 +848,30 @@ pub const REGISTRY: &[TypeSpec] = &[
         output_ports: &["out"],
         ..TypeSpec::empty("routing.from")
     },
+    // A subsystem's boundary, from the inside. The editor synthesizes one of these per wire
+    // that crosses a selection when a user groups blocks into a subsystem, so like a
+    // `routing.junction` it is created by an editing gesture and never picked up from a
+    // palette — and like a `spice-subckt.boundary` it only *marks* an interface, which is what
+    // makes it structural: the body's contents emit, the boundary itself has no card.
+    //
+    // Both need a library entry even so, which no other structural type does except the
+    // palette five: the editor reads its ports, its symbol and its `id`/`kind` params out of
+    // the generated catalogue in order to draw and parametrise the blocks it just created. See
+    // `docs/decisions/0007`, which this pair is the reason to amend: the library holds the
+    // universals that *need describing to a front end*, not the ones a user places.
+    TypeSpec {
+        structural: true,
+        // An inport drives the wire that continues into the body, so it declares its `out`
+        // port for the same reason `routing.from` does: `Scope::peer_of` prefers a peer with a
+        // known output when a port carries several wires, and a boundary source has to win
+        // that preference like any other driver.
+        output_ports: &["out"],
+        ..TypeSpec::empty("hierarchy.inport")
+    },
+    TypeSpec {
+        structural: true,
+        ..TypeSpec::empty("hierarchy.outport")
+    },
     // -- passives -----------------------------------------------------------
     rc!("passive.resistor", 'R', TWO_PIN, "R"),
     rc!("passive.capacitor", 'C', TWO_PIN, "C"),
