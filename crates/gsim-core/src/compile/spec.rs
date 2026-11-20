@@ -2138,7 +2138,30 @@ pub const REGISTRY: &[TypeSpec] = &[
 ];
 
 pub fn lookup(type_name: &str) -> Option<&'static TypeSpec> {
-    REGISTRY.iter().find(|s| s.type_name == type_name)
+    if let Some(exact) = REGISTRY.iter().find(|s| s.type_name == type_name) {
+        return Some(exact);
+    }
+    // Not in the registry under that spelling — but this crate's own component library may
+    // know the name as an alias of one that is.
+    //
+    // `super::library::find_component` was written for exactly this and its doc comment says
+    // so: "Documents already on disk name components the way the front end's catalogue did
+    // (`physical-electrical.passive.resistor`), while the library is now keyed the way the
+    // engine names them (`passive.resistor`). Those older spellings are kept as aliases, and
+    // this is what makes a saved sheet still resolve." It had **no callers**, so it made
+    // nothing resolve: `lookup` was exact-match, and one crate gave two answers about the same
+    // name — the library saying `physical-electrical.source.voltage_dc` is a compilable DC
+    // source, the compiler saying `unknown-type`.
+    //
+    // Found by compiling real saved sheets through the WASM binding: every one of this
+    // project's `.gsim_sch` fixtures failed on an alias spelling, and the editor only gets away
+    // with it because its own loader canonicalises types on deserialize. A document written by
+    // hand, or saved before that canonicalisation existed, did not compile at all.
+    // `id` is the engine's own name and `r#type` is the *legacy* catalogue spelling -- the
+    // opposite of what the field names suggest, and worth stating because getting it the wrong
+    // way round resolves every alias to another name the registry does not have.
+    let component = super::library::find_component(type_name)?;
+    REGISTRY.iter().find(|s| s.type_name == component.id)
 }
 
 /// Whether `type_name` is a **universal component** — one the *editor* owns rather than any

@@ -337,3 +337,67 @@ fn resolution_happens_before_any_target_sees_the_document() {
         );
     }
 }
+
+/// A saved sheet that names a component the way the editor's old catalogue did still compiles.
+///
+/// `library::find_component` resolves a name through the library's aliases and its doc comment
+/// says why it exists: *"Documents already on disk name components the way the front end's
+/// catalogue did (`physical-electrical.passive.resistor`), while the library is now keyed the way
+/// the engine names them (`passive.resistor`). Those older spellings are kept as aliases, and
+/// this is what makes a saved sheet still resolve."*
+///
+/// It had **no callers**, so it made nothing resolve. `spec::lookup` was exact-match, and one
+/// crate gave two answers about one name: the library saying
+/// `physical-electrical.source.voltage_dc` is a compilable DC source, the compiler saying
+/// `unknown-type: ... add a TypeSpec for it`.
+///
+/// Found by compiling this project's own `.gsim_sch` fixtures through the WASM binding — every
+/// one failed on an alias spelling. The editor only gets away with it because its loader
+/// canonicalises types on deserialize; a document written by hand, or saved before that
+/// canonicalisation existed, did not compile at all.
+#[test]
+fn an_alias_spelling_resolves_to_its_registry_entry() {
+    use gsim_core::compile::library;
+
+    // Every spelling the library declares for one component must reach one registry entry.
+    for alias in [
+        "source.voltage.dc",
+        "physical-electrical.source.voltage_dc",
+        "physical_electrical.source.voltage_dc",
+        "voltage_dc",
+    ] {
+        let found = spec::lookup(alias)
+            .unwrap_or_else(|| panic!("{alias} should resolve through the library's aliases"));
+        assert_eq!(
+            found.type_name, "source.voltage.dc",
+            "{alias} resolved to the wrong entry"
+        );
+    }
+
+    for alias in [
+        "passive.resistor",
+        "physical-electrical.passive.resistor",
+        "physical_electrical.passive.resistor",
+    ] {
+        assert_eq!(
+            spec::lookup(alias).map(|s| s.type_name),
+            Some("passive.resistor"),
+            "{alias}"
+        );
+    }
+
+    // `id` is the engine's name and `type` is the legacy spelling -- the opposite of what the
+    // field names suggest. Getting it the wrong way round resolves every alias to another name
+    // the registry does not have, which is exactly what the first version of this fix did.
+    let component = library::find_component("physical-electrical.source.voltage_dc")
+        .expect("the library knows the alias");
+    assert_eq!(component.id, "source.voltage.dc", "id is the engine's name");
+    assert_eq!(
+        component.r#type.as_deref(),
+        Some("physical-electrical.source.voltage_dc"),
+        "type is the legacy catalogue spelling"
+    );
+
+    // A name nothing knows is still unknown -- the fallback must not invent a resolution.
+    assert!(spec::lookup("no.such.component").is_none());
+}
