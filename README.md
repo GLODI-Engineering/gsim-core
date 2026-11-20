@@ -131,8 +131,8 @@ tier**, under `fidelities`, and each tier carries its own `ports` and `params`:
 { "tier": "spice",      "params": ["C"],       "ports": ["p", "n"] }
 ```
 
-Four tiers are in use across the 76 components: `ideal` (72), `behavioral` (7), `spice` (6) and
-`n_a` (4). `n_a` means the question does not apply — a ground or a Goto has no fidelity. 69
+Four tiers are in use across the 78 components: `ideal` (74), `behavioral` (7), `spice` (6) and
+`n_a` (4). `n_a` means the question does not apply — a ground or a Goto has no fidelity. 71
 components offer exactly one tier, one offers two and 6 offer three.
 
 **A block records its tier.** `Block::fidelity` is a plain string on the document and defaults

@@ -81,9 +81,12 @@ docs/journal/        chronological continuity log, one file per month
    `general-simulator` can emit it, and `compile::spec::REGISTRY` is the proof. There is no
    "shown but unsupported" state and no `planned` flag — roadmap belongs in an issue, where it
    carries a reason and can be closed. The one exception is a universal component (invariant in
-   `docs/decisions/0006`): the five that a user *places* have library entries, while
-   `routing.junction` (spliced in by drawing) and `spice-subckt.boundary` (compiler-internal)
-   deliberately do not. Three guards in `compile::library` hold this, and the one that matters
+   `docs/decisions/0006`): the seven a front end has to be told **how to draw** have library
+   entries, while `routing.junction` (drawn as a dot by the editor's own wire renderer) and
+   `spice-subckt.boundary` (a pseudo-block no front end ever receives) deliberately do not. The
+   line is the data, not the gesture: nobody *places* a boundary port either, but grouping
+   blocks builds one from its catalogue entry, and drawing that line at the gesture is what
+   broke Ctrl+G — see the amendment in `docs/decisions/0007`. Three guards in `compile::library` hold this, and the one that matters
    is `every_component_resolves_under_its_own_id`, which checks `spec::lookup` — the resolver a
    document actually goes through — rather than the `compiles_to` field that merely promises it.
    Adding a component without its `TypeSpec`, or a `TypeSpec` without its component, fails. See
