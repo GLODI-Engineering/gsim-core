@@ -442,6 +442,29 @@ impl Scope<'_> {
         self.blocks.iter().find(|b| b.id == id)
     }
 
+    /// The blocks a target may emit: every block except the **universal components**, which the
+    /// editor owns and this pipeline has already resolved.
+    ///
+    /// A [`NetlistTarget`] iterates this, not [`Self::blocks`]. The difference is the contract
+    /// in [`spec::is_universal`]: a Goto, a ground, a junction, a scope and a `.SUBCKT` boundary
+    /// are the schematic's own vocabulary rather than any library's devices, so every target has
+    /// to support them — and the way this crate guarantees that is by resolving them into
+    /// something target-independent first (the [`Self::from_source`] redirect table, the
+    /// reference net, the merged conductors at a junction) and then not offering them for
+    /// emission at all.
+    ///
+    /// Use [`Self::blocks`] for connectivity work, where a universal component is exactly what
+    /// you are looking for. Use this for anything that writes a card.
+    ///
+    /// An **unknown** type is not filtered out: it is not universal, so it still reaches the
+    /// caller and still raises [`CompileError::UnknownType`]. A type this crate has never heard
+    /// of must fail loudly, which is the one thing worse than emitting a Goto.
+    pub fn emittable(&self) -> impl Iterator<Item = &Block> {
+        self.blocks
+            .iter()
+            .filter(|block| !spec::is_universal(&block.r#type))
+    }
+
     /// The other end of whatever wire lands on `(block, port)`, preferring a wire whose far end
     /// is a *known output* — a `field=` reference names a driver, and a port can legally carry
     /// more than one wire (the chained fan-out convention `examples/h_bridge_3phase.py`
@@ -675,12 +698,38 @@ fn heuristic_reference(wires: &[Wire], scope: &NetScope) -> Result<NetScope, Com
     )
 }
 
+/// Every target this crate can compile for.
+///
+/// One list, so that adding a target is one edit here and the cross-target guarantees pick it up
+/// without their authors being told: `tests/universal_components.rs` sweeps this and asserts no
+/// target emits a component the editor owns (see [`spec::is_universal`]). A target added to
+/// [`target_for`] and not to this list gets no such sweep, which is the mistake this constant
+/// exists to make visible.
+pub const TARGETS: &[&str] = &["general-simulator"];
+
+fn target_for(name: &str) -> Result<Box<dyn NetlistTarget>, CompileError> {
+    match name {
+        "general-simulator" => Ok(Box::new(GeneralSimulatorTarget)),
+        other => Err(CompileError::UnknownTarget(other.to_string())),
+    }
+}
+
 /// Compiles `model` for the named target.
 pub fn compile(model: &Model, target: &str) -> Result<CompileOutput, CompileError> {
-    let target: Box<dyn NetlistTarget> = match target {
-        "general-simulator" => Box::new(GeneralSimulatorTarget),
-        other => return Err(CompileError::UnknownTarget(other.to_string())),
-    };
+    compile_with(model, target_for(target)?.as_ref())
+}
+
+/// Compiles `model` with a [`NetlistTarget`] the caller supplies.
+///
+/// Exists so that a target can be written and tested *outside* [`target_for`]'s match — which
+/// is what `tests/universal_components.rs` does: it compiles with a deliberately naive target
+/// that emits a line for every block it is handed, and asserts no component the editor owns
+/// comes back. A guarantee about what every target receives has to be testable by a target that
+/// does not already know the rule, or it is only a guarantee about the one target that does.
+pub fn compile_with(
+    model: &Model,
+    target: &dyn NetlistTarget,
+) -> Result<CompileOutput, CompileError> {
     let mut notes = Vec::new();
     let top = build_scope(&model.blocks, &model.wires, None, model, &mut notes)?;
     let mut defs = BTreeMap::new();
