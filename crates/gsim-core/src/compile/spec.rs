@@ -2141,6 +2141,55 @@ pub fn lookup(type_name: &str) -> Option<&'static TypeSpec> {
     REGISTRY.iter().find(|s| s.type_name == type_name)
 }
 
+/// Whether `type_name` is a **universal component** — one the *editor* owns rather than any
+/// library.
+///
+/// # What makes a component universal
+///
+/// A resistor belongs to a device library: it models a thing, a target decides how to spell it,
+/// and an engine that cannot model one may legitimately refuse it. A Goto does not. It is not a
+/// part anyone could buy; it is a way of saying *this signal continues over there*, and it means
+/// the same thing on every sheet whatever engine the sheet is bound for. So are a ground symbol
+/// (which only *names* the reference net), a wire junction (which the front end splices in when
+/// a branch lands on a conductor), a scope (a display concern), and a `.SUBCKT` boundary.
+///
+/// These are the schematic's own vocabulary. The editor owns them, which has a consequence this
+/// crate is responsible for: **every target must support them**, because they are not the
+/// target's components to support or decline. A sheet can contain a Goto whatever it compiles
+/// for.
+///
+/// # How that requirement is met, and why it is not the target's job
+///
+/// By never handing them to a target in the first place. The pipeline resolves each one into
+/// something target-independent *before* [`super::NetlistTarget::emit`] is called —
+/// [`super::routing::resolve_scope`] turns Goto/From into the redirect table on
+/// [`super::Scope::from_source`], the net walk merges the conductors meeting at a junction, and
+/// a ground becomes [`super::nets::REFERENCE_NET`] — and then [`super::Scope::emittable`] leaves
+/// them out of what a target iterates.
+///
+/// The alternative, which this crate did until gsim-core#54, was for each target to remember to
+/// skip them. `general_simulator.rs` did remember, in two places. A second target would have had
+/// to remember too, in its own two places, and nothing would have told its author so: the spec
+/// of a `routing.goto` declares no device letter and no `kind=` name, so emitting one produces
+/// a malformed card rather than a compile error.
+pub fn is_universal(type_name: &str) -> bool {
+    lookup(type_name).is_some_and(|spec| spec.structural)
+}
+
+/// Every universal component type, in registry order.
+///
+/// One list, derived from the registry rather than written beside it, so it cannot fall behind:
+/// marking a new [`TypeSpec`] `structural` is the only edit needed to add one. Used by the
+/// capability manifest (the editor renders these as always available, since no engine's
+/// catalogue gets to withhold a component the editor owns) and by the cross-target test that
+/// asserts none of them reaches a netlist.
+pub fn universal_types() -> impl Iterator<Item = &'static str> {
+    REGISTRY
+        .iter()
+        .filter(|spec| spec.structural)
+        .map(|spec| spec.type_name)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

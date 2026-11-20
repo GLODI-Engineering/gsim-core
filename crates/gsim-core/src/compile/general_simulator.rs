@@ -141,7 +141,11 @@ fn with_comments(block: &Block, card: String) -> String {
 fn emit_scope(scope: &Scope<'_>, lines: &mut Vec<String>) -> Result<(), CompileError> {
     let mut elements = Vec::new();
     let mut blocks = Vec::new();
-    for block in scope.blocks {
+    // `emittable()`, not `blocks`: the universal components the editor owns -- Goto/From, a
+    // ground, a junction, a scope, a `.SUBCKT` boundary -- are resolved by the shared pipeline
+    // and never offered here. This target used to skip them itself, which worked only for as
+    // long as it was the only target. See `spec::is_universal`.
+    for block in scope.emittable() {
         if block.subckt_ref.is_some() {
             continue; // X cards are emitted by the caller, after the plain cards
         }
@@ -151,9 +155,6 @@ fn emit_scope(scope: &Scope<'_>, lines: &mut Vec<String>) -> Result<(), CompileE
                 type_name: block.r#type.clone(),
             });
         };
-        if spec.structural {
-            continue;
-        }
         if let Some(parts) = spec.expansion {
             // A composite contributes several ordinary element cards rather than one. They are
             // emitted together, under the parent block's comments, so a reader sees the whole
@@ -274,13 +275,10 @@ fn dc_reference_cards(scope: &Scope<'_>) -> Result<(Vec<String>, Vec<String>), C
     // off one would be meaningless. A capacitor still registers its nodes below without
     // tying them, so an AC-coupled node is not missed.
 
-    for block in scope.blocks {
+    for block in scope.emittable() {
         let Some(spec) = spec::lookup(&block.r#type) else {
             continue; // an unknown type is already a hard error on the emission path
         };
-        if spec.structural {
-            continue;
-        }
         // Collect this block's (letter, nodes) contributions: a composite gives several.
         let mut cards: Vec<(char, Vec<String>)> = Vec::new();
         if let Some(parts) = spec.expansion {

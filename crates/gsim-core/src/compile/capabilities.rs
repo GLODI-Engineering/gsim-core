@@ -28,7 +28,7 @@ use serde::Serialize;
 use super::spec::{self, ElementTail, FieldSpec, KindName, SubTail, TypeSpec, REGISTRY};
 
 /// The manifest's own version, so a consumer can refuse one it does not understand.
-pub const CAPABILITIES_SCHEMA_VERSION: u32 = 2;
+pub const CAPABILITIES_SCHEMA_VERSION: u32 = 3;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Capabilities {
@@ -38,6 +38,16 @@ pub struct Capabilities {
     pub types: Vec<TypeCapability>,
     /// The rating vocabulary, once, for the whole manifest — see [`RatingsCapability`].
     pub ratings: RatingsCapability,
+    /// The components the **editor** owns rather than any library: Goto/From, a ground, a wire
+    /// junction, a scope, a `.SUBCKT` boundary. See [`super::spec::is_universal`] for what
+    /// qualifies.
+    ///
+    /// Carried separately from [`Self::types`] because the answer a front end needs about these
+    /// is not "how does this engine spell it" — no engine spells them, they never reach a
+    /// netlist — but "may I always offer this component?". The answer is yes, whatever engine a
+    /// sheet is bound for, which is what makes them the editor's: no engine's catalogue gets to
+    /// withhold one. A palette that filters on engine support must not filter these out.
+    pub universal_types: Vec<String>,
 }
 
 /// What a **rating** is, as data: a datasheet limit written on the component itself rather than
@@ -401,6 +411,7 @@ pub fn capabilities() -> Capabilities {
     Capabilities {
         schema_version: CAPABILITIES_SCHEMA_VERSION,
         generator: format!("gsim-core {}", env!("CARGO_PKG_VERSION")),
+        universal_types: spec::universal_types().map(str::to_string).collect(),
         ratings: RatingsCapability {
             fields: spec::RATING_FIELDS
                 .iter()
