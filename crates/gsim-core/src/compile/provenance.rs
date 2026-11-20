@@ -742,12 +742,7 @@ mod tests {
         // event on `FT1_pri` has to highlight the transformer symbol, and the suffix is what
         // lets the front end say *which half* of it the engine is talking about.
         let mut b = ModelBuilder::new("m", "M", 10);
-        add(
-            &mut b,
-            "T1",
-            "physical_electrical.passive.transformer",
-            json!({"n": 3.0}),
-        );
+        add(&mut b, "T1", "passive.transformer", json!({"n": 3.0}));
         add(&mut b, "gnd", "routing.ground", json!({}));
         for (i, port) in ["p1", "n1", "p2", "n2"].iter().enumerate() {
             let r = format!("R{i}");
