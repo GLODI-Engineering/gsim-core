@@ -76,6 +76,18 @@ docs/journal/        chronological continuity log, one file per month
    real-world/proprietary design. If a commit violates this, it must be purged from git history
    (`git filter-repo`), not just deleted in a follow-up commit — see
    `docs/decisions/0002-no-private-content.md`.
+9. **The library holds exactly what this engine compiles.** `data/component-library.json` is not
+   a catalogue of things that might one day be drawable; being in it *is* the claim that
+   `general-simulator` can emit it, and `compile::spec::REGISTRY` is the proof. There is no
+   "shown but unsupported" state and no `planned` flag — roadmap belongs in an issue, where it
+   carries a reason and can be closed. The one exception is a universal component (invariant in
+   `docs/decisions/0006`): the five that a user *places* have library entries, while
+   `routing.junction` (spliced in by drawing) and `spice-subckt.boundary` (compiler-internal)
+   deliberately do not. Three guards in `compile::library` hold this, and the one that matters
+   is `every_component_resolves_under_its_own_id`, which checks `spec::lookup` — the resolver a
+   document actually goes through — rather than the `compiles_to` field that merely promises it.
+   Adding a component without its `TypeSpec`, or a `TypeSpec` without its component, fails. See
+   `docs/decisions/0007-the-library-is-what-the-engine-compiles.md`.
 
 ## Development cycle
 

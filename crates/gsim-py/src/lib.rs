@@ -53,7 +53,7 @@ fn builder_err_to_py(e: BuilderError) -> PyErr {
         BuilderError::CrossParadigm { .. } => "cross-paradigm",
         // One keyword per `port-compat.ts` reason rather than a single "port-incompatible":
         // the three cases need different fixes (drop a v3-reserved kind / correct the wire kind
-        // / insert a routing.merge), so a caller branching on them is the expected use. Same
+        // / remove the second driver), so a caller branching on them is the expected use. Same
         // sub-matching precedent as `Subckt(CyclicDefReference)` below.
         BuilderError::PortIncompatible(inc) => match &inc.failure {
             CompatFailure::ReservedKind { .. } => "port-reserved-kind",

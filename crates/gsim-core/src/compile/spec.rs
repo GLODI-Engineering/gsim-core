@@ -1029,7 +1029,7 @@ pub const REGISTRY: &[TypeSpec] = &[
                 },
             },
         ]),
-        ..TypeSpec::empty("physical_electrical.passive.transformer")
+        ..TypeSpec::empty("passive.transformer")
     },
     // Two real inductors plus a `K` coupling card -- the magnetising inductance is physical
     // here, unlike the ideal transformer above, so this is the one to reach for when the
@@ -1059,7 +1059,7 @@ pub const REGISTRY: &[TypeSpec] = &[
                 },
             },
         ]),
-        ..TypeSpec::empty("physical_electrical.passive.mutual_inductor")
+        ..TypeSpec::empty("passive.mutual_inductor")
     },
     // Same shape, the catalogue's other spelling of it; its coupling param is capital `K` and
     // its two inductances name sibling blocks rather than carrying values, so only the

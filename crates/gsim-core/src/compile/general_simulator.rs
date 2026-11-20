@@ -1554,7 +1554,7 @@ mod tests {
         add(
             &mut b,
             "T1",
-            "physical_electrical.passive.transformer",
+            "passive.transformer",
             Paradigm::PhysicalNetwork,
             json!({"n": 1.0}),
         );
@@ -1647,7 +1647,7 @@ mod tests {
         add(
             &mut b,
             "T1",
-            "physical_electrical.passive.transformer",
+            "passive.transformer",
             Paradigm::PhysicalNetwork,
             json!({"n": 3.0}),
         );
@@ -1705,7 +1705,7 @@ mod tests {
         add(
             &mut b,
             "LK",
-            "physical_electrical.passive.mutual_inductor",
+            "passive.mutual_inductor",
             Paradigm::PhysicalNetwork,
             json!({"L1": 1e-3, "L2": 4e-3, "k": 0.95}),
         );

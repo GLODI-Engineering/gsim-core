@@ -196,7 +196,7 @@ impl std::fmt::Display for CompatFailure {
             ),
             CompatFailure::FanInOnSignal { at, existing_wire } => write!(
                 f,
-                "causal port '{}.{}' is already driven by wire '{existing_wire}' (fan-in is forbidden on a causal kind; converge with a routing.merge block instead)",
+                "causal port '{}.{}' is already driven by wire '{existing_wire}' (fan-in is forbidden on a causal kind: a causal port takes exactly one driver)",
                 at.block, at.port
             ),
             CompatFailure::DimMismatch { expected, actual } => write!(
@@ -906,6 +906,11 @@ mod tests {
     fn signal_and_signal_bus_are_different_kinds() {
         // Neither is a conserving domain, so `physical_domain_of` says nothing about either --
         // this case is reachable only through an exact per-port declaration.
+        //
+        // The contract below is hand-registered, so the name is a stand-in for "something that
+        // drives a signal bus" and not a component the library has: #59 removed
+        // `routing.bus_creator` along with everything no target could emit, and #61 is what
+        // decides whether a bus is the editor's own vocabulary and comes back as a universal.
         let bus = contract(json!({
             "name": "routing.bus_creator",
             "label": "Bus creator",

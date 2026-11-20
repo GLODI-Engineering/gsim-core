@@ -150,10 +150,24 @@ mod tests {
 
     #[test]
     fn the_embedded_library_parses() {
-        assert!(
-            library().len() > 200,
-            "expected the whole library, got {}",
-            library().len()
+        // Derived rather than a magic number. The bound used to be `> 200`, which was a
+        // truncated-read check while the library held 240 components of which 164 compiled
+        // nowhere. Since #59 it holds exactly what this engine compiles, so the size is a
+        // consequence of the registry: every type a target emits, plus the universal
+        // components that are *placed from a palette* -- a Goto, a From, a ground, and both
+        // catalogue spellings of a scope.
+        //
+        // Two universals are deliberately absent, which is why this is not simply
+        // `REGISTRY.len()`: `routing.junction` is spliced in by drawing onto a conductor and
+        // `spice-subckt.boundary` marks a def's interface, so neither is something a user
+        // picks up. `the_registry_is_not_drifting_further_from_the_library` exempts every
+        // structural type for that reason; this counts the five that are real palette entries.
+        const PALETTE_UNIVERSALS: usize = 5;
+        let emittable = REGISTRY.iter().filter(|s| !s.structural).count();
+        assert_eq!(
+            library().len(),
+            emittable + PALETTE_UNIVERSALS,
+            "the embedded library did not parse whole, or a type was added on one side only"
         );
     }
 
@@ -458,26 +472,23 @@ mod tests {
 
     #[test]
     fn compilable_is_derived_from_the_registry_not_stored() {
-        let catalog = catalog();
-        let resistor = catalog
-            .components
-            .iter()
-            .find(|c| c.component.id == "passive.resistor")
-            .expect("resistor");
-        assert!(resistor.compilable);
-
-        // A MOSFET is in the library and has no compile registry entry, so it is shown and
-        // honestly marked rather than hidden.
-        let mosfet = catalog
-            .components
-            .iter()
-            .find(|c| c.component.id.contains("mosfet"))
-            .expect("the library knows about MOSFETs");
-        assert!(
-            !mosfet.compilable,
-            "{} claims to compile",
-            mosfet.component.id
-        );
+        // Asserted as the derivation itself rather than by example: for every component,
+        // `compilable` is exactly whether `spec::lookup` finds a `TypeSpec`. Nothing is read
+        // from the data file, so the flag cannot disagree with what the compiler will do.
+        //
+        // This used to be pinned with a resistor (compilable) and a MOSFET (not), the MOSFET
+        // standing for "in the library, honestly marked unsupported". Since #59 the library
+        // holds only what this engine compiles, so no such component exists to point at --
+        // `every_component_resolves_under_its_own_id` is now what catches an entry the
+        // registry does not back.
+        for entry in &catalog().components {
+            let id = &entry.component.id;
+            assert_eq!(
+                entry.compilable,
+                crate::compile::spec::lookup(id).is_some(),
+                "{id}: the catalogue's `compilable` disagrees with `spec::lookup`"
+            );
+        }
     }
 
     /// Registry types no component points at — compilable by the engine, unreachable from a
@@ -513,6 +524,43 @@ mod tests {
             "{} registry types have no component to place them:\n  {}",
             orphans.len(),
             orphans.join("\n  ")
+        );
+    }
+
+    /// Every component resolves under **its own id** -- the name a saved document carries.
+    ///
+    /// Not the same question as the guard above, which walks the other direction through
+    /// `compiles_to`. `compiles_to` is a *claim* in the data file; `spec::lookup` is what the
+    /// compiler runs, and it resolves an unknown spelling by finding the component and then
+    /// matching `component.id` against the registry. The two disagreed, and nothing said so:
+    ///
+    /// ```text
+    /// lookup=false  find_component.id=Some("physical-electrical.passive.transformer")
+    /// lookup=true   find_component.id=None   <- physical_electrical.passive.transformer
+    /// ```
+    ///
+    /// The library spelled the transformer and the mutual inductor with a **hyphen** and the
+    /// registry with an **underscore**, so each was split into two unreachable halves: the
+    /// drawable name failed `UnknownType`, and the compilable name had no component to place
+    /// it. Both carried `compiles_to` pointing at the registry's spelling, so the guard above
+    /// was satisfied the entire time and two components were unusable in either direction.
+    ///
+    /// This is the guard that makes "the library is exactly what this engine compiles" true
+    /// under the resolver a document actually goes through, rather than under a field that
+    /// only promises it.
+    #[test]
+    fn every_component_resolves_under_its_own_id() {
+        let mut unresolvable: Vec<&str> = library()
+            .iter()
+            .filter(|c| crate::compile::spec::lookup(&c.id).is_none())
+            .map(|c| c.id.as_str())
+            .collect();
+        unresolvable.sort_unstable();
+        assert!(
+            unresolvable.is_empty(),
+            "{} components cannot be compiled under the name a document saves:\n  {}",
+            unresolvable.len(),
+            unresolvable.join("\n  ")
         );
     }
 
