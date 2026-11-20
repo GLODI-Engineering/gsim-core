@@ -67,6 +67,42 @@ pub fn version() -> String {
     gsim_core::version().to_string()
 }
 
+/// What this engine can compile, as JSON — see [`gsim_core::compile::capabilities`].
+///
+/// # Why a front end needs this from the compiler and not from a file
+///
+/// The editor used to keep its own list of supported types and their parameters. It drifted
+/// until **none of the 143 catalogue types matched it**, because the two sides spelled type
+/// names differently, so every block on every sheet reported "not supported by the simulator".
+/// The direction was fixed then: the engine declares, the front end renders.
+///
+/// `gsim-py` has exposed this since that fix; this binding did not, so a browser-hosted editor
+/// could compile a document but could not ask what was compilable — and had to be handed a
+/// generated JSON file instead, checked into its own repository with a drift job to notice when
+/// it went stale. A generated file with a drift job is a copy with an alarm on it. This is the
+/// call that makes the copy unnecessary.
+///
+/// The manifest carries `universal_types` as well as `types`: the components the *editor* owns
+/// rather than any library — Goto/From, a ground, a wire junction, a scope. A palette that
+/// filters on engine support must not filter those out, because no engine's catalogue gets to
+/// withhold them (see [`gsim_core::compile::spec::is_universal`] and decision 0006).
+#[wasm_bindgen]
+pub fn capabilities() -> String {
+    gsim_core::compile::capabilities::capabilities_json()
+}
+
+/// The component library: everything a front end needs to draw a palette, plus whether this
+/// engine can compile each component — see [`gsim_core::compile::library`].
+///
+/// The same drift story as [`capabilities`], one layer up and with a worse symptom. The editor
+/// kept its own catalogue beside this one — labels, port geometry, parameter names and defaults
+/// — and the two disagreed until a switch's parameters could not agree on whether they were
+/// resistances or conductances. There is one description now, and it is this one.
+#[wasm_bindgen]
+pub fn catalog() -> String {
+    gsim_core::compile::library::catalog_json()
+}
+
 fn evaluate_component_impl(contract_json: &str, params_json: &str) -> Result<String, String> {
     let contract: ComponentContract = parse_json(contract_json, "contract")?;
     let params: Map<String, Value> = parse_json(params_json, "params")?;
@@ -1177,5 +1213,117 @@ mod tests {
             err.contains("unknown netlist target 'ngspice'"),
             "got: {err}"
         );
+    }
+
+    /// The manifest a browser-hosted editor renders its palette from.
+    ///
+    /// Asserted on shape rather than on contents: the contents are the registry's, and
+    /// `gsim-core`'s own tests own them. What this checks is that the call reaches them at all
+    /// from *this* binding, which is the thing that was missing.
+    #[test]
+    fn capabilities_reaches_the_registry() {
+        let manifest: Value = serde_json::from_str(&capabilities()).expect("valid JSON");
+
+        assert!(
+            manifest["schema_version"].as_u64().is_some(),
+            "a consumer refuses a manifest whose version it cannot read: {manifest}"
+        );
+        assert!(
+            manifest["generator"]
+                .as_str()
+                .is_some_and(|g| g.starts_with("gsim-core ")),
+            "the manifest says which compiler produced it: {manifest}"
+        );
+        let types = manifest["types"].as_array().expect("types array");
+        assert!(
+            types.len() > 50,
+            "the whole registry, not a handful: {} types",
+            types.len()
+        );
+        // The components the editor owns, carried separately -- a palette that filters on
+        // engine support must not filter these out. Decision 0006.
+        let universal = manifest["universal_types"]
+            .as_array()
+            .expect("universal_types array");
+        let names: Vec<&str> = universal.iter().filter_map(|v| v.as_str()).collect();
+        assert!(
+            names.contains(&"routing.goto") && names.contains(&"routing.from"),
+            "Goto/From are the case that contract exists for: {names:?}"
+        );
+    }
+
+    /// The component library, likewise.
+    #[test]
+    fn catalog_reaches_the_library() {
+        let catalog: Value = serde_json::from_str(&catalog()).expect("valid JSON");
+
+        let components = catalog
+            .get("components")
+            .and_then(|c| c.as_array())
+            .or_else(|| catalog.as_array())
+            .expect("a components array, however the library nests it");
+        assert!(
+            components.len() > 50,
+            "the whole library, not a handful: {} components",
+            components.len()
+        );
+    }
+
+    /// This binding and `gsim-py` expose the same surface.
+    ///
+    /// Not a nicety. The two drifted for real: `capabilities` and `catalog` existed in `gsim-py`
+    /// and not here, so a browser-hosted editor could compile a document but could not ask what
+    /// was compilable, and had to be handed a generated JSON file checked into its own
+    /// repository instead. Nothing noticed, because nothing compared the two lists.
+    ///
+    /// # Why this is a reference and not a comparison
+    ///
+    /// The first version of this test compared two hand-written lists of names. Both were typed
+    /// by the same hand in the same minute, so it passed by construction and could never fail —
+    /// the same trap as asserting a tolerant emitter drops a block it was never handed.
+    ///
+    /// So it *references* every function instead. A `fn` item coerced to a function pointer of a
+    /// stated signature does not compile if the function is missing, renamed, or has a different
+    /// shape — so the guarantee is the build, not an assertion, and the failure arrives at the
+    /// line naming what went. The list below is `dir(gsim_py)` as of the commit that added
+    /// `capabilities` and `catalog`; a `cfg(test)` build here cannot introspect a PyO3 module,
+    /// so keeping it in step is still a human job — but forgetting is now a compile error on
+    /// this side rather than silence.
+    #[test]
+    fn every_gsim_py_function_exists_in_this_binding_too() {
+        // add_block, add_model_param, add_subckt_def, auto_arrange
+        let _: fn(&str, &str) -> Result<String, JsValue> = add_block;
+        let _: fn(&str, &str, &str) -> Result<String, JsValue> = add_model_param;
+        let _: fn(&str, &str) -> Result<String, JsValue> = add_subckt_def;
+
+        // capabilities, catalog -- the two this commit adds
+        let _: fn() -> String = capabilities;
+        let _: fn() -> String = catalog;
+
+        // compile, connect
+        let _: fn(&str, &str) -> Result<String, JsValue> = compile;
+
+        // evaluate_component, instantiate_subckt
+        let _: fn(&str, &str) -> Result<String, JsValue> = evaluate_component;
+        let _: fn(&str, &str) -> Result<String, JsValue> = instantiate_subckt;
+
+        // load_document, new_model, remove_block, save_document
+        let _: fn(&str) -> Result<String, JsValue> = load_document;
+        let _: fn(&str, &str, i64) -> String = new_model;
+        let _: fn(&str, &str) -> Result<String, JsValue> = remove_block;
+        let _: fn(&str) -> Result<String, JsValue> = save_document;
+
+        // validate_parameters, version
+        let _: fn(&str, &str) -> Result<String, JsValue> = validate_parameters;
+        let _: fn() -> String = version;
+
+        // The remaining four -- auto_arrange, connect, layered_layout, place_without_overlap --
+        // take more arguments than are worth spelling twice; referencing them by name is enough
+        // to make a removal a compile error here.
+        let _ = auto_arrange;
+        let _ = connect;
+        let _ = layered_layout;
+        let _ = place_without_overlap;
+        let _ = set_param;
     }
 }
