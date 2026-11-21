@@ -1,5 +1,5 @@
 {
-  "name": "passive.switch.ideal",
+  "name": "ideal.switch",
   "label": "Ideal Switch",
   "category": "passive",
   "parameters": [

@@ -2,7 +2,7 @@
 //! `docs/journal/2026-08.md`'s entry on the component-spec audit), not synthetic examples. Each
 //! one exercises a real structural pattern found there:
 //!
-//! - `passive.diode.ideal` / `passive.switch.ideal` — plain static components (fixed ports,
+//! - `ideal.diode` / `ideal.switch` — plain static components (fixed ports,
 //!   scalar params, a cross-parameter `validate` rule).
 //! - `control.pid` — the simplest possible static reference case.
 //! - `control.transfer_function` — a variable-*length* array parameter that does NOT drive port
@@ -75,7 +75,7 @@ fn params(v: Value) -> Map<String, Value> {
 
 #[test]
 fn ideal_diode_is_static_with_two_ports_and_a_cross_param_validation_rule() {
-    let c = load("passive.diode.ideal");
+    let c = load("ideal.diode");
 
     let evaluated = evaluate_component(&c, &params(json!({}))).unwrap();
     assert_eq!(evaluated.ports.len(), 2);
@@ -92,7 +92,7 @@ fn ideal_diode_is_static_with_two_ports_and_a_cross_param_validation_rule() {
 
 #[test]
 fn ideal_switch_has_three_ports_including_the_gate() {
-    let c = load("passive.switch.ideal");
+    let c = load("ideal.switch");
     let evaluated = evaluate_component(&c, &params(json!({}))).unwrap();
     let ids: Vec<&str> = evaluated.ports.iter().map(|p| p.id.as_str()).collect();
     assert_eq!(ids, vec!["d", "s", "g"]);

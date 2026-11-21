@@ -1210,7 +1210,7 @@ pub const REGISTRY: &[TypeSpec] = &[
                 },
             ],
         }),
-        ..TypeSpec::empty("passive.switch.ideal")
+        ..TypeSpec::empty("ideal.switch")
     },
     TypeSpec {
         device_letter: Some('D'),
@@ -1246,7 +1246,7 @@ pub const REGISTRY: &[TypeSpec] = &[
                 },
             ],
         }),
-        ..TypeSpec::empty("passive.diode.ideal")
+        ..TypeSpec::empty("ideal.diode")
     },
     // -- converters ---------------------------------------------------------
     TypeSpec {
