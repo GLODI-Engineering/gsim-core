@@ -103,6 +103,14 @@ fallback set. The names overlap on four strings (`passive.resistor`, `passive.ca
 | `sinks.scope` | (none) |
 | `hierarchy.subsystem.virtual` | (none — see Finding 4) |
 
+> **Later, and deliberately not rewritten above.** This table is a dated audit, so it keeps the
+> names as they were measured. Two rows have since changed: the `REGISTRY` side now spells them
+> `ideal.diode` and `ideal.switch` (#60 — see the amendment to 0001 for why the group rather than
+> the leaf carries the distinction), and `physical-electrical.passive.transformer` /
+> `.mutual_inductor` now have registry entries, each under one spelling (#62). Every old name in
+> this column still resolves, as an alias — except `passive.switch.voltage`, which is now
+> `UnknownType` on purpose.
+
 `REGISTRY`'s names came from `general-mna`/`general-simulator`'s own engine vocabulary; the GUI's
 came from its block catalogue under `packages/blocks/src/blocks/`. Neither is wrong, but there is
 no mapping layer, and adding one is a real design decision (translate in `gsim-core`? alias entries

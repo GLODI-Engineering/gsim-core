@@ -148,9 +148,9 @@ def build(blocks_ref):
 
     model = add(model, "gnd", "routing.ground", "physical-network", (0, 300))
     model = add(model, "Vdc", "source.voltage.dc", "physical-network", (0, 150), {"V": VIN})
-    model = add(model, "DSW", "passive.switch.ideal", "physical-network", (120, 100),
+    model = add(model, "DSW", "ideal.switch", "physical-network", (120, 100),
                 SWITCH_PARAMS)
-    model = add(model, "Dfw", "passive.diode.ideal", "physical-network", (120, 220),
+    model = add(model, "Dfw", "ideal.diode", "physical-network", (120, 220),
                 DIODE_PARAMS)
     model = add(model, "Lf", "passive.inductor", "physical-network", (240, 100), {"L": LF})
     model = add(model, "Cf", "passive.capacitor", "physical-network", (360, 220), {"C": CF})
