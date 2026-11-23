@@ -1,5 +1,5 @@
 {
-  "name": "passive.diode.ideal",
+  "name": "ideal.diode",
   "label": "Ideal Diode",
   "category": "passive",
   "parameters": [

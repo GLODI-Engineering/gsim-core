@@ -8,7 +8,7 @@
     "blocks": [
       {
         "id": "lega_high",
-        "type": "passive.switch.ideal",
+        "type": "ideal.switch",
         "paradigm": "physical-network",
         "domain": "electrical",
         "fidelity": "ideal",
@@ -30,7 +30,7 @@
       },
       {
         "id": "lega_low",
-        "type": "passive.switch.ideal",
+        "type": "ideal.switch",
         "paradigm": "physical-network",
         "domain": "electrical",
         "fidelity": "ideal",
@@ -52,7 +52,7 @@
       },
       {
         "id": "legb_high",
-        "type": "passive.switch.ideal",
+        "type": "ideal.switch",
         "paradigm": "physical-network",
         "domain": "electrical",
         "fidelity": "ideal",
@@ -74,7 +74,7 @@
       },
       {
         "id": "legb_low",
-        "type": "passive.switch.ideal",
+        "type": "ideal.switch",
         "paradigm": "physical-network",
         "domain": "electrical",
         "fidelity": "ideal",
@@ -96,7 +96,7 @@
       },
       {
         "id": "legc_high",
-        "type": "passive.switch.ideal",
+        "type": "ideal.switch",
         "paradigm": "physical-network",
         "domain": "electrical",
         "fidelity": "ideal",
@@ -118,7 +118,7 @@
       },
       {
         "id": "legc_low",
-        "type": "passive.switch.ideal",
+        "type": "ideal.switch",
         "paradigm": "physical-network",
         "domain": "electrical",
         "fidelity": "ideal",

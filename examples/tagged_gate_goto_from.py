@@ -111,7 +111,7 @@ def power_stage_and_control(model):
     e = "physical-electrical"
     model = add(model, "gnd", "routing.ground", "physical-network", (0, 300))
     model = add(model, "Vdc", "source.voltage.dc", "physical-network", (0, 150), {"V": VDC})
-    model = add(model, "DSW", "passive.switch.ideal", "physical-network", (120, 100),
+    model = add(model, "DSW", "ideal.switch", "physical-network", (120, 100),
                 SWITCH_PARAMS)
     model = add(model, "Rload", "passive.resistor", "physical-network", (240, 200),
                 {"R": RLOAD})

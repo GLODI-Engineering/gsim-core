@@ -1761,7 +1761,7 @@ mod tests {
         add(
             &mut b,
             "DEV",
-            "passive.switch.ideal",
+            "ideal.switch",
             Paradigm::PhysicalNetwork,
             json!({"r_on": 0.04, "body_g_breakdown": 0.0, "body_v_breakdown": -1e6,
                    "body_g_off": 1e-6, "body_v_f": 0.6, "body_g_on": 100.0}),
@@ -1839,7 +1839,7 @@ mod tests {
         add(
             &mut b,
             "lega_high",
-            "passive.switch.ideal",
+            "ideal.switch",
             Paradigm::PhysicalNetwork,
             json!({"r_on": 0.1, "body_g_breakdown": 0.0, "body_v_breakdown": -100.0,
                    "body_g_off": 1e-9, "body_v_f": 0.6, "body_g_on": 5.0}),
@@ -2736,7 +2736,7 @@ mod tests {
         add_commented(
             &mut b,
             "DEV",
-            "passive.switch.ideal",
+            "ideal.switch",
             Paradigm::PhysicalNetwork,
             json!({"r_on": 0.04, "body_g_breakdown": 0.0, "body_v_breakdown": -1e6,
                    "body_g_off": 1e-6, "body_v_f": 0.6, "body_g_on": 100.0}),
@@ -3739,7 +3739,7 @@ mod tests {
             add(
                 &mut b,
                 id,
-                "passive.switch.ideal",
+                "ideal.switch",
                 Paradigm::PhysicalNetwork,
                 json!({"r_on": 1e-3, "body_g_breakdown": 1.0, "body_v_breakdown": 1e3,
                        "body_g_off": 1e-9, "body_v_f": 0.5, "body_g_on": 1e3}),

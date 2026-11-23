@@ -1,6 +1,6 @@
 # 0001 — Scope and naming
 
-**Status:** accepted (2026-08-29).
+**Status:** accepted (2026-08-29); the taxonomy decision amended 2026-11-21 (see the amendment at the end).
 
 ## Context
 
@@ -166,3 +166,55 @@ is pure port-geometry math despite its name, not autolayout).
   Phase 1's document model should decide explicitly whether to enforce full schema conformance
   at construction time (stricter) or keep the "fast-fail subset + external full check" split
   `gsim_model` uses today.
+
+## Amendment — the distinct leaf is a distinct *group*, `ideal.*` (#60)
+
+**2026-11-21.** The taxonomy decision above says a component targeting `general-simulator`'s
+ideal diode/switch "must be a **distinct catalog leaf** from `semi.diode`/`semi.mosfet.n` […]
+not a parameter variant". It did not say where the distinction lives, and the library put it in
+the leaf word: `passive.diode.ideal` and `passive.switch.ideal`.
+
+That turned out to be the wrong half of the name to carry it, for two separate reasons.
+
+**The group was false.** `passive.switch.ideal`'s own `TypeSpec` declares `node_ports`
+`["d", "s"]` — drain and source — a block-driven `ctrl` mapped to a third terminal `g`, a
+`v_gs_th` gate threshold, and an intrinsic body diode with its own `body_v_f`,
+`body_v_breakdown`, `body_g_on` and `body_g_off`. A three-terminal gate-driven active device
+with a body diode was filed next to the resistor. `passive.diode.ideal` is passive in the
+energy sense but is not a lumped R/L/C element, which is the only thing `passive.` was ever
+describing.
+
+**The obvious fix would have broken this very decision.** `semi.diode.ideal` reads as a
+parameter variant of `semi.diode` — precisely the conflation the paragraph above exists to
+prevent. Moving the qualifier to the leaf's end cannot express "different model", because leaf
+qualifiers are how parameter variants are spelled everywhere else in the taxonomy.
+
+So the distinction goes in the group:
+
+| was | is |
+|---|---|
+| `passive.diode.ideal` | `ideal.diode` |
+| `passive.switch.ideal` | `ideal.switch` |
+
+`ideal.*` names general-simulator's piecewise-linear ideal-device family for what it is. It
+cannot be read as a SPICE model's variant, it leaves `semi.diode` and `semi.mosfet.n` unclaimed
+for a real SPICE target, and it leaves `passive.` holding exactly the six lumped elements it
+always meant: resistor, capacitor, inductor, `inductor.coupled`, transformer,
+`mutual_inductor`.
+
+**The leaf words are unchanged on purpose.** The emitted netlist still carries
+`kind=ideal_switch`, so nothing desynchronises from `general-simulator`, `general-mna` or
+`spice-lsp`'s grammar. Verified rather than assumed: every example in `examples/` was run after
+the rename and all four that name a renamed type emit a netlist byte-identical to its committed
+`.cir`.
+
+**The old ids still open a saved sheet.** The model behind each is unchanged, so
+`passive.diode.ideal` and `passive.switch.ideal` are kept as aliases and resolve to the same
+`TypeSpec`. What is *not* kept is `passive.switch.voltage`: a voltage-controlled switch is not
+the ideal PWL switch, and an alias that answers for it is the conflation this decision forbids.
+
+**What this cost.** The whole workspace suite stayed green through the rename — nothing pinned
+either name, in a repo whose entire purpose is to be the shared source of those names. The
+guards now exist in `tests/the_ideal_devices_are_not_passive.rs`, and each was watched fail
+before it was trusted.
+

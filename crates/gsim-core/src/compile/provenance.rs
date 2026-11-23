@@ -681,7 +681,7 @@ mod tests {
         add(
             &mut b,
             "DEV",
-            "passive.switch.ideal",
+            "ideal.switch",
             json!({"r_on": 0.04, "body_g_breakdown": 0.0, "body_v_breakdown": -1e6,
                    "body_g_off": 1e-6, "body_v_f": 0.6, "body_g_on": 100.0}),
         );

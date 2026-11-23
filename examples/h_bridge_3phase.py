@@ -40,13 +40,13 @@ def leg_positions(index: int) -> tuple[tuple[int, int], tuple[int, int]]:
 
 def add_switch(model_json: str, block_id: str, position: tuple[int, int]) -> str:
     spec = {
-        "type": "passive.switch.ideal",
+        "type": "ideal.switch",
         "paradigm": "physical-network",
         "domain": "electrical",
         "position": list(position),
         "rotation": 0,
         "id": block_id,
-        # Defaults matching crates/gsim-core/tests/fixtures/general_simulator/passive.switch.ideal.json
+        # Defaults matching crates/gsim-core/tests/fixtures/general_simulator/ideal.switch.json
         "params": {
             "r_on": 0.1,
             "body_g_breakdown": 0.0,
