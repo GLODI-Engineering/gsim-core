@@ -89,6 +89,65 @@ jobs:
           pip install --find-links target/wheels gsim_py
           python -c "import gsim_py; print('gsim_py imports')"
 
+  # Nothing ran `examples/` until this job existed, and they are not illustrative snippets:
+  # each `.py` builds a document, emits a netlist, and writes it next to itself, with the
+  # committed `.cir` as the golden file. So the library can be renamed out from under all ten
+  # of them and every other job stays green.
+  #
+  # That is not hypothetical. gsim-core#60 renamed two component ids that four examples spell;
+  # the renames were verified by running the examples by hand and diffing the netlists,
+  # because no job did it. This is that check, so the next rename does not depend on somebody
+  # remembering.
+  #
+  # The solver is not available here, so the examples compile and emit but do not run:
+  # `GSIM_SIMULATOR` is left unset and each example says "compiled only, not run" and exits
+  # clean. Emission is the part this repository owns.
+  examples-still-emit-what-they-emitted:
+    name: The examples emit the netlists they committed
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build and install gsim_py
+        run: |
+          pip install maturin
+          maturin build --release --manifest-path crates/gsim-py/Cargo.toml --out dist
+          pip install --find-links dist gsim_py
+
+      # Run from `examples/` and without `-I`: `h_bridge_3phase_driven.py` imports a sibling
+      # module, and isolated mode drops the script's own directory from `sys.path`, which
+      # fails the import and looks exactly like a broken example.
+      - name: Run every example
+        working-directory: examples
+        run: |
+          failed=0
+          for f in *.py; do
+            echo "::group::$f"
+            if python "$f"; then echo "ok: $f"; else echo "FAILED: $f"; failed=1; fi
+            echo "::endgroup::"
+          done
+          exit $failed
+
+      # The examples rewrite their own `.cir` in place, so an unchanged tree means every
+      # netlist still matches the one committed. A diff here is the library having changed
+      # under an example without the example being updated.
+      - name: The emitted netlists match the committed ones
+        run: |
+          if ! git diff --exit-code -- examples/; then
+            echo "::error::An example emitted a netlist that differs from its committed .cir."
+            exit 1
+          fi
+
   # The rating vocabulary lives in two repositories by necessity: `general-simulator`
   # interprets `i_max` and this crate emits it, and neither depends on the other (the engine
   # would gain a compiler it does not need; this crate would gain a solver). So the agreement
