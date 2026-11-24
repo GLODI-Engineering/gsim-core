@@ -91,12 +91,23 @@ jobs:
           name: wheels-sdist
           path: dist
 
-  # Deliberately not a publish step. Pushing to an index needs a token this
-  # repository does not have, and publishing is a decision rather than a
-  # consequence of tagging. The artifacts above are what a release attaches.
+  # Deliberately not a *publish* step. Pushing to an index needs a token this
+  # repository does not have, and publishing to PyPI is a decision rather than a
+  # consequence of tagging.
+  #
+  # Attaching to the release for the tag that built them is a different thing,
+  # and this job used to stop short of it: the comment here claimed "the
+  # artifacts above are what a release attaches", and nothing attached them.
+  # v0.5.0 built wheels for five platforms, succeeded, and shipped zero release
+  # assets. A CI artifact expires and cannot be fetched without a GitHub login
+  # and a run id, so for anyone outside CI `gsim_py` was unobtainable without a
+  # Rust toolchain -- which is the whole problem wheels exist to solve (#71).
   collect:
     needs: [build, sdist]
     runs-on: ubuntu-24.04
+    permissions:
+      # Scoped to this job: the only write it performs is the release upload below.
+      contents: write
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -105,7 +116,36 @@ jobs:
           path: dist
       - name: what was built
         run: ls -la dist
+
+      # A matrix leg that silently stops producing wheels is invisible otherwise:
+      # `download-artifact` is happy with whatever showed up, and the release
+      # would simply be missing a platform nobody notices until someone on it
+      # tries to install. Naming the five expected tags turns that into a failure.
+      - name: Every platform in the matrix produced a wheel
+        run: |
+          missing=0
+          for tag in "manylinux*_x86_64" "manylinux*_aarch64" \
+                     "macosx_*_arm64" "macosx_*_x86_64" "win_amd64"; do
+            # shellcheck disable=SC2086
+            if ! ls dist/*-$tag.whl >/dev/null 2>&1; then
+              echo "::error::no wheel for $tag"
+              missing=1
+            fi
+          done
+          test -n "$(ls -1 dist/*.tar.gz 2>/dev/null)" || {
+            echo "::error::no sdist"; missing=1; }
+          exit $missing
+
       - uses: actions/upload-artifact@v4
         with:
           name: all-wheels
           path: dist
+
+      - name: Attach them to the release for this tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # --clobber so re-running the workflow on an existing tag replaces the
+          # assets instead of failing on a name that is already there.
+          gh release upload "${GITHUB_REF_NAME}" dist/* --clobber --repo "${GITHUB_REPOSITORY}"
