@@ -1203,4 +1203,43 @@ mod tests {
         assert!(msg.starts_with("unknown-type:"), "got: {msg}");
         assert!(msg.contains("made.up.type"), "got: {msg}");
     }
+
+    /// A `Model` carrying the four features `gsim-core` does not model, plus a key no struct
+    /// anywhere models. See `gsim-core/tests/the_document_keeps_what_it_does_not_model_78.rs`.
+    const MODEL_WITH_UNMODELLED_FIELDS: &str = r#"{
+        "id": "top", "name": "Top", "grid": 10,
+        "blocks": [{
+            "id": "sub1", "type": "hierarchy.subsystem", "paradigm": "hierarchy",
+            "domain": "mixed", "position": [0, 0],
+            "subsystem": { "id": "inner", "name": "Inner", "blocks": [], "wires": [] }
+        }],
+        "wires": [],
+        "subckt_defs": [{ "id": "od", "name": "OPAMP", "body": "E1 out 0 inp inn 1e5" }],
+        "ports": [{ "id": "p1", "direction": "in", "kind": "signal" }],
+        "parent_param_aliases": [{ "inner": "x", "outer": "fsw" }],
+        "a_field_from_a_later_format_version": 42
+    }"#;
+
+    /// The wheel is the officially recommended way to build a document programmatically, so
+    /// this is the surface a user actually loses data through -- #78 is only fixed if it is
+    /// fixed *here*, not merely on the Rust struct.
+    #[test]
+    fn save_document_keeps_the_fields_the_engine_does_not_model_78() {
+        let doc: Value =
+            serde_json::from_str(&save_document(MODEL_WITH_UNMODELLED_FIELDS).unwrap()).unwrap();
+        let model = &doc["model"];
+        assert_eq!(model["blocks"][0]["subsystem"]["id"], "inner");
+        assert_eq!(model["subckt_defs"][0]["body"], "E1 out 0 inp inn 1e5");
+        assert_eq!(model["ports"][0]["id"], "p1");
+        assert_eq!(model["parent_param_aliases"][0]["outer"], "fsw");
+        assert_eq!(model["a_field_from_a_later_format_version"], 42);
+
+        // ...and a second trip through the pair the editor actually calls keeps them too.
+        let again: Value = serde_json::from_str(&load_document(&doc.to_string()).unwrap()).unwrap();
+        assert_eq!(again["model"]["blocks"][0]["subsystem"]["id"], "inner");
+        assert_eq!(
+            again["model"]["subckt_defs"][0]["body"],
+            "E1 out 0 inp inn 1e5"
+        );
+    }
 }

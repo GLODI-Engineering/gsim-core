@@ -141,6 +141,11 @@ pub struct Block {
     /// list, and `connect()` deliberately does not validate port existence against a catalogue.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub subckt_ref: Option<String>,
+    /// See [`super::Model::extra`]. `subsystem` -- an entire nested model, which this crate
+    /// deliberately does not interpret -- lands here and survives a round trip as an opaque
+    /// value (#78).
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
 }
 
 pub struct NewBlock {
@@ -192,6 +197,7 @@ impl Block {
             comment_before: spec.comment_before,
             comment_after: spec.comment_after,
             subckt_ref: spec.subckt_ref,
+            extra: Map::new(),
         })
     }
 }

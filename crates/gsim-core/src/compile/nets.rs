@@ -271,6 +271,7 @@ mod tests {
             pinned: false,
             net: None,
             label: None,
+            extra: serde_json::Map::new(),
         }
     }
 

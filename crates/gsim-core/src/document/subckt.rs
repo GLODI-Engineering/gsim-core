@@ -112,6 +112,9 @@ pub struct SubcktPort {
     /// literally (or deserializing it) does not validate, matching how [`super::Block`]'s own
     /// pattern checks live in `Block::new` rather than in `Deserialize`.
     pub kind: String,
+    /// See [`super::Model::extra`].
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
 }
 
 impl SubcktPort {
@@ -121,7 +124,11 @@ impl SubcktPort {
         if !SUBCKT_PORT_KINDS.contains(&kind.as_str()) {
             return Err(SubcktError::InvalidPortKind { port: id, kind });
         }
-        Ok(SubcktPort { id, kind })
+        Ok(SubcktPort {
+            id,
+            kind,
+            extra: Map::new(),
+        })
     }
 }
 
@@ -136,6 +143,9 @@ pub struct SubcktInstance {
     pub connections: Vec<String>,
     #[serde(default)]
     pub params: Map<String, Value>,
+    /// See [`super::Model::extra`].
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
 }
 
 impl SubcktInstance {
@@ -145,6 +155,7 @@ impl SubcktInstance {
             def_ref: def_ref.into(),
             connections: Vec::new(),
             params: Map::new(),
+            extra: Map::new(),
         }
     }
 
@@ -176,6 +187,11 @@ pub struct SubcktDef {
     pub wires: Vec<Wire>,
     #[serde(default)]
     pub instances: Vec<SubcktInstance>,
+    /// See [`super::Model::extra`]. `body` -- the raw SPICE text of a netlist-only `.SUBCKT`,
+    /// which this module deliberately replaced with a structured body (see "Divergence 1") --
+    /// lands here and survives a round trip verbatim (#78).
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
 }
 
 impl SubcktDef {
@@ -195,6 +211,7 @@ impl SubcktDef {
             blocks: Vec::new(),
             wires: Vec::new(),
             instances: Vec::new(),
+            extra: Map::new(),
         })
     }
 
