@@ -81,12 +81,12 @@ already ships `pyblock-ffi` and `cscript-ffi` around its own Rust core.
 
 All three Phase 1 deliverables are implemented — the GSF v2 contract schema with its
 `${{ }}` expression language, the `.gsim_sch` document model, and autolayout — and netlist
-compilation, which Phase 1 had deferred, has landed on top of them. Published at **0.5.0**,
+compilation, which Phase 1 had deferred, has landed on top of them. Published at **0.6.0**,
 together with both binding crates.
 
 ```toml
 [dependencies]
-gsim-core = "0.5"
+gsim-core = "0.6"
 ```
 
 ### The bindings
