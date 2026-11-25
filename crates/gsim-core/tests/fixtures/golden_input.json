@@ -1,0 +1,31 @@
+{
+  "schema_version": 2,
+  "model": {
+    "id": "top", "name": "Top", "grid": 20,
+    "params": [{ "name": "fsw", "value": 100000, "unit": "Hz", "doc": "switching" }],
+    "blocks": [{
+      "id": "R1", "type": "passive.resistor", "paradigm": "physical-network",
+      "domain": "electrical", "fidelity": "spice", "position": [10, 20],
+      "rotation": 90, "mirror": "x", "params": { "R": 0.011067758972493853 },
+      "ic": { "V": 0 }, "ratings": { "i_max": 3 }, "label": "load",
+      "comment_before": ["measured"], "comment_after": ["and again"]
+    }],
+    "wires": [{
+      "id": "w1", "from": { "block": "R1", "port": "p" }, "to": { "block": "R1", "port": "n" },
+      "kind": "physical-electrical", "waypoints": [[10, 10]], "pinned": true,
+      "net": "vout", "label": "out"
+    }],
+    "subckt_defs": [{
+      "id": "leaf", "name": "LEAF",
+      "ports": [{ "id": "a", "kind": "physical-electrical" }],
+      "params": [{ "name": "gain", "value": 1e-9 }],
+      "blocks": [], "wires": [],
+      "instances": [{ "id": "X1", "def_ref": "leaf", "connections": ["a"], "params": { "m": 2 } }]
+    }],
+    "role": "library",
+    "lines": [{ "id": "a1", "kind": "text", "position": [0, 0], "text": "hello" }],
+    "nets": [{ "name": "vout", "kind": "physical-electrical" }],
+    "simulation": { "analyses": [] },
+    "metadata": { "author": "nobody" }
+  }
+}

@@ -482,6 +482,7 @@ impl ModelBuilder {
             value,
             unit: None,
             doc: None,
+            extra: Map::new(),
         });
         Ok(())
     }
@@ -597,6 +598,7 @@ impl ModelBuilder {
             pinned: opts.pinned,
             net: opts.net,
             label: opts.label,
+            extra: Map::new(),
         });
         // Borrow-check note: return the id, not a &Wire -- the caller already has the id and can
         // look the wire back up via `model().wires` if needed; avoids a self-referential borrow.

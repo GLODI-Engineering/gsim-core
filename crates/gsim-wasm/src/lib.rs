@@ -1326,4 +1326,44 @@ mod tests {
         let _ = place_without_overlap;
         let _ = set_param;
     }
+
+    /// A `Model` carrying the four features `gsim-core` does not model, plus a key no struct
+    /// anywhere models. See `gsim-core/tests/the_document_keeps_what_it_does_not_model_78.rs`.
+    const MODEL_WITH_UNMODELLED_FIELDS: &str = r#"{
+        "id": "top", "name": "Top", "grid": 10,
+        "blocks": [{
+            "id": "sub1", "type": "hierarchy.subsystem", "paradigm": "hierarchy",
+            "domain": "mixed", "position": [0, 0],
+            "subsystem": { "id": "inner", "name": "Inner", "blocks": [], "wires": [] }
+        }],
+        "wires": [],
+        "subckt_defs": [{ "id": "od", "name": "OPAMP", "body": "E1 out 0 inp inn 1e5" }],
+        "ports": [{ "id": "p1", "direction": "in", "kind": "signal" }],
+        "parent_param_aliases": [{ "inner": "x", "outer": "fsw" }],
+        "a_field_from_a_later_format_version": 42
+    }"#;
+
+    /// `saveDocument` is what `omni-schematics` ships a committed bundle of, and
+    /// `apps/frontend/src/file/engine-agreement.test.ts` is what measured the loss over there.
+    /// Asserting it on this side too means the editor's gate and this crate cannot drift.
+    #[test]
+    fn save_document_keeps_the_fields_the_engine_does_not_model_78() {
+        let doc: Value =
+            serde_json::from_str(&save_document_impl(MODEL_WITH_UNMODELLED_FIELDS).unwrap())
+                .unwrap();
+        let model = &doc["model"];
+        assert_eq!(model["blocks"][0]["subsystem"]["id"], "inner");
+        assert_eq!(model["subckt_defs"][0]["body"], "E1 out 0 inp inn 1e5");
+        assert_eq!(model["ports"][0]["id"], "p1");
+        assert_eq!(model["parent_param_aliases"][0]["outer"], "fsw");
+        assert_eq!(model["a_field_from_a_later_format_version"], 42);
+
+        let again: Value =
+            serde_json::from_str(&load_document_impl(&doc.to_string()).unwrap()).unwrap();
+        assert_eq!(again["model"]["blocks"][0]["subsystem"]["id"], "inner");
+        assert_eq!(
+            again["model"]["subckt_defs"][0]["body"],
+            "E1 out 0 inp inn 1e5"
+        );
+    }
 }

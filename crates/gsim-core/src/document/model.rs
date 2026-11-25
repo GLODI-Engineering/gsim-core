@@ -41,6 +41,9 @@ pub struct ModelParam {
     pub unit: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub doc: Option<String>,
+    /// See [`Model::extra`].
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -73,6 +76,28 @@ pub struct Model {
     pub simulation: Map<String, Value>,
     #[serde(default)]
     pub metadata: Map<String, Value>,
+    /// Every key of this object that the fields above do not model, kept verbatim.
+    ///
+    /// `save_document` is a parse followed by a serialize, and serde drops an unrecognised key
+    /// at the *parse* step -- so before this field existed, loading and saving a document
+    /// deleted `model.ports`, `model.parent_param_aliases`, `blocks[].subsystem` (an entire
+    /// nested model) and `subckt_defs[].body` without a word, and without an error (#78). The
+    /// editor writes all four. This crate models none of them, and
+    /// `docs/decisions/0002-no-private-content.md`'s scope note plus this module's own
+    /// "deliberately out of scope" list say it should not have to: **round-tripping is a
+    /// separate obligation from understanding.** What the compiler does not interpret, the
+    /// document still has to hand back.
+    ///
+    /// A catch-all rather than four typed fields, so the next field the format gains costs
+    /// nothing here. The accepted cost is that a *misspelled* key now round-trips instead of
+    /// being silently dropped -- for a format whose writer (an editor that may be newer than
+    /// the engine reading it) that is the correct bias, because the alternative is deleting a
+    /// user's work because we did not recognise it.
+    ///
+    /// Empty is the common case and emits nothing, so a document that uses none of this
+    /// serializes exactly as it did before.
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
 }
 
 impl Model {
@@ -90,6 +115,7 @@ impl Model {
             nets: Vec::new(),
             simulation: Map::new(),
             metadata: Map::new(),
+            extra: Map::new(),
         }
     }
 }
@@ -98,6 +124,9 @@ impl Model {
 pub struct GsimSchDocument {
     pub schema_version: u32,
     pub model: Model,
+    /// See [`Model::extra`] -- the same obligation, at the document's own top level.
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -122,6 +151,7 @@ impl GsimSchDocument {
         GsimSchDocument {
             schema_version: 2,
             model,
+            extra: Map::new(),
         }
     }
 

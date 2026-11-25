@@ -2,6 +2,7 @@
 //! `docs/specs/gsim-sch-format.md` §8.4, so schema validation never needs the block catalogue.
 
 use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Endpoint {
@@ -48,4 +49,7 @@ pub struct Wire {
     pub net: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
+    /// See [`super::Model::extra`].
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
 }
