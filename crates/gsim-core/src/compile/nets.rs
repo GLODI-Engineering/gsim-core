@@ -25,16 +25,42 @@ use super::{CompileError, NetCollision};
 use crate::document::{Endpoint, Wire};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
-/// A wire whose `kind` starts with this is an acausal physical-network connection, and is what
-/// nets are made of. Everything else (`signal`, `physical-signal`) is a causal block reference.
+/// The spelling prefix the four conserving domains share in their long form
+/// (`physical-electrical` and its siblings).
+///
+/// **Not a classification test, and never again used as one.** `physical-signal` carries this
+/// prefix and is causal, which is exactly how #80 happened -- see [`is_physical_kind`].
 pub const PHYSICAL_KIND_PREFIX: &str = "physical-";
 
 /// The reference ("ground") net's name in emitted netlist text. Real SPICE, and
 /// `general-simulator`'s dialect of it, both spell node zero exactly this way.
 pub const REFERENCE_NET: &str = "0";
 
+/// Does this wire or port `kind` name an acausal physical-network connection -- the kind nets
+/// are made of? Everything else (`signal`, `signal-bus`, `function-call`, `physical-signal`) is
+/// a causal block reference, and a net invented for one is a node the target grammar cannot
+/// express.
+///
+/// **One predicate for the whole crate, deliberately.** This was
+/// `kind.starts_with(PHYSICAL_KIND_PREFIX)`, and `"physical-signal"` starts with
+/// `"physical-"` -- so a sensor-output to actuator-input wire was union-found into a circuit
+/// node, the solver reported that node's voltage with `quantity=voltage` and unit `V`, and a
+/// sensor reading of `0.42` arrived on a plot as `0.42` volts. Nothing errored; the number was
+/// simply wrong, in the hardest way to notice -- plausibly scaled, correctly labelled and
+/// entirely fictional (#80).
+///
+/// Four other places in this crate already classed the kind correctly:
+/// `super::routing`'s own `ROUTABLE_KINDS` (which says in a comment that `physical-signal` *is*
+/// causal), [`crate::document::SubcktPort::new`]'s rejected-kind list, this module's own doc
+/// comment above, and [`crate::document::port_compat`] -- which rolled its own closed set
+/// rather than reuse this function, and recorded in a comment that it did so because this
+/// function's prefix test got `physical-signal` wrong.
+///
+/// Two predicates that disagree *is* the defect, so there is one: `port_compat::is_acausal`,
+/// whose closed list cannot gain a member by prefix accident the way a `starts_with` can.
+/// `compile::nets::tests::the_two_predicates_this_crate_has_agree` holds them together.
 pub fn is_physical_kind(kind: &str) -> bool {
-    kind.starts_with(PHYSICAL_KIND_PREFIX)
+    crate::document::port_compat::is_acausal(kind)
 }
 
 /// Maps a `Block` id (or port id) onto §9's net-name character set.
@@ -293,6 +319,51 @@ mod tests {
         let wires = vec![wire("w1", "c1", "out", "g1", "in", "signal")];
         let scope = resolve_scope(&wires, &ScopeOptions::default()).unwrap();
         assert!(scope.net_of(&Endpoint::new("c1", "out")).is_none());
+    }
+
+    #[test]
+    fn no_causal_kind_becomes_a_net_however_it_is_spelled() {
+        // This test used to pass the kind `signal` and nothing else, which is why #80 lived
+        // here for five releases: the predicate was `starts_with("physical-")`, and
+        // `physical-signal` starts with `physical-`. Every causal kind the format has is now
+        // named, because the one that was wrong is the one the old spelling could not see.
+        for kind in ["signal", "signal-bus", "function-call", "physical-signal"] {
+            let wires = vec![wire("w1", "sen1", "out", "act", "in", kind)];
+            let scope = resolve_scope(&wires, &ScopeOptions::default()).unwrap();
+            assert!(
+                scope.net_of(&Endpoint::new("sen1", "out")).is_none(),
+                "a {kind} wire was given the net {:?}; it is a causal block reference, and a \
+                 node invented for it is reported by the solver as a voltage -- a sensor \
+                 reading of 0.42 arrives on a plot as 0.42 V (#80)",
+                scope.net_of(&Endpoint::new("sen1", "out"))
+            );
+            assert!(scope.net_of(&Endpoint::new("act", "in")).is_none());
+            assert!(scope.names().next().is_none(), "{kind} invented a net name");
+        }
+    }
+
+    #[test]
+    fn the_two_predicates_this_crate_has_agree() {
+        // `document::port_compat` rolled its own closed set rather than reuse this predicate,
+        // and said in a comment that it did so because this one got `physical-signal` wrong.
+        // The disagreement was the defect, so there is one predicate now and this holds it.
+        for kind in [
+            "physical-electrical",
+            "physical-translational",
+            "physical-rotational",
+            "physical-thermal",
+            "signal",
+            "signal-bus",
+            "function-call",
+            "physical-signal",
+            "reserved.magnetic",
+        ] {
+            assert_eq!(
+                is_physical_kind(kind),
+                crate::document::port_compat::is_acausal(kind),
+                "the two predicates disagree about {kind}"
+            );
+        }
     }
 
     #[test]
