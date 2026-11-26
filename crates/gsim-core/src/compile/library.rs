@@ -638,6 +638,39 @@ mod tests {
         );
     }
 
+    #[test]
+    fn no_two_components_share_a_label() {
+        // The palette shows a component's label and nothing else, so two components wearing one
+        // label are indistinguishable at the moment of choosing between them -- found by
+        // `omni-schematics`' real-VS-Code sweep clicking all 68 entries, not by reading the
+        // data (#83, `omni-schematics#216`).
+        //
+        // Two pairs shared one: `signal.step` / `signal-flow.source.step` and `sinks.scope` /
+        // `signal-flow.sink.scope`. Each pair is one component twice -- the engine's name and
+        // the GSF v2 spelling a saved sheet may carry -- and `compile::spec` says so beside
+        // both ("Both catalogue spellings are here"). So the label says that, which is the only
+        // difference there is to state.
+        let mut by_label: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
+        for component in library() {
+            let Some(label) = component.label.as_deref() else {
+                continue;
+            };
+            by_label.entry(label).or_default().push(&component.id);
+        }
+        let shared: Vec<String> = by_label
+            .iter()
+            .filter(|(_, ids)| ids.len() > 1)
+            .map(|(label, ids)| format!("{label:?}: {}", ids.join(", ")))
+            .collect();
+        assert!(
+            shared.is_empty(),
+            "{} label(s) are worn by more than one component, so the palette cannot tell them \
+             apart:\n  {}",
+            shared.len(),
+            shared.join("\n  ")
+        );
+    }
+
     // --- `port_sigs`: a signal port says what it carries, or nothing says it ----------------
     //
     // `port_sigs` is a per-port *dimension* signature that nothing in this crate reads: it is
