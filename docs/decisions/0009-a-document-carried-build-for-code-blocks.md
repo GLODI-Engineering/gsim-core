@@ -487,6 +487,7 @@ compares it against what `compile()` resolved for the same step. A mismatch refu
   "includes": ["code", "code/generated"],
   "sources": ["code/cscript_ctrl.c", "code/control_law.c", "code/clarke.c"],
   "libs": ["m"],
+  "compiler": { "program": "clang", "source": "setting" },
   "built_at": "2026-11-26T11:04:08Z"
 }
 ```
@@ -500,8 +501,13 @@ implementations compare the same thing. The header's lines are compared the same
 what makes a changed lookup table a stale artifact rather than an invisible one — the header is
 rewritten every run, so its timestamp is always fresh and says nothing.
 
+`compiler` is the one field of the record this crate has nothing to say about: it is a statement
+about a machine (see "Does this crate interpret the description, or merely carry it?" below), so
+the builder fills it in from its own choice and compares it on the way
+back. Everything else is produced here, which is why the define lists can be compared at all.
+
 The record is written by whoever runs the build and read by whoever starts the run. This crate
-defines its content and produces the list to compare against; it does not write files.
+defines its content and produces the lists to compare against; it does not write files.
 
 ### 7. The canonical define list
 
@@ -655,13 +661,23 @@ So the division is drawn inside the description rather than around it:
   compiler, and `flags` is passed through as opaque strings precisely so that it cannot start
   to.
 
-The machine half already exists and already has evidence behind it.
-`omni-schematics`' `apps/vscode-extension/src/toolchain-probe.ts` chooses a compiler by
-*building a two-line shared library* with each of `clang`, `cc`, `gcc` — and `cl.exe` first on
-Windows — and reporting `{ usable, attempts }` with the stderr of each failure; a candidate that
-exists but cannot link is `"cannot-build"`, not `"works"`. It is a pure module with injected IO
-and it names no document concept. That is the right side of the line, and nothing in this record
-moves it.
+The machine half already exists, already has evidence behind it, and is already settled.
+`omni-schematics`' `apps/vscode-extension/src/toolchain-probe.ts` resolves a compiler in three
+steps — a block's own `compiler` parameter, then the `omniSchematics.compilerPath` setting, then
+discovery — where discovery tries `clang`, `cc`, `gcc` (and `cl.exe` last, on Windows only) by
+*actually building a two-line shared library* with each, rather than looking it up on `PATH`, and
+reports the stderr of every failure; a candidate that exists but cannot link comes back
+`"cannot-build"`, not `"works"`. **A named compiler is tried alone, with no fallback.** It is a
+pure module with injected IO and it names no document concept. That is the right side of the
+line, and nothing in this record moves it.
+
+That last rule and §6's receipt are the same argument from two directions, which is worth saying
+because the two have to agree. A library built by a compiler the user did not name, with flags
+they did not choose, is a library whose provenance nothing records — so a build is refused rather
+than silently redirected. The receipt exists for exactly that question one step later, which is
+why it carries the compiler it was built with alongside the defines, and why a change there is
+as much a mismatch as a changed constant. Neither mechanism is complete without the other: the
+no-fallback rule protects the build, and the receipt protects the artifact the build left behind.
 
 That line also says what `flags` costs. `sources`, `includes`, `defines`, `libs` and `lang` are
 portable; `flags` is an escape hatch whose contents only some compilers accept, and a sheet that
