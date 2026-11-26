@@ -28,7 +28,7 @@ pub mod spec;
 
 mod general_simulator;
 
-pub use code_build::{ResolvedCodeBuild, ResolvedStep};
+pub use code_build::{ResolvedCodeBuild, ResolvedHeader, ResolvedStep};
 pub use general_simulator::GeneralSimulatorTarget;
 pub use nets::{NetScope, ScopeOptions};
 pub use provenance::{CardRole, ElementOrigin, NetOrigin, PortOrigin, Provenance};

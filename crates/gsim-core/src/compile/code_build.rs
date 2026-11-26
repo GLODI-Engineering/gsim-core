@@ -71,6 +71,31 @@ pub struct ResolvedStep {
     /// Which drawn blocks this step builds for. More than one is legitimate and means they
     /// share a library.
     pub blocks: Vec<String>,
+    /// `Some` exactly when one of this step's bound defines resolved to a structured value.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub header: Option<ResolvedHeader>,
+}
+
+/// The generated constants header for a step whose bound defines include a structured value —
+/// a lookup table, an array, a struct initialiser — which `-D` carries badly or not at all
+/// (`docs/decisions/0009` §3).
+///
+/// **A build output, not a source.** It sits beside the artifact, is rewritten every run and is
+/// meant to be gitignored; it must never be written into the user's own source folder, where it
+/// would look like something they wrote and would be stale the moment a parameter changed.
+///
+/// This crate says what it contains and where it goes *relative to the schematic*. It does not
+/// write the file, and it does not know which of `-include` and `/FI` forces it onto a compile
+/// line — that is a statement about a compiler, and the builder's.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ResolvedHeader {
+    /// Beside the artifact, derived from the block's own `lib` so that no machine path is baked
+    /// into anything.
+    pub path: String,
+    /// Whole `#define NAME { ... }` lines, in the canonical order of §7. Compared by **content**
+    /// rather than by the file's timestamp: the header is rewritten every run, so an mtime
+    /// check would be vacuous and a changed lookup table would be an invisible staleness.
+    pub defines: Vec<String>,
 }
 
 /// A sheet's build, in dependency order: a step appears after everything it `needs`.
@@ -232,7 +257,15 @@ pub fn resolve(model: &Model) -> Result<Option<ResolvedCodeBuild>, CompileError>
         for include in &includes {
             check_path(include, &format!("build step '{step_id}' include"))?;
         }
-        let (defines, omitted_defines) = resolve_defines(model, plan, step_id, &step.defines)?;
+        let Resolved {
+            defines,
+            omitted_defines,
+            header_defines,
+        } = resolve_defines(model, plan, step_id, &step.defines)?;
+        let header = (!header_defines.is_empty()).then(|| ResolvedHeader {
+            path: header_path(artifact),
+            defines: header_defines,
+        });
         steps.push(ResolvedStep {
             id: step.id.clone(),
             kind: step.kind.clone(),
@@ -246,6 +279,7 @@ pub fn resolve(model: &Model) -> Result<Option<ResolvedCodeBuild>, CompileError>
             needs: step.needs.clone(),
             artifact: artifact.clone(),
             blocks: blocks.clone(),
+            header,
         });
     }
 
@@ -332,12 +366,20 @@ fn order_steps(plan: &CodeBuild) -> Result<Vec<&str>, CompileError> {
 
 /// 0009 §7: plan-level defines in document order, then the step's own, a repeated `name`
 /// replacing the earlier entry in place rather than adding a second `-D`.
+/// What one step's `defines` resolve to: the `-D` tokens, the names the author declared absent,
+/// and the `#define` lines a structured constant needs instead of a `-D`.
+struct Resolved {
+    defines: Vec<String>,
+    omitted_defines: Vec<String>,
+    header_defines: Vec<String>,
+}
+
 fn resolve_defines(
     model: &Model,
     plan: &CodeBuild,
     step_id: &str,
     step_defines: &[CodeDefine],
-) -> Result<(Vec<String>, Vec<String>), CompileError> {
+) -> Result<Resolved, CompileError> {
     reject_duplicates(&plan.defines, "this sheet's build plan")?;
     reject_duplicates(step_defines, &format!("build step '{step_id}'"))?;
 
@@ -351,14 +393,72 @@ fn resolve_defines(
 
     let mut defines = Vec::new();
     let mut omitted = Vec::new();
+    let mut header_defines = Vec::new();
     for name in order {
         let define = effective[name];
+        // The shape of the resolved value is the *only* thing that decides which transport
+        // carries it (0009 §3). One list, one pass, one set of refusals -- so an author's
+        // choice of shape cannot make their build less safe, because they never chose a
+        // transport at all.
         match resolve_one(model, define)? {
-            Some(value) => defines.push(format!("{}={value}", define.name)),
+            Some(Carried::Scalar(value)) => defines.push(format!("{}={value}", define.name)),
+            Some(Carried::Structured(initialiser)) => {
+                header_defines.push(format!("#define {} {initialiser}", define.name));
+            }
             None => omitted.push(define.name.clone()),
         }
     }
-    Ok((defines, omitted))
+    Ok(Resolved {
+        defines,
+        omitted_defines: omitted,
+        header_defines,
+    })
+}
+
+/// How a resolved value gets to the block: on the compile line, or through the header.
+enum Carried {
+    Scalar(String),
+    Structured(String),
+}
+
+/// The generated header sits beside the artifact and is named after it, so a sheet with two
+/// built blocks gets two headers and neither has to be told where to go. Derived from `lib`
+/// rather than declared, because a second place to write the path is a second place for it to
+/// drift -- the same reason a step has no `output` (§4).
+fn header_path(artifact: &str) -> String {
+    let stem = artifact
+        .rsplit(['/', '\\'])
+        .next()
+        .unwrap_or(artifact)
+        .trim_end_matches(".so")
+        .trim_end_matches(".dylib")
+        .trim_end_matches(".dll");
+    match artifact.rfind(['/', '\\']) {
+        Some(cut) => format!("{}/{stem}_gsim_constants.h", &artifact[..cut]),
+        None => format!("{stem}_gsim_constants.h"),
+    }
+}
+
+/// A JSON array becomes a C brace initialiser, nesting as it goes — which is what an array, a
+/// 2-D table and a struct initialiser all want. A non-scalar *inside* an array (an object, or
+/// null) has no C spelling and is refused by the caller rather than rendered as something.
+fn brace_initialiser(values: &[Value], define: &CodeDefine) -> Result<String, CompileError> {
+    let mut parts = Vec::with_capacity(values.len());
+    for value in values {
+        match value {
+            Value::Array(inner) => parts.push(brace_initialiser(inner, define)?),
+            Value::Number(_) | Value::Bool(_) | Value::String(_) => parts.push(stringify(value)),
+            other => {
+                return Err(CompileError::BadCodeBuild {
+                    at: format!("define '{}'", define.name),
+                    reason: format!(
+                        "contains {other}, which has no C spelling -- a structured constant is a number, or an array of them"
+                    ),
+                })
+            }
+        }
+    }
+    Ok(format!("{{ {} }}", parts.join(", ")))
 }
 
 fn reject_duplicates(defines: &[CodeDefine], at: &str) -> Result<(), CompileError> {
@@ -379,7 +479,7 @@ fn reject_duplicates(defines: &[CodeDefine], at: &str) -> Result<(), CompileErro
 
 /// `Ok(None)` means an `optional` define whose parameter is absent — the author's declared
 /// absence, and the only absence this function will report without refusing.
-fn resolve_one(model: &Model, define: &CodeDefine) -> Result<Option<String>, CompileError> {
+fn resolve_one(model: &Model, define: &CodeDefine) -> Result<Option<Carried>, CompileError> {
     if !is_identifier(&define.name) {
         return Err(CompileError::BadCodeBuild {
             at: format!("define '{}'", define.name),
@@ -395,13 +495,7 @@ fn resolve_one(model: &Model, define: &CodeDefine) -> Result<Option<String>, Com
             at: format!("define '{}'", define.name),
             reason: "carries neither 'from' (a model parameter) nor 'literal' (a constant the author writes out), so it has no value".to_string(),
         }),
-        (None, Some(literal)) => match literal {
-            Value::Null | Value::Array(_) | Value::Object(_) => Err(CompileError::BadCodeBuild {
-                at: format!("define '{}'", define.name),
-                reason: format!("has a 'literal' of {literal}, which is not a single value a macro can expand to"),
-            }),
-            scalar => Ok(Some(stringify(scalar))),
-        },
+        (None, Some(literal)) => carry(literal, define).map(Some),
         (Some(param), None) => resolve_from_param(model, define, param).map(Some),
     }
     .or_else(|err| {
@@ -428,7 +522,7 @@ fn resolve_from_param(
     model: &Model,
     define: &CodeDefine,
     param: &str,
-) -> Result<String, CompileError> {
+) -> Result<Carried, CompileError> {
     if param.contains('.') {
         return Err(CompileError::BadCodeBuild {
             at: format!("define '{}'", define.name),
@@ -459,7 +553,7 @@ fn resolve_from_param(
         });
     };
     match &entry.value {
-        Value::Number(_) | Value::Bool(_) => Ok(stringify(&entry.value)),
+        Value::Number(_) | Value::Bool(_) | Value::Array(_) => carry(&entry.value, define),
         // A string value is one of `.gsim_sch` §5.1's other two forms -- an expression
         // `"{Rload * 2}"` or a bare reference `"Rload"` -- and this crate evaluates neither
         // (#94; `ModelParam::value` says so). Emitting the text would put `-DR={Rload * 2}` on
@@ -475,7 +569,21 @@ fn resolve_from_param(
         other => Err(CompileError::UnderivableDefine {
             define: define.name.clone(),
             param: param.to_string(),
-            reason: format!("its value is {other}, which is not a single value a macro can expand to"),
+            reason: format!("its value is {other}, which is not a value a macro can expand to"),
+        }),
+    }
+}
+
+/// Decides a resolved value's transport from its shape, and only from its shape.
+fn carry(value: &Value, define: &CodeDefine) -> Result<Carried, CompileError> {
+    match value {
+        Value::Number(_) | Value::Bool(_) | Value::String(_) => {
+            Ok(Carried::Scalar(stringify(value)))
+        }
+        Value::Array(values) => brace_initialiser(values, define).map(Carried::Structured),
+        other => Err(CompileError::BadCodeBuild {
+            at: format!("define '{}'", define.name),
+            reason: format!("has the value {other}, which is not a value a macro can expand to"),
         }),
     }
 }

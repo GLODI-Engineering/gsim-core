@@ -603,3 +603,120 @@ fn a_plan_the_compiler_refuses_still_round_trips_without_losing_a_key() {
     assert_eq!(step["kind"], "host-program");
     assert_eq!(step["run"]["stdout"], "code/generated/table.h");
 }
+
+// -- the structured half: a constant -D carries badly --------------------------------------
+
+/// A lookup table declared once in `model.params` reaches the block through a generated header
+/// that the compile line force-includes, and the author never chose that transport — the shape
+/// of the value did. 0009 §3.
+#[test]
+fn a_table_becomes_a_header_define_and_a_scalar_stays_on_the_command_line() {
+    let model = sheet(
+        json!([
+            { "name": "fsw", "value": 250000 },
+            { "name": "vq_table", "value": [0.0, 0.25, 0.5, 0.75, 1.0] }
+        ]),
+        json!([
+            { "name": "FSW", "from": "fsw" },
+            { "name": "LUT_VQ", "from": "vq_table" }
+        ]),
+    );
+    let out = compile(&model, "general-simulator").expect("must compile");
+    let step = &out.code_build.as_ref().unwrap().steps[0];
+    // The scalar, and only the scalar, is on the compile line.
+    assert_eq!(step.defines, vec!["FSW=250000".to_string()]);
+    let header = step.header.as_ref().expect("a table needs a header");
+    assert_eq!(
+        header.defines,
+        vec!["#define LUT_VQ { 0, 0.25, 0.5, 0.75, 1 }".to_string()]
+    );
+    // Beside the artifact, derived from it, so nothing has to be told where it goes — and so it
+    // can never land in the user's own source folder.
+    assert_eq!(header.path, "runs/case3/ctrl_gsim_constants.h");
+}
+
+#[test]
+fn a_table_of_tables_becomes_a_nested_brace_initialiser() {
+    let model = sheet(
+        json!([{ "name": "m", "value": [[1, 2], [3, 4]] }]),
+        json!([{ "name": "M", "from": "m" }]),
+    );
+    let out = compile(&model, "general-simulator").expect("must compile");
+    let header = out.code_build.as_ref().unwrap().steps[0]
+        .header
+        .as_ref()
+        .expect("a matrix needs a header");
+    assert_eq!(
+        header.defines,
+        vec!["#define M { { 1, 2 }, { 3, 4 } }".to_string()]
+    );
+}
+
+#[test]
+fn a_step_with_no_structured_constant_has_no_header_at_all() {
+    let model = sheet(json!([{ "name": "L_f", "value": 2.8e-6 }]), one_define());
+    let out = compile(&model, "general-simulator").expect("must compile");
+    assert!(out.code_build.as_ref().unwrap().steps[0].header.is_none());
+}
+
+/// 0009 §3's third property, and the reason there is one list rather than two: a structured
+/// constant refuses exactly as a scalar one does. If the two differed, an author's choice of
+/// *shape* would quietly change how safe their build is.
+#[test]
+fn a_structured_constant_whose_parameter_is_missing_refuses_exactly_as_a_scalar_one_does() {
+    let model = sheet(json!([]), json!([{ "name": "LUT_VQ", "from": "vq_table" }]));
+    let err = compile(&model, "general-simulator").expect_err("must refuse");
+    match &err {
+        CompileError::UnderivableDefine { define, param, .. } => {
+            assert_eq!(define, "LUT_VQ");
+            assert_eq!(param, "vq_table");
+        }
+        other => panic!("wrong refusal: {other:?}"),
+    }
+    assert!(err.to_string().contains("rather than guess"), "{err}");
+}
+
+#[test]
+fn a_table_holding_something_with_no_c_spelling_is_refused() {
+    for value in [json!([1, { "a": 2 }]), json!([1, null])] {
+        let model = sheet(
+            json!([{ "name": "t", "value": value }]),
+            json!([{ "name": "T", "from": "t" }]),
+        );
+        assert!(
+            matches!(
+                compile(&model, "general-simulator"),
+                Err(CompileError::BadCodeBuild { .. })
+            ),
+            "{value} should be refused"
+        );
+    }
+}
+
+/// An artifact already carrying a platform suffix still gets a header named after the stem, so
+/// `ctrl.so` and the suffix-less `ctrl` produce the same header name rather than
+/// `ctrl.so_gsim_constants.h`.
+#[test]
+fn a_suffixed_artifact_and_a_stem_name_the_same_header() {
+    for lib in [
+        "runs/case3/ctrl",
+        "runs/case3/ctrl.so",
+        "runs/case3/ctrl.dll",
+    ] {
+        let mut model = sheet(
+            json!([{ "name": "t", "value": [1, 2] }]),
+            json!([{ "name": "T", "from": "t" }]),
+        );
+        model.blocks[1].params.insert("lib".into(), json!(lib));
+        let out = compile(&model, "general-simulator").expect("must compile");
+        assert_eq!(
+            out.code_build.as_ref().unwrap().steps[0]
+                .header
+                .as_ref()
+                .unwrap()
+                .path,
+            "runs/case3/ctrl_gsim_constants.h",
+            "for lib={lib}"
+        );
+    }
+}
