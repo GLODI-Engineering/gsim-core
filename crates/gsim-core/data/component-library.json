@@ -74,6 +74,12 @@
         }
       ],
       "main_param": "modulus",
+      "port_sigs": {
+        "clk": "[1]",
+        "count": "[1]",
+        "reset": "[1]",
+        "up_down": "[1]"
+      },
       "fidelities": [
         {
           "doc": "Edge-triggered up/down counter with an optional modulus and reset.",
@@ -190,6 +196,10 @@
         ]
       },
       "params": [],
+      "port_sigs": {
+        "in": "inherit",
+        "out": "from(in)"
+      },
       "fidelities": [
         {
           "doc": "One-simulation-step delay: reads its input's value from the previous step (general-simulator's own `prev:` reference).",
@@ -282,6 +292,10 @@
         ]
       },
       "params": [],
+      "port_sigs": {
+        "in": "inherit",
+        "out": "from(in)"
+      },
       "fidelities": [
         {
           "doc": "Continuous-time derivative `y = du/dt`.",
@@ -591,6 +605,10 @@
         }
       ],
       "main_param": "ts",
+      "port_sigs": {
+        "in": "inherit",
+        "out": "from(in)"
+      },
       "fidelities": [
         {
           "doc": "Discrete-time SISO transfer function num(z)/den(z) at a fixed sample period.",
@@ -717,6 +735,10 @@
         }
       ],
       "main_param": "k",
+      "port_sigs": {
+        "in": "inherit",
+        "out": "from(in)"
+      },
       "fidelities": [
         {
           "doc": "Scalar gain `y = k * u`.",
@@ -839,6 +861,10 @@
         }
       ],
       "main_param": "x0",
+      "port_sigs": {
+        "in": "inherit",
+        "out": "from(in)"
+      },
       "fidelities": [
         {
           "doc": "Continuous-time integrator `dx/dt = u`, with optional output limits.",
@@ -1143,6 +1169,10 @@
         }
       ],
       "main_param": "n_inputs",
+      "port_sigs": {
+        "in*": "inherit",
+        "out": "from(in0)"
+      },
       "fidelities": [
         {
           "doc": "Multiplies all of its input signals together.",
@@ -1554,6 +1584,10 @@
         }
       ],
       "main_param": "signs",
+      "port_sigs": {
+        "in*": "inherit",
+        "out": "from(in0)"
+      },
       "fidelities": [
         {
           "doc": "Weighted summation. Number of inputs and their signs come from `signs`.",
@@ -1667,6 +1701,10 @@
         }
       ],
       "main_param": "num",
+      "port_sigs": {
+        "in": "inherit",
+        "out": "from(in)"
+      },
       "fidelities": [
         {
           "doc": "Rational transfer function `H(s) = num(s) / den(s)`, realised as state-space.",
@@ -1814,6 +1852,14 @@
         ]
       },
       "params": [],
+      "port_sigs": {
+        "a": "inherit",
+        "alpha": "from(a)",
+        "b": "inherit",
+        "beta": "from(a)",
+        "c": "inherit",
+        "zero": "from(a)"
+      },
       "fidelities": [
         {
           "doc": "Clarke (abc to alpha-beta-zero) transform.",
@@ -1975,6 +2021,14 @@
         ]
       },
       "params": [],
+      "port_sigs": {
+        "a": "from(alpha)",
+        "alpha": "inherit",
+        "b": "from(alpha)",
+        "beta": "inherit",
+        "c": "from(alpha)",
+        "zero": "inherit"
+      },
       "fidelities": [
         {
           "doc": "Inverse Clarke (alpha-beta-zero to abc) transform.",
@@ -2146,6 +2200,15 @@
         ]
       },
       "params": [],
+      "port_sigs": {
+        "a": "inherit",
+        "b": "inherit",
+        "c": "inherit",
+        "d": "from(a)",
+        "q": "from(a)",
+        "theta": "inherit",
+        "zero": "from(a)"
+      },
       "fidelities": [
         {
           "doc": "Combined Clarke-Park (abc to dq0) transform.",
@@ -2325,6 +2388,15 @@
         ]
       },
       "params": [],
+      "port_sigs": {
+        "a": "from(d)",
+        "b": "from(d)",
+        "c": "from(d)",
+        "d": "inherit",
+        "q": "inherit",
+        "theta": "inherit",
+        "zero": "inherit"
+      },
       "fidelities": [
         {
           "doc": "Combined inverse Clarke-Park (dq0 to abc) transform.",
@@ -2504,6 +2576,15 @@
         ]
       },
       "params": [],
+      "port_sigs": {
+        "alpha": "inherit",
+        "beta": "inherit",
+        "d": "from(alpha)",
+        "q": "from(alpha)",
+        "theta": "inherit",
+        "zero": "inherit",
+        "zero_out": "from(alpha)"
+      },
       "fidelities": [
         {
           "doc": "Park (alpha-beta-zero to dq0) transform.",
@@ -2683,6 +2764,15 @@
         ]
       },
       "params": [],
+      "port_sigs": {
+        "alpha": "from(d)",
+        "beta": "from(d)",
+        "d": "inherit",
+        "q": "inherit",
+        "theta": "inherit",
+        "zero": "inherit",
+        "zero_out": "from(d)"
+      },
       "fidelities": [
         {
           "doc": "Inverse Park (dq0 to alpha-beta-zero) transform.",
@@ -2829,6 +2919,10 @@
         }
       ],
       "main_param": "f_max",
+      "port_sigs": {
+        "in": "inherit",
+        "out": "from(in)"
+      },
       "fidelities": [
         {
           "doc": "Voltage-controlled oscillator: maps the input signal onto a frequency ramp.",
@@ -2936,6 +3030,9 @@
           "type": "string"
         }
       ],
+      "port_sigs": {
+        "out": "[1]"
+      },
       "fidelities": [
         {
           "doc": "Reads a circuit node voltage or branch current back out as a signal.",
@@ -3041,6 +3138,9 @@
         }
       ],
       "main_param": "domain",
+      "port_sigs": {
+        "in": "[1]"
+      },
       "fidelities": [
         {
           "doc": "Drives a physical-electrical node from a signal, as a voltage or a current.",
@@ -3208,6 +3308,10 @@
         }
       ],
       "main_param": "lib",
+      "port_sigs": {
+        "in*": "[1]",
+        "out*": "[1]"
+      },
       "fidelities": [
         {
           "doc": "Stateful block hosted in a precompiled C shared library.",
@@ -3407,6 +3511,10 @@
         }
       ],
       "main_param": "function",
+      "port_sigs": {
+        "in*": "[1]",
+        "out*": "[1]"
+      },
       "fidelities": [
         {
           "doc": "Stateful block hosted in an Octave function.",
@@ -3604,6 +3712,10 @@
         }
       ],
       "main_param": "function",
+      "port_sigs": {
+        "in*": "[1]",
+        "out*": "[1]"
+      },
       "fidelities": [
         {
           "doc": "Stateless block evaluated by an Octave function.",
@@ -3795,6 +3907,10 @@
         }
       ],
       "main_param": "path",
+      "port_sigs": {
+        "in*": "[1]",
+        "out*": "[1]"
+      },
       "fidelities": [
         {
           "doc": "Stateful block hosted in a Python module.",
@@ -3986,6 +4102,10 @@
         }
       ],
       "main_param": "function",
+      "port_sigs": {
+        "in*": "[1]",
+        "out*": "[1]"
+      },
       "fidelities": [
         {
           "doc": "Stateless block evaluated by a Python function.",
@@ -4969,6 +5089,15 @@
         }
       ],
       "main_param": "kind",
+      "port_sigs": {
+        "clk": "[1]",
+        "d": "[1]",
+        "j": "[1]",
+        "k": "[1]",
+        "q": "[1]",
+        "reset": "[1]",
+        "t": "[1]"
+      },
       "fidelities": [
         {
           "doc": "Edge-triggered flip-flop: D, T or JK, with an optional asynchronous reset.",
@@ -5151,6 +5280,10 @@
         }
       ],
       "main_param": "op",
+      "port_sigs": {
+        "in*": "inherit",
+        "out": "from(in0)"
+      },
       "fidelities": [
         {
           "doc": "Boolean gate (and/or/xor/nand/nor/xnor/not) over its input signals.",
@@ -5286,6 +5419,10 @@
         }
       ],
       "main_param": "high",
+      "port_sigs": {
+        "in": "inherit",
+        "out": "from(in)"
+      },
       "fidelities": [
         {
           "doc": "Schmitt-trigger hysteresis comparator with separate low and high thresholds.",
@@ -5410,6 +5547,11 @@
         }
       ],
       "main_param": "priority",
+      "port_sigs": {
+        "q": "[1]",
+        "reset": "[1]",
+        "set": "[1]"
+      },
       "fidelities": [
         {
           "doc": "Level-triggered set/reset latch with a configurable priority input.",
@@ -5627,6 +5769,15 @@
         }
       ],
       "main_param": "pole_pairs",
+      "port_sigs": {
+        "id": "[1]",
+        "iq": "[1]",
+        "omega_m": "[1]",
+        "t_load": "[1]",
+        "theta_e": "[1]",
+        "vd": "[1]",
+        "vq": "[1]"
+      },
       "fidelities": [
         {
           "doc": "Permanent-magnet synchronous machine in the dq frame, with mechanical dynamics.",
@@ -5842,6 +5993,10 @@
         }
       ],
       "main_param": "fn",
+      "port_sigs": {
+        "in": "inherit",
+        "out": "from(in)"
+      },
       "fidelities": [
         {
           "doc": "Unary waveform-arithmetic function applied to one signal.",
@@ -5994,6 +6149,11 @@
         }
       ],
       "main_param": "fn",
+      "port_sigs": {
+        "in1": "inherit",
+        "in2": "inherit",
+        "out": "from(in1)"
+      },
       "fidelities": [
         {
           "doc": "Binary waveform-arithmetic function applied to two signals.",
@@ -6140,6 +6300,12 @@
         }
       ],
       "main_param": "fn",
+      "port_sigs": {
+        "in1": "inherit",
+        "in2": "inherit",
+        "in3": "inherit",
+        "out": "from(in1)"
+      },
       "fidelities": [
         {
           "doc": "Ternary waveform-arithmetic function applied to three signals.",
@@ -6274,6 +6440,10 @@
         }
       ],
       "main_param": "points",
+      "port_sigs": {
+        "in": "inherit",
+        "out": "from(in)"
+      },
       "fidelities": [
         {
           "doc": "Piecewise-linear lookup table over a list of [x, y] breakpoints.",
@@ -7547,6 +7717,11 @@
         }
       ],
       "main_param": "freq",
+      "port_sigs": {
+        "comp": "[1]",
+        "in": "[1]",
+        "main": "[1]"
+      },
       "fidelities": [
         {
           "doc": "Fixed-carrier PWM modulator with complementary output and dead time.",
@@ -7730,6 +7905,13 @@
         }
       ],
       "main_param": "f_max",
+      "port_sigs": {
+        "comp": "[1]",
+        "duty": "[1]",
+        "freq": "[1]",
+        "main": "[1]",
+        "phase": "[1]"
+      },
       "fidelities": [
         {
           "doc": "Phase-shift PWM modulator driven by live frequency, phase and duty signals.",
@@ -7959,6 +8141,9 @@
           "type": "enum"
         }
       ],
+      "port_sigs": {
+        "in": "inherit"
+      },
       "fidelities": [
         {
           "doc": "Goto endpoint for tag-routed signal.",
@@ -8139,6 +8324,9 @@
         }
       ],
       "main_param": "t_step",
+      "port_sigs": {
+        "out": "[1]"
+      },
       "fidelities": [
         {
           "doc": "Step input — outputs `before` for t < t_step, `after` afterwards.",
@@ -8423,6 +8611,9 @@
         }
       ],
       "main_param": "t_window",
+      "port_sigs": {
+        "in": "inherit"
+      },
       "fidelities": [
         {
           "doc": "Captures the input signal for display in the waveform viewer.",
@@ -8512,6 +8703,9 @@
         }
       ],
       "main_param": "value",
+      "port_sigs": {
+        "out": "[1]"
+      },
       "fidelities": [
         {
           "doc": "Constant signal source.",
@@ -10010,6 +10204,9 @@
         }
       ],
       "main_param": "tau1",
+      "port_sigs": {
+        "out": "[1]"
+      },
       "fidelities": [
         {
           "doc": "Exponential rise/fall signal source, using ngspice EXP() semantics.",
@@ -10180,6 +10377,9 @@
         }
       ],
       "main_param": "per",
+      "port_sigs": {
+        "out": "[1]"
+      },
       "fidelities": [
         {
           "doc": "Trapezoidal pulse signal source, using ngspice PULSE() semantics.",
@@ -10338,6 +10538,9 @@
         }
       ],
       "main_param": "fc",
+      "port_sigs": {
+        "out": "[1]"
+      },
       "fidelities": [
         {
           "doc": "Single-frequency FM signal source, using ngspice SFFM() semantics.",
@@ -10491,6 +10694,9 @@
         }
       ],
       "main_param": "freq",
+      "port_sigs": {
+        "out": "[1]"
+      },
       "fidelities": [
         {
           "doc": "Damped sine signal source, using ngspice SIN() semantics.",
@@ -10600,6 +10806,9 @@
         ]
       },
       "params": [],
+      "port_sigs": {
+        "out": "[1]"
+      },
       "fidelities": [
         {
           "doc": "Emits the current simulation time t as a signal.",
@@ -11672,6 +11881,9 @@
       "version": 1,
       "description": "A measured waveform read from a file: one output per value column, interpolated or held between samples.",
       "compiles_to": "source.file",
+      "port_sigs": {
+        "out*": "[1]"
+      },
       "fidelities": [
         {
           "doc": "A measured waveform read from a text table.",

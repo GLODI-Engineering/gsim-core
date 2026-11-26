@@ -147,6 +147,7 @@ pub fn catalog_json() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeMap;
 
     #[test]
     fn the_embedded_library_parses() {
@@ -634,6 +635,290 @@ mod tests {
         assert!(
             compilable >= 26,
             "only {compilable} components can be compiled"
+        );
+    }
+
+    // --- `port_sigs`: a signal port says what it carries, or nothing says it ----------------
+    //
+    // `port_sigs` is a per-port *dimension* signature that nothing in this crate reads: it is
+    // data this library carries on a front end's behalf, like a symbol or a label, and the
+    // editor's signal-dimension overlay (FE-65) derives a wire's width from it. The overlay
+    // needs a signature on **every** block along a path, so one missing entry silences the
+    // whole sheet -- which is what 45 missing entries did (#64).
+    //
+    // The closed vocabulary, from the front end's own `block-metadata.schema.json`:
+    // `[N]` / `[N,M]` (a literal width), `inherit`, `from(<port>)`, `sum(<port>*)`,
+    // `partition(<port>, <param>)`, `shape(<param>)` and `bus`.
+    //
+    // What makes this worth a guard rather than a bulk fill: a *wrong* signature is worse than
+    // a missing one. A missing one draws nothing; a wrong one draws a width the engine never
+    // produces, confidently, which is this project's recurring failure mode. So the guard asks
+    // two questions -- is a signature present, and is the one present well-formed against the
+    // ports and parameters the component actually declares.
+
+    /// Signal ports that deliberately carry **no** signature, with the reason.
+    ///
+    /// Not a to-do list. Each of these is a width this engine really has and the signature
+    /// language really cannot name, so the honest entry is the absent one: the overlay then
+    /// draws nothing for that wire instead of drawing a number that is wrong.
+    ///
+    /// * `control.state_space`, `control.discrete_state_space` -- `TypeSpec::vector_output`:
+    ///   these two emit **one vector-valued signal** under the block's own name, and its width
+    ///   is the row count of the `c` matrix parameter. The language has `shape(<param>)`, which
+    ///   is a matrix's `[rows, cols]`, and no way to say "that matrix's rows". `[1]` would be a
+    ///   lie for every state-space block with more than one output.
+    /// * `hierarchy.inport`, `hierarchy.outport` -- their single port declares
+    ///   `domain_from: "kind"`, so the author picks the domain from five choices and the port
+    ///   may not be a signal port at all. A dimension is a signal-domain concept; declaring one
+    ///   for a port that may be `physical-electrical` would be declaring it for a port that has
+    ///   none.
+    /// * `routing.from` -- a From's width is whatever its matched `routing.goto` was handed, and
+    ///   the pairing is by the `tag` parameter's *value*, across blocks. No signature can name
+    ///   another block's port.
+    ///
+    /// Not in this list, and deliberately out of the guard's scope: `ideal.switch`'s `g` gate
+    /// port, the one signal port on a `physical-electrical` component. The overlay skips a
+    /// block whose paradigm is not `signal-flow` before it ever looks at a port, so a signature
+    /// there could not be read by the one consumer this field exists for.
+    const NO_SIGNATURE_IS_THE_HONEST_ANSWER: &[&str] = &[
+        "control.discrete_state_space",
+        "control.state_space",
+        "hierarchy.inport",
+        "hierarchy.outport",
+        "routing.from",
+    ];
+
+    /// One port, as this guard needs to see it: its id (or `id*` for a variadic group's
+    /// template), and whether it is an input.
+    struct SignalPort {
+        id: String,
+        input: bool,
+    }
+
+    /// Every signal port `component` declares, variadic groups included as `<template>*`.
+    ///
+    /// A port carrying `domain_from` is skipped: its domain is a parameter's value, so it is
+    /// not knowably a signal port. A port whose `kind.domain` is not `signal` is skipped too --
+    /// `converter.sig2phys`'s `out` is `physical-electrical`, and an acausal connection has no
+    /// width.
+    fn signal_ports(component: &Component) -> Vec<SignalPort> {
+        fn is_signal(port: &serde_json::Value) -> bool {
+            port.get("domain_from").is_none()
+                && port
+                    .get("kind")
+                    .and_then(|k| k.get("domain"))
+                    .and_then(|d| d.as_str())
+                    == Some("signal")
+        }
+
+        let Some(groups) = component.presentation.get("ports") else {
+            return Vec::new();
+        };
+        let mut out = Vec::new();
+        for (group, input) in [("inputs", true), ("outputs", false)] {
+            let Some(list) = groups.get(group).and_then(|g| g.as_array()) else {
+                continue;
+            };
+            for port in list.iter().filter(|p| is_signal(p)) {
+                if let Some(id) = port.get("id").and_then(|v| v.as_str()) {
+                    out.push(SignalPort {
+                        id: id.to_string(),
+                        input,
+                    });
+                }
+            }
+        }
+        for (group, input) in [("variadic_inputs", true), ("variadic_outputs", false)] {
+            let Some(template) = groups.get(group).and_then(|g| g.get("template")) else {
+                continue;
+            };
+            if !is_signal(template) {
+                continue;
+            }
+            if let Some(id) = template.get("id").and_then(|v| v.as_str()) {
+                // `resolve-ports.ts` names an expanded port `<template.id><index>`, so the only
+                // signature that can cover the group is the wildcard.
+                out.push(SignalPort {
+                    id: format!("{id}*"),
+                    input,
+                });
+            }
+        }
+        out
+    }
+
+    /// Does `key` (a `port_sigs` key, possibly `in*`) cover the port `id` (possibly `in*`)?
+    fn covers(key: &str, id: &str) -> bool {
+        if key == id {
+            return true;
+        }
+        match key.strip_suffix('*') {
+            // `in*` covers `in0`, and covers the variadic group `in*` itself.
+            Some(prefix) => id.strip_suffix('*').unwrap_or(id).starts_with(prefix),
+            None => false,
+        }
+    }
+
+    fn port_sigs_of(component: &Component) -> BTreeMap<String, String> {
+        component
+            .presentation
+            .get("port_sigs")
+            .and_then(|v| v.as_object())
+            .map(|map| {
+                map.iter()
+                    .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Components whose ports a dimension signature is meaningful for: the signal-domain ones,
+    /// and the two `mixed` converters, which have a signal port on one side.
+    fn signal_domain_components() -> Vec<&'static Component> {
+        library()
+            .iter()
+            .filter(|c| matches!(c.domain.as_deref(), Some("signal") | Some("mixed")))
+            .collect()
+    }
+
+    #[test]
+    fn every_signal_port_declares_a_dimension_signature() {
+        let mut missing: Vec<String> = Vec::new();
+        for component in signal_domain_components() {
+            if NO_SIGNATURE_IS_THE_HONEST_ANSWER.contains(&component.id.as_str()) {
+                continue;
+            }
+            let sigs = port_sigs_of(component);
+            for port in signal_ports(component) {
+                if !sigs.keys().any(|key| covers(key, &port.id)) {
+                    missing.push(format!("{}:{}", component.id, port.id));
+                }
+            }
+        }
+        assert!(
+            missing.is_empty(),
+            "{} signal port(s) carry no dimension signature, so the editor's FE-65 overlay \
+             resolves nothing for any sheet they appear on (#64). Give each one a signature, or \
+             add the component to `NO_SIGNATURE_IS_THE_HONEST_ANSWER` with the reason:\n  {}",
+            missing.len(),
+            missing.join("\n  ")
+        );
+    }
+
+    #[test]
+    fn a_declared_signature_is_well_formed_against_the_ports_it_names() {
+        // The other half, and the one a bulk fill would have failed: a signature naming a port
+        // or a parameter that is not there resolves to nothing at best, and to a width the
+        // engine never produces at worst.
+        let mut wrong: Vec<String> = Vec::new();
+        for component in signal_domain_components() {
+            let ports = signal_ports(component);
+            let params: Vec<&str> = component
+                .presentation
+                .get("params")
+                .and_then(|p| p.as_array())
+                .map(|list| {
+                    list.iter()
+                        .filter_map(|p| p.get("name")?.as_str())
+                        .collect()
+                })
+                .unwrap_or_default();
+            let names_an_input = |named: &str| {
+                ports
+                    .iter()
+                    .any(|p| p.input && (covers(named, &p.id) || covers(&p.id, named)))
+            };
+
+            for (key, sig) in port_sigs_of(component) {
+                let (key, sig) = (key.as_str(), sig.as_str());
+                let Some(port) = ports.iter().find(|p| covers(key, &p.id)) else {
+                    wrong.push(format!(
+                        "{}: `port_sigs` key '{key}' matches no signal port",
+                        component.id
+                    ));
+                    continue;
+                };
+                let complain = |what: &str| format!("{}:{key} = '{sig}' -- {what}", component.id);
+
+                // A literal width: `[3]`, or `[2,3]` for a matrix.
+                if let Some(dims) = sig.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+                    let legal = !dims.is_empty()
+                        && dims
+                            .split(',')
+                            .all(|d| d.trim().parse::<usize>().is_ok_and(|n| n >= 1));
+                    if !legal {
+                        wrong.push(complain("not a literal width like `[1]` or `[2,3]`"));
+                    }
+                    continue;
+                }
+
+                if sig == "inherit" {
+                    // An output declared `inherit` is unresolvable by construction:
+                    // `dim-propagate.ts` resolves an output from `from`/`sum`/`partition`/a
+                    // literal only, reports the port as unresolved, and returns
+                    // `dim-unresolved` for the **whole sheet** -- so one of these silences the
+                    // overlay everywhere, not just on its own wire.
+                    if !port.input {
+                        wrong.push(complain("`inherit` on an output port resolves to nothing"));
+                    }
+                    continue;
+                }
+
+                if port.input {
+                    wrong.push(complain(
+                        "an input port takes a literal width or `inherit`; the deriving forms \
+                         describe an output",
+                    ));
+                    continue;
+                }
+
+                let derived = sig
+                    .strip_prefix("from(")
+                    .and_then(|s| s.strip_suffix(')'))
+                    .map(|p| (p.trim().to_string(), "from"))
+                    .or_else(|| {
+                        sig.strip_prefix("sum(")
+                            .and_then(|s| s.strip_suffix(')'))
+                            .map(|p| (p.trim().to_string(), "sum"))
+                    })
+                    .or_else(|| {
+                        sig.strip_prefix("partition(")
+                            .and_then(|s| s.strip_suffix(')'))
+                            .and_then(|s| s.split_once(','))
+                            .map(|(p, _)| (p.trim().to_string(), "partition"))
+                    });
+                if let Some((named, form)) = derived {
+                    if !names_an_input(&named) {
+                        wrong.push(complain(&format!(
+                            "`{form}` names '{named}', which is not an input port of this \
+                             component"
+                        )));
+                    }
+                    continue;
+                }
+
+                if let Some(param) = sig.strip_prefix("shape(").and_then(|s| s.strip_suffix(')')) {
+                    if !params.contains(&param.trim()) {
+                        wrong.push(complain(&format!(
+                            "`shape` names the parameter '{}', which this component does not \
+                             declare",
+                            param.trim()
+                        )));
+                    }
+                    continue;
+                }
+
+                if sig == "bus" {
+                    continue;
+                }
+                wrong.push(complain("not a form the signature language has"));
+            }
+        }
+        assert!(
+            wrong.is_empty(),
+            "{} malformed port signature(s):\n  {}",
+            wrong.len(),
+            wrong.join("\n  ")
         );
     }
 }
