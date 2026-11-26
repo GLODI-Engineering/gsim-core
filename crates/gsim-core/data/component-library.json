@@ -8391,7 +8391,8 @@
       "category": "sinks",
       "type": "signal-flow.sink.scope",
       "aliases": [
-        "scope"
+        "scope",
+        "signal_flow.sink.scope"
       ],
       "tags": [
         "signal-flow",
@@ -8472,7 +8473,8 @@
       "category": "signal",
       "type": "signal-flow.source.step",
       "aliases": [
-        "step"
+        "step",
+        "signal_flow.source.step"
       ],
       "tags": [
         "signal-flow",
