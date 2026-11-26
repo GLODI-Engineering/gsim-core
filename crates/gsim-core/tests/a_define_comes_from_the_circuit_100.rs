@@ -135,31 +135,63 @@ fn the_define_and_the_netlist_agree_on_how_the_number_prints() {
     );
 }
 
-// -- the expression case, which is what #94 makes real --------------------------------------
+// -- the expression case, which #94 turned from a refusal into a value ----------------------
+//
+// These three tests were written the other way round, asserting that a define bound to a
+// parameter holding `"{L_base * 2}"` was *refused*. That was honest while this crate did not
+// evaluate §5.2 -- it refused rather than emitting `-DL_F={L_base * 2}` -- but it was a refusal
+// caused by the loader not reading its own format, not by anything undiscoverable in principle.
+// #94 removed the cause, so the tests flipped. The refusal that remains is the one that was
+// always the point: a define whose parameter is not there.
 
 #[test]
-fn a_parameter_holding_an_expression_is_underivable_and_says_so() {
+fn a_parameter_holding_an_expression_resolves_and_the_define_carries_the_number() {
+    let model = sheet(
+        json!([
+            { "name": "L_base", "value": 1.4e-6 },
+            { "name": "L_f", "value": "{L_base * 2}" }
+        ]),
+        one_define(),
+    );
+    let out = compile(&model, "general-simulator").expect("must compile");
+    assert_eq!(
+        out.code_build.as_ref().unwrap().steps[0].defines,
+        vec!["L_F=2.8e-6".to_string()]
+    );
+    // And the resolved table comes back, so a front end never evaluates §5.2 itself.
+    assert_eq!(out.params["L_f"], json!(2.8e-6));
+}
+
+#[test]
+fn a_parameter_holding_a_bare_reference_resolves_too() {
+    let model = sheet(
+        json!([
+            { "name": "L_base", "value": 2.8e-6 },
+            { "name": "L_f", "value": "L_base" }
+        ]),
+        one_define(),
+    );
+    let out = compile(&model, "general-simulator").expect("must compile");
+    assert_eq!(
+        out.code_build.as_ref().unwrap().steps[0].defines,
+        vec!["L_F=2.8e-6".to_string()]
+    );
+}
+
+/// What an unresolvable expression does now: it refuses the **whole compile**, before any build
+/// is resolved, because a parameter table that does not resolve is not a sheet. Stronger than
+/// the define-level refusal it replaces, and it names the parameter and the text.
+#[test]
+fn an_expression_naming_something_undeclared_refuses_the_compile_and_names_it() {
     let model = sheet(
         json!([{ "name": "L_f", "value": "{L_base * 2}" }]),
         one_define(),
     );
     let err = compile(&model, "general-simulator").expect_err("must refuse");
     let message = err.to_string();
-    assert!(
-        matches!(err, CompileError::UnderivableDefine { .. }),
-        "{message}"
-    );
-    assert!(message.contains("{L_base * 2}"), "{message}");
-    assert!(message.contains("#94"), "{message}");
-}
-
-#[test]
-fn a_parameter_holding_a_bare_reference_is_underivable_too() {
-    let model = sheet(json!([{ "name": "L_f", "value": "L_base" }]), one_define());
-    assert!(matches!(
-        compile(&model, "general-simulator"),
-        Err(CompileError::UnderivableDefine { .. })
-    ));
+    assert!(matches!(err, CompileError::BadParams(_)), "{message}");
+    assert!(message.contains("L_f"), "{message}");
+    assert!(message.contains("L_base"), "{message}");
 }
 
 // -- optional: the author's declared absence, and nothing else -------------------------------
@@ -176,18 +208,32 @@ fn an_optional_define_whose_parameter_is_absent_builds_and_records_the_omission(
     assert_eq!(step.omitted_defines, vec!["DEBUG_LOG".to_string()]);
 }
 
-/// `optional` forgives the parameter not being there. It does not forgive the parameter being
-/// there and unusable: the author asked for that parameter's value, and the value is not
-/// available, which is a different sentence.
+/// `optional` forgives the parameter not being there, and nothing else. Since #94 a parameter
+/// holding an expression *has* a value, so there is nothing to forgive — it resolves like any
+/// other.
 #[test]
-fn an_optional_define_whose_parameter_holds_an_expression_is_still_refused() {
+fn an_optional_define_whose_parameter_holds_an_expression_resolves_rather_than_being_omitted() {
     let model = sheet(
-        json!([{ "name": "debug_log", "value": "{n + 1}" }]),
+        json!([{ "name": "n", "value": 2 }, { "name": "debug_log", "value": "{n + 1}" }]),
+        json!([{ "name": "DEBUG_LOG", "from": "debug_log", "optional": true }]),
+    );
+    let out = compile(&model, "general-simulator").expect("must compile");
+    let step = &out.code_build.as_ref().unwrap().steps[0];
+    assert_eq!(step.defines, vec!["DEBUG_LOG=3".to_string()]);
+    assert!(step.omitted_defines.is_empty());
+}
+
+/// And `optional` cannot rescue a parameter table that does not resolve, because the table is
+/// resolved before any build is: the compile has already refused.
+#[test]
+fn an_optional_define_does_not_rescue_a_broken_parameter_table() {
+    let model = sheet(
+        json!([{ "name": "debug_log", "value": "{nowhere + 1}" }]),
         json!([{ "name": "DEBUG_LOG", "from": "debug_log", "optional": true }]),
     );
     assert!(matches!(
         compile(&model, "general-simulator"),
-        Err(CompileError::UnderivableDefine { .. })
+        Err(CompileError::BadParams(_))
     ));
 }
 

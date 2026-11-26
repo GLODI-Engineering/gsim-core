@@ -13,6 +13,9 @@
 //!   [`contract::evaluate_component`] pipeline tying all of the above together (GSF v2, done).
 //! - [`document`] — the `.gsim_sch` document/builder model, superseding
 //!   `packages/gsim-model`'s Python-only equivalent (done).
+//! - [`params`] — `.gsim_sch` §5: resolving a sheet's parameter table and substituting the
+//!   result at every §5.3 use site. **Not** [`expr`]: §5.2 is a different, numeric-only
+//!   grammar, and the two disagree about what a number is — see that module's doc.
 //! - [`layout`] — real autolayout (auto-spacing/collision avoidance), which existed nowhere in
 //!   the codebase before this crate (done — all three Phase 1 deliverables now complete).
 //!
@@ -25,6 +28,7 @@ pub mod document;
 pub mod expr;
 mod fmt;
 pub mod layout;
+pub mod params;
 pub mod port;
 pub mod primitive;
 pub mod resolve;

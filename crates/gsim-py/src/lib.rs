@@ -93,6 +93,7 @@ fn compile_err_to_py(e: CompileError) -> PyErr {
         CompileError::BadRating { .. } => "bad-rating",
         CompileError::UnderivableDefine { .. } => "underivable-define",
         CompileError::BadCodeBuild { .. } => "bad-code-build",
+        CompileError::BadParams(_) => "bad-params",
     };
     PyErr::new::<PyValueError, _>(format!("{keyword}: {e}"))
 }
@@ -256,6 +257,10 @@ struct CompileResult {
     /// document carries no plan, so a script written before this field keeps working.
     #[serde(skip_serializing_if = "Option::is_none")]
     code_build: Option<gsim_core::compile::ResolvedCodeBuild>,
+    /// `model.params` with §5.2 evaluated and §5.1 references followed — the table a caller
+    /// should read a resolved value from rather than evaluating the grammar a second time.
+    #[serde(skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    params: std::collections::BTreeMap<String, serde_json::Value>,
 }
 
 /// Compiles a `Model` into netlist text for `target` (currently only `"general-simulator"`).
@@ -266,12 +271,14 @@ struct CompileResult {
 /// "element"|"block"|"element_and_block"|"part"|"instance", "suffix"?, "def"?}, ...],
 /// "nets": [{"net": "<node name>", "ports": [{"blocks": [...], "port": "<port id>"}, ...]},
 /// ...]}}`, plus `"code_build": {"steps": [...]}` when the document carries a build plan
-/// (`docs/decisions/0009`). Raises a
+/// (`docs/decisions/0009`) and `"params": {"<name>": <resolved value>}` when the sheet declares
+/// any (`.gsim_sch` §5.2, evaluated here so a caller does not implement the grammar twice).
+/// Raises a
 /// `ValueError` whose message is keyword-prefixed the same way the builder errors are
 /// (`duplicate-name:`, `duplicate-net:`, `unknown-type:`, `unknown-target:`, `floating-port:`, `unconnected-ref:`,
 /// `missing-param:`, `unknown-subckt-def:`, `unconnected-subckt-port:`, `unknown-variant:`, `vector-output-port:`,
 /// `indexed-ref-arity:`, `unresolved-from-tag:`, `ambiguous-from-tag:`, `cyclic-from-tag:`,
-/// `routing-kind-unsupported:`, `underivable-define:`, `bad-code-build:`),
+/// `routing-kind-unsupported:`, `underivable-define:`, `bad-code-build:`, `bad-params:`),
 /// with the real underlying message following unmodified.
 #[pyfunction]
 fn compile(model_json: &str, target: &str) -> PyResult<String> {
@@ -282,6 +289,7 @@ fn compile(model_json: &str, target: &str) -> PyResult<String> {
         notes: out.notes,
         provenance: out.provenance,
         code_build: out.code_build,
+        params: out.params,
     })
 }
 

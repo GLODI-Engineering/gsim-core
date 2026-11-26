@@ -554,16 +554,17 @@ fn resolve_from_param(
     };
     match &entry.value {
         Value::Number(_) | Value::Bool(_) | Value::Array(_) => carry(&entry.value, define),
-        // A string value is one of `.gsim_sch` §5.1's other two forms -- an expression
-        // `"{Rload * 2}"` or a bare reference `"Rload"` -- and this crate evaluates neither
-        // (#94; `ModelParam::value` says so). Emitting the text would put `-DR={Rload * 2}` on
-        // a compile line; emitting nothing would be the silent omission the whole record is
-        // against. So it is underivable, and says what it is.
+        // Unreachable through `compile`, which resolves §5.1 references and §5.2 expressions
+        // before any build is resolved (#94) -- so by the time this runs, a parameter's value is
+        // a number, a bool or a structured constant. Kept, and kept fatal, for a caller that
+        // reaches `resolve` with an unsubstituted model: emitting the text would put
+        // `-DR={Rload * 2}` on a compile line, and emitting nothing would be the silent omission
+        // this whole module exists to prevent.
         Value::String(text) => Err(CompileError::UnderivableDefine {
             define: define.name.clone(),
             param: param.to_string(),
             reason: format!(
-                "its value is '{text}', which is a .gsim_sch §5.1 expression or reference that this crate does not evaluate (GLODI-Engineering/gsim-core#94)"
+                "its value is still the unresolved text '{text}'; a build is resolved from a model whose §5.2 expressions have been evaluated"
             ),
         }),
         other => Err(CompileError::UnderivableDefine {

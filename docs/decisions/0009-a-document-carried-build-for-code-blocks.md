@@ -539,7 +539,7 @@ Every one of these is a `CompileError`, so none of them produces a deck:
 | refusal | message names |
 | --- | --- |
 | a define's `from` names no `model.params` entry | the define, the parameter, and the parameters that do exist |
-| a define's `from` names a parameter whose value is a §5.2 expression or a §5.1 reference | the define, the parameter, and the unevaluated text |
+| a define's `from` names a parameter whose value does not resolve | **superseded by #94** — the parameter table is resolved before any build is, so an expression that does not resolve refuses the compile as `BadParams`, naming the parameter and the text, and a build is never reached |
 | a define with both `from` and `literal`, or neither | the define |
 | a define's `from` is dotted (`"L1.L"`) | the define and the reserved spelling |
 | a duplicate define `name` within one list | the define and the list |
@@ -559,13 +559,26 @@ Every one of these is a `CompileError`, so none of them produces a deck:
 | a `build` on a block whose type is not `extensibility.cscript` | the block and its type |
 | an absolute path, or a `..` segment, in `sources`/`includes`/`lib` | the path and the field |
 
-The second row is the one that will fire most often and is the most important to get right.
-`model.params` is **not evaluated by this crate** — `#94` is open, and `ModelParam::value` says
-so — so a parameter whose value is `"{Rload * 2}"` is, today, genuinely underivable. It is
-refused, naming the expression, rather than emitting `-DR={Rload * 2}` for a compiler to choke
-on or, worse, emitting nothing. When #94 lands, the same documents start building with no format
-change, because the format never said anything about expressions: it said the value has to be
-derivable.
+**Amended by #94, which landed after this record and removed a refusal rather than adding one.**
+
+As written, the second row said that a parameter whose value is `"{Rload * 2}"` is underivable,
+because this crate did not evaluate `.gsim_sch` §5.2 — so a define bound to it was refused
+rather than emitting `-DR={Rload * 2}` for a compiler to choke on, or worse, emitting nothing.
+That was honest about the implementation and it was the right behaviour while it was true, but
+it was a refusal caused by the loader not reading its own format, not by anything undiscoverable
+in principle. The record said so at the time: *"when #94 lands, the same documents start
+building with no format change, because the format never said anything about expressions: it
+said the value has to be derivable."*
+
+#94 has landed. `crate::params` resolves the table topologically and substitutes at every §5.3
+use site **before** a build is resolved, so by the time a define is bound, a parameter's value
+is a number. A parameter whose expression does not resolve now refuses the *compile*, which is
+stronger: there is no deck and no build, and the message names the parameter and its text rather
+than the define that happened to read it.
+
+What that leaves is the refusal this record was actually written for: a define whose parameter
+**is not there**. That one is undiscoverable in principle — no amount of evaluation conjures a
+parameter nobody declared — and it is unchanged.
 
 **A define whose value is legitimately absent is declared on the define**, never inferred:
 
@@ -578,9 +591,10 @@ define is then omitted, and its name is **recorded in `omitted_defines`** (§7.5
 record shows the omission and the comparison in §6 still catches an artifact built on the other
 side of it. Absence on the author's side is
 a decision; absence on the document's side is a mistake, and nothing in the format lets the
-second look like the first. `optional` has no effect on the other refusals: an `optional`
-define whose parameter *is* present but carries an expression is still refused, because the
-author asked for that parameter's value and the value is not available.
+second look like the first. `optional` has no effect on the other refusals. Its scope narrowed with #94 and is
+worth stating exactly: a parameter holding an expression now *has* a value, so there is nothing
+to forgive and it resolves like any other; and `optional` cannot rescue a parameter table that
+does not resolve, because the table is resolved first and the compile has already refused.
 
 ### 9. The refusal rule is a property of the format
 
