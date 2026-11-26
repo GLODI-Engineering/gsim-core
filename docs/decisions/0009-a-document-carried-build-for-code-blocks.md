@@ -179,6 +179,155 @@ This is not an implementation note; it is the point. A separate formatter is a s
 implementation of "what number is this", and the two agree until an exponent or a trailing zero
 makes them not.
 
+#### The whole loop, in one example
+
+The owner's description of what he wants is the test this format has to pass, so it is written
+out end to end rather than described. A constant is declared **once**, in the sheet; the
+schematic uses it for a device value; the C source names it as a macro; the same number arrives
+on both sides.
+
+**Declared once** — in `model.params`, which is where `.gsim_sch` §5 already puts a sheet's
+constants. A parallel table was considered and rejected in one line: the whole claim is that the
+build and the netlist read *the same* dictionary, and a second table is two dictionaries however
+carefully they are kept in step. `params` is also already editable (the "Model Parameters"
+drawer), already referenced from a device value, already sweepable (§13.2) and already the thing
+`.PARAM` means.
+
+```json
+"params": [
+  { "name": "L_f",  "value": 2.8e-6, "unit": "H"  },
+  { "name": "fsw",  "value": 250000, "unit": "Hz" }
+]
+```
+
+**Used in the schematic.** The inductor's value is the parameter, by §5.1 reference:
+
+```json
+{ "id": "L1", "type": "passive.inductor", "params": { "L": "L_f" } }
+```
+
+**Named by a macro in the C source**, which carries no number at all:
+
+```c
+#include "gsim_cscript.h"
+
+void cscript_output(void *state, const double *in, int in_len, double dt,
+                     double *out, int out_len) {
+    /* L_F and FSW are the sheet's own constants. Nothing here is a literal. */
+    out[0] = in[0] * dt / (L_F * FSW);
+}
+```
+
+**Bound in the plan**, which is the one place that says which sheet constant answers to which
+macro:
+
+```json
+"defines": [{ "name": "L_F", "from": "L_f" }, { "name": "FSW", "from": "fsw" }]
+```
+
+**And the two sides agree, by construction.** One `compile()` produces both:
+
+```text
+L1 n1 n2 L_f                          <- the netlist card
+-DL_F=2.8e-6 -DFSW=250000             <- the compile line for the same run
+```
+
+Change `L_f` in the drawer and both change, because both came from the same read. Misspell the
+`from` and neither exists, because `compile()` refused.
+
+#### How the value reaches the macro: three options, and the recommendation
+
+The owner described the mechanism as *"the macro will replace those by defines in the file"*, and
+then said plainly that the description is not binding — *"If what I'm suggesting is the right
+one, yes, we implement it. If yours is better, we take yours."* So the three candidates are
+written out, because the argument is the deliverable here as much as the code is.
+
+**Option A — `-D` on the compile line.** The user's `.c` is compiled untouched; the C
+preprocessor does the substituting, with the value the command line gave it.
+
+**Option B — substitute into the source.** Rewrite the `.c` (or a generated copy of it) with the
+numbers pasted in, then compile that.
+
+**Option C — a generated header.** Write the constants into a header in the build directory,
+`#include`d by the block. The user's `.c` is untouched; the values arrive as `#define`s in a
+file the build produced.
+
+**Recommended: A for every constant this format can express today, with C as the named
+extension point for the ones it cannot. B is rejected.**
+
+Against **B**, five things, and the first two are not preferences:
+
+1. **It breaks the diagnostics the editor just built.** `omni-schematics#237` made a compiler
+   error a clickable Problems entry on a file and a line. Compile a rewritten copy and every
+   diagnostic points at a file the user never wrote, at a line that is not theirs. The standard
+   answer is `#line` directives, which then have to be honoured by the Problems entry, by a
+   debugger stepping into the `.so`, and by anything else reading the artifact's line table —
+   three places to be right instead of zero.
+2. **It breaks the editor the user is typing in.** `clangd` reads the file on disk. Rewriting
+   into a copy leaves it looking at the original, where `L_F` is undefined, and underlining it.
+   The fix is a `compile_commands.json` carrying the same `-D` flags — at which point the flags
+   exist anyway and the rewrite has bought nothing. Under A, one flag list serves the build *and*
+   the language server, and the file the user opens is the file the compiler read.
+3. **It writes into the user's source tree**, or it makes a second copy — and a copy is a trap,
+   because the next person edits the wrong one.
+4. **It hides the constants.** The builder prints its command line verbatim before spawning
+   (`omni-schematics#253`'s own requirement). Under A the values are *in that line*, so the
+   Output panel says which constants the artifact was built with, and the line can be pasted
+   into a terminal to reproduce the artifact by hand — worth a great deal when a result is
+   disputed, and it is how the build scripts behind this feature already pass their defines.
+   Under B you have to find and open a generated file.
+5. **It needs a preprocessor nobody wrote.** Substituting a macro textually means getting
+   strings, comments, partial identifiers and token pasting right — a second, hand-rolled C
+   preprocessor inside a front end, in a feature whose entire subject is not being silently
+   wrong.
+
+B's one honest advantage is inspectability, and A has it without the file: §1's resolved step
+carries the list, the command line prints it, and the build record (§6) keeps it beside the
+artifact. Three places say `L_F=2.8e-6`.
+
+**Where A genuinely stops, and why C is the answer rather than B.** `-D` carries a scalar well
+and a structured constant badly — a lookup table, an array, a struct initialiser. That is the
+case B's instinct is reaching for, and it is real. C covers it with every property above intact:
+the `.c` is untouched, the diagnostics are unmoved, `clangd` sees a real header, and the
+generated file is inspectable because it *is* a file. So the shape is A for scalars, C for
+structure, never B.
+
+**C is not implemented, and the reason is worth stating because it is checkable rather than a
+matter of appetite: nothing in `.gsim_sch` can declare a structured constant.** `ParamValue` is
+a number, a boolean, or one of §5.1's two string forms. There is no array and no table, so a
+sheet cannot declare the thing C would carry, and building C first would be building the
+transport for a cargo that does not exist. `#96` — a port cannot declare a width that depends on
+a parameter — is the nearest open edge of the same gap. When a sheet can declare a table, C
+arrives as a step kind (§10) with no breaking change, and `defines` gains nothing: a structured
+constant is not a `-D`.
+
+**One distinction to keep, because conflating these two would be a design error.** The real
+project that generates a lookup-table header does not *declare* that table — it compiles a host
+program and runs it to **compute** one. That is a build step whose product another step consumes
+(§10's first expected kind), not a constant the sheet wrote down. A declared table and a computed
+table need different things: the first needs a value in the document, the second needs a step
+graph. The format has room for both and should not grow one mechanism that half-serves each.
+
+#### Who writes the `defines` list
+
+The document does, and that is what keeps the refusal mechanical: the author writes a name, the
+sheet declares it or it does not, and nothing scans anything.
+
+The alternative — take the define set from the macros the `.c` actually uses — is the one piece
+of the owner's description this record implements differently, so the difference is stated
+plainly. It would mean the build set depends on the *contents* of a file outside the document,
+which 0005 settled against for `filewave` on reasoning that applies unchanged here: a document
+whose build cannot be reviewed, diffed or compiled without its sources present is a document
+nobody can review, and a source edited to drop a macro would silently change the build. It would
+also mean this crate reading a `.c`, which it will not do.
+
+What bridges the two is a front-end convenience with precedent in this very editor: the
+Inspector already offers **"Read ports from source"**, which parses a block's source once and
+fills `input_names`/`output_names` with what it found, for the user to accept. The same gesture
+fills `defines` from the macros a `.c` names. The document still carries the declaration — so
+the refusal still has something to refuse against — and the user still never types a name twice.
+Filed on the editor as the companion to this record.
+
 ### 4. The artifact is the block's `lib`, and nowhere else
 
 A `shared-library` step has no `output` field. Its artifact is the `lib` parameter of the
@@ -215,6 +364,27 @@ end to end**: it is resolved here, it is executed by whoever runs the build, and
 never mentions it. `general-simulator`'s own `--capabilities` already says the same thing from
 the other side — `cscript=load-only`, documented as "this binary loads a shared library and
 never invokes a compiler. A caller that wants a `.so` built has to build it."
+
+That is also the split the owner stated, and it is worth recording in his terms because it is
+an architectural position and not only a consequence of a parser check:
+
+> it is the responsibility of the compiler to take the information from the view and compile it
+> accordingly — compile the schematic to the netlist, compile the C files — and send it to the
+> simulator. The simulator, when it comes, it's just to take the schematic, everything set, and
+> it does the simulation.
+
+So the solver receives a netlist and artifacts that are **already consistent**, and builds
+nothing. This is the existing division taken one step further rather than a new one: the webview
+already compiles the netlist through `gsim-wasm`, the host already spawns the solver, and the
+host now also produces the artifacts. `--capabilities`' `cscript=load-only` is the solver's own
+statement of the same thing.
+
+The corollary for the document is the owner's third point, and it closes
+`omni-schematics#222` in the form he asked for: **the paths are set in the view.** Where the
+`.c` is taken from is `Block::source`, where the `.so` is written is the block's `lib`, both
+relative to the schematic and both editable beside the block's other properties. Neither is a
+convention the editor guesses at — which is what `#222` was filed about, and what the four
+candidate paths in `netlist/code-source.ts` were working around.
 
 The three carriers that *would* smuggle it into a deck — a column-1 `*` comment, an unrecognised
 dot command, a `kind=build` card stripped by the CLI before `general-mna` sees it, which is how
