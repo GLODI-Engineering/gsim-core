@@ -6404,7 +6404,7 @@
               "domain": "signal"
             },
             "label": "",
-            "offset": 20,
+            "offset": 30,
             "side": "left"
           }
         ],
@@ -6416,7 +6416,7 @@
               "domain": "signal"
             },
             "label": "",
-            "offset": 20,
+            "offset": 30,
             "side": "right"
           }
         ]
@@ -6470,7 +6470,7 @@
               "id": "in",
               "kind": "signal",
               "label": "",
-              "offset": 20,
+              "offset": 30,
               "side": "left"
             },
             {
@@ -6478,7 +6478,7 @@
               "id": "out",
               "kind": "signal",
               "label": "",
-              "offset": 20,
+              "offset": 30,
               "side": "right"
             }
           ],
@@ -6487,8 +6487,8 @@
       ],
       "symbol": {
         "bbox": [
-          60,
-          40
+          80,
+          60
         ],
         "shape": "rect",
         "text": "LUT"
@@ -8387,7 +8387,7 @@
     {
       "id": "signal-flow.sink.scope",
       "name": "signal_flow.sink.scope",
-      "label": "Scope",
+      "label": "Scope (legacy spelling)",
       "category": "sinks",
       "type": "signal-flow.sink.scope",
       "aliases": [
@@ -8462,13 +8462,13 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Signal scope sink.",
+      "description": "Signal scope sink, under the GSF v2 spelling `signal_flow.sink.scope`. Identical to Scope: both emit no netlist card at all. Kept so a sheet saved under this name still opens; place Scope on a new sheet.",
       "compiles_to": "signal-flow.sink.scope"
     },
     {
       "id": "signal-flow.source.step",
       "name": "signal_flow.source.step",
-      "label": "Step",
+      "label": "Step (legacy spelling)",
       "category": "signal",
       "type": "signal-flow.source.step",
       "aliases": [
@@ -8565,7 +8565,7 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Step signal source.",
+      "description": "Step input, under the GSF v2 spelling `signal_flow.source.step`. Identical to Step: both compile to the same `kind=pulsewave` card. Kept so a sheet saved under this name still opens; place Step on a new sheet.",
       "compiles_to": "signal-flow.source.step"
     },
     {
