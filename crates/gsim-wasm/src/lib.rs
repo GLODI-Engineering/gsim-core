@@ -233,6 +233,10 @@ fn compile_impl(model_json: &str, target: &str) -> Result<String, String> {
         // Null when the document carries no build plan, so a front end that does not look for
         // this field sees exactly what it saw before `docs/decisions/0009`.
         "code_build": out.code_build,
+        // `.gsim_sch` §5.2, evaluated. The front end reads a resolved parameter from here
+        // instead of evaluating the grammar itself -- which is how the inspector came to show a
+        // confident number beside a field that could not compile.
+        "params": out.params,
     }))
 }
 
@@ -240,7 +244,7 @@ fn compile_impl(model_json: &str, target: &str) -> Result<String, String> {
 ///
 /// **Shared JSON contract** (identical to `gsim-py`'s `compile`): returns
 /// `{"netlist": "<text>", "notes": [...], "provenance": {"elements": [...], "nets": [...]},
-/// "code_build": {"steps": [...]} | null}`;
+/// "code_build": {"steps": [...]} | null, "params": {"<name>": <resolved value>}}`;
 /// throws a real JS `Error` carrying the compiler's own message on failure. See
 /// `gsim_core::compile::provenance` for the provenance shape and why it is carried rather than
 /// re-derived on the JS side.

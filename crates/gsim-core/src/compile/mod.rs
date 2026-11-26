@@ -73,6 +73,16 @@ pub enum CompileError {
         param: String,
         reason: String,
     },
+    /// A `model.params` table that does not resolve, or a §5.3 use site whose expression does
+    /// not — `.gsim_sch` §5.2 and `GLODI-Engineering/gsim-core#94`.
+    ///
+    /// Fatal, and the bound this replaces is worth recording: before #94 these reached the deck
+    /// as text, and the *solver* refused them — `unexpected extra parameter '*'` for
+    /// `{3 + 4}`, `MissingSymbol("Rload")` for a bare reference. So the user was already
+    /// protected from a wrong number; what they were not protected from was being told that `*`
+    /// is an unexpected extra parameter about an expression the inspector had just shown them
+    /// the value of.
+    BadParams(crate::params::ParamError),
     /// A build plan this crate cannot make sense of — see `compile::code_build` for the list.
     /// `at` names the step, block or define at fault, in the words the document uses for it.
     BadCodeBuild {
@@ -234,6 +244,7 @@ impl std::fmt::Display for CompileError {
             CompileError::BadCodeBuild { at, reason } => {
                 write!(f, "this sheet's build plan: {at} {reason}")
             }
+            CompileError::BadParams(e) => write!(f, "{e}"),
             CompileError::BadRating {
                 block,
                 field,
@@ -379,6 +390,14 @@ pub struct CompileOutput {
     /// `-D` and the element card carry the same number" true by construction instead of by
     /// review.
     pub code_build: Option<ResolvedCodeBuild>,
+    /// `model.params`, resolved — `.gsim_sch` §5.2 evaluated, references followed, in a form a
+    /// consumer can read numbers out of.
+    ///
+    /// Emitted for the same reason [`Provenance`] is: a front end that wants to show a
+    /// parameter's resolved value must not compute it, because a second implementation of §5.2
+    /// is how the inspector came to show a confident `14` beside a field that could not compile
+    /// (`omni-schematics#199`).
+    pub params: BTreeMap<String, serde_json::Value>,
 }
 
 /// A netlist backend. One implementation per simulator dialect; the pipeline above
@@ -805,6 +824,16 @@ pub fn compile_with(
     model: &Model,
     target: &dyn NetlistTarget,
 ) -> Result<CompileOutput, CompileError> {
+    // §5 first, before nets or names: everything below reads parameter *values*, and a value
+    // that is still `"{Rload * 2}"` is one every reader downstream would have to know how to
+    // evaluate. Resolved once here, substituted into a clone, and the document on disk keeps
+    // the expression -- see `crate::params`' module doc for why substituting at load time would
+    // delete the user's parameterisation on the next save.
+    let table = crate::params::resolve_table(model).map_err(CompileError::BadParams)?;
+    let substituted = crate::params::substitute(model, &table).map_err(CompileError::BadParams)?;
+    let model = &substituted;
+    let resolved_params = table.to_map().into_iter().collect();
+
     let mut notes = Vec::new();
     let top = build_scope(&model.blocks, &model.wires, None, model, &mut notes)?;
     let mut defs = BTreeMap::new();
@@ -830,5 +859,6 @@ pub fn compile_with(
     out.notes.extend(ctx.notes.iter().cloned());
     out.provenance = provenance;
     out.code_build = code_build;
+    out.params = resolved_params;
     Ok(out)
 }

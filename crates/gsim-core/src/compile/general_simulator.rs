@@ -93,6 +93,8 @@ impl NetlistTarget for GeneralSimulatorTarget {
             // Likewise, and for a second reason: a build description is a statement about the
             // document's parameters, not about this dialect, so no emitter resolves one.
             code_build: None,
+            // Likewise `compile`'s: §5 is a property of the document, not of this dialect.
+            params: Default::default(),
         })
     }
 }
