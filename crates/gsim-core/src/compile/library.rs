@@ -576,6 +576,47 @@ mod tests {
         );
     }
 
+    /// Every component resolves under its **`name`** -- the type string a front end places.
+    ///
+    /// The sibling of `every_component_resolves_under_its_own_id`, one field across. That guard
+    /// was written for the transformer, whose library spelling and registry spelling disagreed
+    /// by one character, and it asks about `id`. A front end does not place by `id`:
+    /// `omni-schematics`' `library/insert.ts` builds a block with `type: metadata.name`, and
+    /// `loadCatalog` keys the palette by `name`, `type` and every alias -- so a component whose
+    /// `name` resolves nowhere inserts happily and leaves a block nothing downstream can
+    /// compile.
+    ///
+    /// Two did. `signal-flow.sink.scope` and `signal-flow.source.step` are the only entries
+    /// whose `name` differs from their `id` (underscored where the id is hyphenated), and the
+    /// underscored spelling was in none of the three fields `find_component` matches. Measured
+    /// on a 0.6.2 wheel rather than reasoned about:
+    ///
+    /// ```text
+    /// signal-flow.sink.scope     OK
+    /// signal_flow.sink.scope     FAIL unknown-type: block 'x1' has type
+    ///                                 'signal_flow.sink.scope', which no netlist emitter knows
+    /// ```
+    ///
+    /// Fixed by making each `name` an alias of its own component, which is what an alias is for:
+    /// a spelling a saved sheet carries. The alternative -- renaming `name` to match `id` --
+    /// would orphan every sheet already saved with the underscored type.
+    #[test]
+    fn every_component_resolves_under_the_name_a_front_end_places_it_by() {
+        let mut unresolvable: Vec<&str> = library()
+            .iter()
+            .filter(|c| crate::compile::spec::lookup(&c.name).is_none())
+            .map(|c| c.name.as_str())
+            .collect();
+        unresolvable.sort_unstable();
+        assert!(
+            unresolvable.is_empty(),
+            "{} component name(s) cannot be compiled, so placing one from a palette leaves a \
+             block that fails at Run naming a type the user never typed:\n  {}",
+            unresolvable.len(),
+            unresolvable.join("\n  ")
+        );
+    }
+
     #[test]
     fn a_sheet_saved_under_the_old_spelling_still_finds_its_component() {
         // The library used to describe many components twice -- once under the engine's name
