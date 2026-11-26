@@ -195,8 +195,9 @@ drawer), already referenced from a device value, already sweepable (§13.2) and 
 
 ```json
 "params": [
-  { "name": "L_f",  "value": 2.8e-6, "unit": "H"  },
-  { "name": "fsw",  "value": 250000, "unit": "Hz" }
+  { "name": "L_f",      "value": 2.8e-6, "unit": "H"  },
+  { "name": "fsw",      "value": 250000, "unit": "Hz" },
+  { "name": "vq_table", "value": [0.0, 0.25, 0.5, 0.75, 1.0] }
 ]
 ```
 
@@ -211,10 +212,14 @@ drawer), already referenced from a device value, already sweepable (§13.2) and 
 ```c
 #include "gsim_cscript.h"
 
+/* L_F and FSW arrive as -D on the compile line. LUT_VQ arrives in a generated header
+   that the compile line force-includes, so there is no #include to write here either.
+   Nothing in this file is a literal. */
+static const double vq[] = LUT_VQ;
+
 void cscript_output(void *state, const double *in, int in_len, double dt,
                      double *out, int out_len) {
-    /* L_F and FSW are the sheet's own constants. Nothing here is a literal. */
-    out[0] = in[0] * dt / (L_F * FSW);
+    out[0] = vq[(int)(in[0] * 4.0)] * dt / (L_F * FSW);
 }
 ```
 
@@ -222,18 +227,34 @@ void cscript_output(void *state, const double *in, int in_len, double dt,
 macro:
 
 ```json
-"defines": [{ "name": "L_F", "from": "L_f" }, { "name": "FSW", "from": "fsw" }]
+"defines": [
+  { "name": "L_F",    "from": "L_f" },
+  { "name": "FSW",    "from": "fsw" },
+  { "name": "LUT_VQ", "from": "vq_table" }
+]
 ```
 
-**And the two sides agree, by construction.** One `compile()` produces both:
+Nothing in that list says which constant travels how. The shape of the resolved value decides.
+
+**And the sides agree, by construction.** One `compile()` produces all of it:
 
 ```text
-L1 n1 n2 L_f                          <- the netlist card
--DL_F=2.8e-6 -DFSW=250000             <- the compile line for the same run
+L1 n1 n2 L_f                                     <- the netlist card
+-DL_F=2.8e-6 -DFSW=250000                        <- the compile line, scalars
+-include runs/case3/ctrl_gsim_constants.h        <- forced, so the .c writes no #include
 ```
 
-Change `L_f` in the drawer and both change, because both came from the same read. Misspell the
-`from` and neither exists, because `compile()` refused.
+```c
+/* runs/case3/ctrl_gsim_constants.h -- generated every run, beside the artifact, gitignored.
+   Never written into the user's code/ folder: it is a build output, not a source. */
+#define LUT_VQ { 0, 0.25, 0.5, 0.75, 1 }
+```
+
+Change `L_f` in the drawer and both change, because both came from the same read. Edit
+`vq_table` and the header changes, the artifact is rebuilt (§6's record compares the content,
+not the header's timestamp — it is rewritten every run, so a timestamp would say nothing), and
+the run uses the new table. Misspell either `from` and **none** of it exists, because `compile()`
+refused — the same refusal, with the same message, whichever shape the constant had.
 
 #### How the value reaches the macro: three options, and the recommendation
 
@@ -252,8 +273,12 @@ numbers pasted in, then compile that.
 `#include`d by the block. The user's `.c` is untouched; the values arrive as `#define`s in a
 file the build produced.
 
-**Recommended: A for every constant this format can express today, with C as the named
-extension point for the ones it cannot. B is rejected.**
+**Decided by the owner, after reading the argument: A for scalars, C for anything structured —
+a lookup table, an array, a struct initialiser. B is rejected.** His words:
+
+> I take your suggestion to use the `-D` to send the scalars, and for other data — lookup table,
+> arrays, struct initializer — we create an include file alongside it, an `.h` file, and include
+> it in our C file automatically and work based on it.
 
 Against **B**, five things, and the first two are not preferences:
 
@@ -285,28 +310,73 @@ B's one honest advantage is inspectability, and A has it without the file: §1's
 carries the list, the command line prints it, and the build record (§6) keeps it beside the
 artifact. Three places say `L_F=2.8e-6`.
 
-**Where A genuinely stops, and why C is the answer rather than B.** `-D` carries a scalar well
-and a structured constant badly — a lookup table, an array, a struct initialiser. That is the
-case B's instinct is reaching for, and it is real. C covers it with every property above intact:
-the `.c` is untouched, the diagnostics are unmoved, `clangd` sees a real header, and the
-generated file is inspectable because it *is* a file. So the shape is A for scalars, C for
-structure, never B.
+**Where A stops, and what C does about it.** `-D` carries a scalar well and a structured
+constant badly. C covers that with every property above intact: the `.c` is untouched, the
+diagnostics are unmoved, `clangd` sees a real header, and the generated file is inspectable
+because it *is* a file.
 
-**C is not implemented, and the reason is worth stating because it is checkable rather than a
-matter of appetite: nothing in `.gsim_sch` can declare a structured constant.** `ParamValue` is
-a number, a boolean, or one of §5.1's two string forms. There is no array and no table, so a
-sheet cannot declare the thing C would carry, and building C first would be building the
-transport for a cargo that does not exist. `#96` — a port cannot declare a width that depends on
-a parameter — is the nearest open edge of the same gap. When a sheet can declare a table, C
-arrives as a step kind (§10) with no breaking change, and `defines` gains nothing: a structured
-constant is not a `-D`.
+#### The generated header, and what "automatically" has to mean
+
+The owner asked for the header to be included **automatically**. Taken literally — the editor
+writing an `#include` line into the user's `.c` — that is option B again, with every objection
+above restored. The mechanism that keeps the promise instead of breaking it is a **forced
+include on the compile line**: `-include <header>` for clang and gcc, `/FI <header>` for MSVC.
+The header is in scope without the user writing a line, and their source is never touched, which
+is the whole reason A beat B.
+
+Asking the user to write the `#include` themselves would also work, and is rejected as a default
+for a specific reason: it is a line they must remember in *every* block, and forgetting it is a
+compile error about an undefined identifier rather than a sentence about a missing include — a
+late, confusing failure in the one feature whose subject is not confusing failures.
+
+Three properties the header has to have, and each is a rule rather than a preference:
+
+1. **It is a build output, not a source.** It is written beside the artifact — in the directory
+   the block's `lib` names — regenerated every run, and gitignored. It must never land in the
+   user's `code/` folder, where it would look like something they wrote and would be stale the
+   moment a parameter changed. This crate emits its path *relative to the schematic*, derived
+   from `lib`, so the document stays portable and no machine path is baked in.
+2. **It is part of staleness.** `omni-schematics#235` refuses a library older than its source. A
+   library is equally stale when the **constants** changed and it was not rebuilt, so the artifact
+   has to be rebuilt when the header's content changes — and the check must compare *content*,
+   never the header's timestamp. It is rewritten every run, so its mtime is always fresh and a
+   timestamp check would be vacuous. §6's build record already carries the resolved list
+   verbatim, which is exactly the content to compare; this is the same equality test, extended to
+   cover the structured half.
+3. **Both paths obey §9 identically.** A structured constant whose parameter the sheet does not
+   declare refuses exactly as a scalar one does, with the same message naming the macro and the
+   parameter. If the two differed in strictness, an author's choice of *shape* would quietly
+   change how safe their build is.
+
+Property 3 is not achieved by writing the same check twice. **It is achieved by there being one
+list.** A `defines` entry says nothing about which mechanism carries it: the *shape of the
+resolved value* decides. A scalar becomes `-DNAME=VALUE`; an array, or an array of arrays,
+becomes a `#define NAME {...}` line in the header. One declaration site, one resolution pass,
+one set of refusals, and the author never chooses a transport — so there is no second path that
+could be laxer than the first.
+
+```json
+"defines": [
+  { "name": "FSW",    "from": "fsw" },        /* a scalar  -> -DFSW=250000      */
+  { "name": "LUT_VQ", "from": "vq_table" }    /* a table   -> a header #define  */
+]
+```
+
+This is also what C costs, stated plainly: a structured constant has to be **declarable** in the
+document, and `.gsim_sch` §5.1's `ParamValue` is a number, a boolean or a string. Extending it to
+carry an array is part of this work rather than a later convenience, because without it the sheet
+has nothing to bind and C is a transport with no cargo. The extension is additive and is already
+what the engine accepts on the other side: `general-simulator`'s block grammar takes a
+Python-style list literal (`a=[[1,2],[3,4]]`) as a field value, and this crate's registry already
+has matrix-shaped parameters, so an array in `params` is a gap in the format's written form
+rather than a new capability.
 
 **One distinction to keep, because conflating these two would be a design error.** The real
 project that generates a lookup-table header does not *declare* that table — it compiles a host
 program and runs it to **compute** one. That is a build step whose product another step consumes
-(§10's first expected kind), not a constant the sheet wrote down. A declared table and a computed
-table need different things: the first needs a value in the document, the second needs a step
-graph. The format has room for both and should not grow one mechanism that half-serves each.
+(§10's first expected kind), not a constant the sheet wrote down. A declared table needs a value
+in the document; a computed table needs a step graph. The format has room for both, and should
+not grow one mechanism that half-serves each.
 
 #### Who writes the `defines` list
 
@@ -410,6 +480,10 @@ compares it against what `compile()` resolved for the same step. A mismatch refu
   "artifact": "runs/case3/ctrl.so",
   "defines": ["L_F=2.8e-06", "C_F=5e-06", "FSW=250000", "N_PHASES=3"],
   "omitted_defines": ["DEBUG_LOG"],
+  "header": {
+    "path": "runs/case3/ctrl_gsim_constants.h",
+    "defines": ["#define LUT_VQ { 0, 0.25, 0.5, 0.75, 1 }"]
+  },
   "includes": ["code", "code/generated"],
   "sources": ["code/cscript_ctrl.c", "code/control_law.c", "code/clarke.c"],
   "libs": ["m"],
@@ -421,8 +495,10 @@ compares it against what `compile()` resolved for the same step. A mismatch refu
 "is something wrong"; the list answers "what is wrong" — `L_F was built as 2.8e-06, the circuit
 now says 3.2e-06` is a sentence a user can act on, and `digest mismatch` is not. It also costs
 this crate no new dependency, which a hash would. The comparison is therefore defined as
-element-wise equality over both lists, in order, and §7 fixes that order so two implementations
-compare the same thing.
+element-wise equality over all three lists, in order, and §7 fixes that order so two
+implementations compare the same thing. The header's lines are compared the same way, which is
+what makes a changed lookup table a stale artifact rather than an invisible one — the header is
+rewritten every run, so its timestamp is always fresh and says nothing.
 
 The record is written by whoever runs the build and read by whoever starts the run. This crate
 defines its content and produces the list to compare against; it does not write files.
@@ -436,8 +512,11 @@ Specified here because it is a wire format between two components and an equalit
    append a second `-D`. A duplicate `name` within one list (plan or step) is refused; a step
    overriding a plan-level define is the one legitimate repeat, and it is the reason the rule is
    "replace in place" rather than "refuse".
-3. Each entry renders as `NAME=VALUE`, where `VALUE` is `crate::fmt::stringify` of the resolved
-   parameter value or of the `literal`.
+3. **The resolved value's shape decides which list the entry lands in**, and it is the only
+   thing that does — see §3. A number, a boolean or a string renders as `NAME=VALUE` in the
+   `-D` list, where `VALUE` is `crate::fmt::stringify` of it. An array, or an array of arrays,
+   renders as `#define NAME { ... }` in the header list, with a nested array becoming a nested
+   brace initialiser, which is what a C array or a struct initialiser wants.
 4. A `NAME` with no `=` is not expressible. A define with no value is a different thing from a
    define with a value, and nothing in the cases this serves needs one.
 5. An `optional` define whose parameter is absent produces **no** entry in that list. Its name
@@ -568,9 +647,11 @@ So the division is drawn inside the description rather than around it:
 - **Interpreted here:** the step graph, the binding of a define to a parameter, the resolved
   value and its formatting, the canonical define list, and every refusal in §8. These are
   statements about the circuit.
-- **Not interpreted here, ever:** the compiler, the spelling of a flag, the platform's library
-  suffix, the process, the include directory `gsim_cscript.h` lives in, and the file the build
-  record is written to. These are statements about a machine. Nothing in this crate names a
+- **Not interpreted here, ever:** the compiler, the spelling of a flag — including which of
+  `-include` and `/FI` forces the generated header in — the platform's library suffix, the
+  process, the include directory `gsim_cscript.h` lives in, and the files the header and the
+  build record are written to. This crate says *what* the header contains and *where* it goes
+  relative to the schematic; it does not write it. These are statements about a machine. Nothing in this crate names a
   compiler, and `flags` is passed through as opaque strings precisely so that it cannot start
   to.
 
