@@ -156,6 +156,19 @@ pub struct ScopeOptions<'a> {
     /// `(boundary, p)` is named `p` — the `.SUBCKT` card's own port name, which is what an
     /// `X`-card's positional connections substitute into.
     pub boundary_block: Option<&'a str>,
+    /// Endpoints the **component library** declares causal, whatever the wire says.
+    ///
+    /// A wire touching one of these makes no net, exactly as a wire whose own `kind` is causal
+    /// makes none. The two are the same rule asked of two sources, and the second source is
+    /// needed because the first can be wrong: §8.4 makes `wire.kind` a *duplicate* of the
+    /// endpoints' port kind so that schema validation needs no catalogue, and a duplicate drifts.
+    /// This repository's own `buck_state_space_pi` example spells its gate-drive wire
+    /// `physical-electrical` while the switch's `g` port is declared `signal`, so a net was
+    /// invented for a causal reference — the shape of #80, from the other side.
+    ///
+    /// Supplied by [`super::build_scope`], which reads [`super::library::port_domain`]. Empty
+    /// here by default, so a caller with no catalogue in hand behaves exactly as before.
+    pub causal_endpoints: &'a [Endpoint],
 }
 
 /// Union-finds `wires` into nets and names each one.
@@ -163,7 +176,13 @@ pub struct ScopeOptions<'a> {
 /// Naming priority, highest first: the reference net; a `.SUBCKT` boundary port name; an
 /// explicit `wire.net` (§9's user-named nets); else the deterministic `n_<block>_<port>` form.
 pub fn resolve_scope(wires: &[Wire], opts: &ScopeOptions<'_>) -> Result<NetScope, CompileError> {
-    let physical: Vec<&Wire> = wires.iter().filter(|w| is_physical_kind(&w.kind)).collect();
+    let physical: Vec<&Wire> = wires
+        .iter()
+        .filter(|w| is_physical_kind(&w.kind))
+        .filter(|w| {
+            !opts.causal_endpoints.contains(&w.from) && !opts.causal_endpoints.contains(&w.to)
+        })
+        .collect();
 
     let mut index: HashMap<Endpoint, usize> = HashMap::new();
     let mut endpoints: Vec<Endpoint> = Vec::new();
@@ -407,6 +426,7 @@ mod tests {
             &ScopeOptions {
                 reference_endpoints: &refs,
                 boundary_block: None,
+                ..ScopeOptions::default()
             },
         )
         .unwrap();
@@ -424,6 +444,7 @@ mod tests {
             &ScopeOptions {
                 reference_endpoints: &[],
                 boundary_block: Some("leaf"),
+                ..ScopeOptions::default()
             },
         )
         .unwrap();
@@ -523,6 +544,7 @@ mod tests {
             &ScopeOptions {
                 reference_endpoints: &refs,
                 boundary_block: None,
+                ..ScopeOptions::default()
             },
         )
         .unwrap();

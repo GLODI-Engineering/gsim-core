@@ -596,15 +596,21 @@ fn build_scope<'a>(
              the largest net was selected as node 0, per docs/specs/gsim-sch-format.md §9"
         ));
     }
+    // What the *library* says each endpoint's port carries, for the endpoints where it says
+    // something causal. `wire.kind` is §8.4's duplicate of that and can disagree with it; a net
+    // invented for a causal connection is a node the target grammar cannot express, and the
+    // solver then reports it as a voltage (#80, #77). See `nets::ScopeOptions::causal_endpoints`.
+    let causal = causal_endpoints(blocks, wires);
     let mut nets = nets::resolve_scope(
         wires,
         &ScopeOptions {
             reference_endpoints: &refs,
             boundary_block: def.map(|d| d.id.as_str()),
+            causal_endpoints: &causal,
         },
     )?;
     if refs.is_empty() && def.is_none() {
-        nets = heuristic_reference(wires, &nets)?;
+        nets = heuristic_reference(wires, &nets, &causal)?;
     }
 
     let mut outputs = Outputs::default();
@@ -672,7 +678,11 @@ fn resolve_from_sources(scope: &Scope<'_>) -> Result<BTreeMap<String, Endpoint>,
 /// §9: "If no `is_reference` net is declared for an acausal sub-network, the compiler selects
 /// one heuristically." The heuristic is the net with the most endpoints (ties broken by name,
 /// so it is deterministic) — in practice the ground rail of any real circuit.
-fn heuristic_reference(wires: &[Wire], scope: &NetScope) -> Result<NetScope, CompileError> {
+fn heuristic_reference(
+    wires: &[Wire],
+    scope: &NetScope,
+    causal: &[Endpoint],
+) -> Result<NetScope, CompileError> {
     let mut counts: BTreeMap<&str, usize> = BTreeMap::new();
     for w in wires {
         for ep in [&w.from, &w.to] {
@@ -694,8 +704,33 @@ fn heuristic_reference(wires: &[Wire], scope: &NetScope) -> Result<NetScope, Com
         &ScopeOptions {
             reference_endpoints: &refs,
             boundary_block: None,
+            causal_endpoints: causal,
         },
     )
+}
+
+/// Every wire endpoint whose port the component library declares **causal**.
+///
+/// Only the endpoints a wire actually touches are considered, so this is proportional to the
+/// drawing rather than to the catalogue. An endpoint the library knows nothing about — an
+/// unrecognised type, an undeclared port, a boundary port whose domain is a parameter's value —
+/// contributes nothing, and the wire's own `kind` decides as it always did.
+fn causal_endpoints(blocks: &[Block], wires: &[Wire]) -> Vec<Endpoint> {
+    let mut causal = Vec::new();
+    for wire in wires {
+        for ep in [&wire.from, &wire.to] {
+            let Some(block) = blocks.iter().find(|b| b.id == ep.block) else {
+                continue;
+            };
+            let Some(domain) = library::port_domain(&block.r#type, &ep.port) else {
+                continue;
+            };
+            if !nets::is_physical_kind(domain) {
+                causal.push(ep.clone());
+            }
+        }
+    }
+    causal
 }
 
 /// Every target this crate can compile for.
