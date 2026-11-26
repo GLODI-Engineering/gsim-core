@@ -256,10 +256,10 @@ not the header's timestamp — it is rewritten every run, so a timestamp would s
 the run uses the new table. Misspell either `from` and **none** of it exists, because `compile()`
 refused — the same refusal, with the same message, whichever shape the constant had.
 
-#### How the value reaches the macro: three options, and the recommendation
+#### How the value reaches the macro: three options, and the decision
 
-The owner described the mechanism as *"the macro will replace those by defines in the file"*, and
-then said plainly that the description is not binding — *"If what I'm suggesting is the right
+The owner first described the mechanism as *"the macro will replace those by defines in the
+file"*, and then said plainly that the description was not binding — *"If what I'm suggesting is the right
 one, yes, we implement it. If yours is better, we take yours."* So the three candidates are
 written out, because the argument is the deliverable here as much as the code is.
 
