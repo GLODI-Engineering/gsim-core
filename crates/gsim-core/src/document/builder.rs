@@ -113,6 +113,12 @@ pub struct NewBlockSpec {
     /// Comment lines emitted below this block's card(s) — see [`Block::comment_after`].
     #[serde(default, deserialize_with = "super::block::deserialize_comment")]
     pub comment_after: Vec<String>,
+    /// The file the user edits — see [`Block::source`].
+    #[serde(default)]
+    pub source: Option<String>,
+    /// The build step that produces this block's artifact — see [`Block::build`].
+    #[serde(default)]
+    pub build: Option<String>,
     #[serde(default)]
     pub id: Option<String>,
 }
@@ -133,6 +139,8 @@ impl Default for NewBlockSpec {
             label: None,
             comment_before: Vec::new(),
             comment_after: Vec::new(),
+            source: None,
+            build: None,
             id: None,
         }
     }
@@ -350,6 +358,8 @@ impl ModelBuilder {
             label: spec.label,
             comment_before: spec.comment_before,
             comment_after: spec.comment_after,
+            source: spec.source,
+            build: spec.build,
             // `add_block` never creates a subckt instance -- `instantiate_subckt` is the only
             // path that sets this, so the "Some(def_id) exactly when paradigm == SpiceSubckt"
             // invariant has exactly one place to be established.
@@ -436,6 +446,10 @@ impl ModelBuilder {
             label: spec.label,
             comment_before: spec.comment_before,
             comment_after: spec.comment_after,
+            // A subckt instance is a whole sheet, not a code block: nothing compiles it, so
+            // neither a source nor a build step has a meaning here.
+            source: None,
+            build: None,
             subckt_ref: Some(spec.def_ref),
         })?;
         self.model.blocks.push(block);

@@ -2277,6 +2277,8 @@ mod tests {
                 label: None,
                 comment_before: Vec::new(),
                 comment_after: Vec::new(),
+                source: None,
+                build: None,
                 subckt_ref: None,
             })
             .unwrap()

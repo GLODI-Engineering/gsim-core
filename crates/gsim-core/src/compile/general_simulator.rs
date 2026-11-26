@@ -90,6 +90,9 @@ impl NetlistTarget for GeneralSimulatorTarget {
             // Filled in by `compile`, which owns the document-to-netlist map: it is the same for
             // every target, so no emitter builds its own.
             provenance: Default::default(),
+            // Likewise, and for a second reason: a build description is a statement about the
+            // document's parameters, not about this dialect, so no emitter resolves one.
+            code_build: None,
         })
     }
 }

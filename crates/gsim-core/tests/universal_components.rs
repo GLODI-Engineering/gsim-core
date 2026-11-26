@@ -312,6 +312,7 @@ impl NetlistTarget for NaiveTarget {
             netlist,
             notes: Vec::new(),
             provenance: Default::default(),
+            code_build: None,
         })
     }
 }

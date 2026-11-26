@@ -21,6 +21,7 @@
 
 mod block;
 mod builder;
+mod code_build;
 mod model;
 mod paradigm;
 pub mod port_compat;
@@ -32,6 +33,7 @@ pub use builder::{
     BuilderError, ConnectOptions, ModelBuilder, NewBlockSpec, NewSubcktInstanceSpec,
     SUBCKT_INSTANCE_TYPE,
 };
+pub use code_build::{CodeBuild, CodeBuildStep, CodeDefine};
 pub use model::{
     DocumentLoadError, GsimSchDocument, Model, ModelParam, ModelRole, WrongSchemaVersion,
 };

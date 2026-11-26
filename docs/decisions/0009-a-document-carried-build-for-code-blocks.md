@@ -543,7 +543,12 @@ Every one of these is a `CompileError`, so none of them produces a deck:
 | a define with both `from` and `literal`, or neither | the define |
 | a define's `from` is dotted (`"L1.L"`) | the define and the reserved spelling |
 | a duplicate define `name` within one list | the define and the list |
-| a block's `build` names no step | the block and the step id |
+| a define `name` that is not an identifier | the define |
+| a define whose `literal` is an array, an object or null | the define and the value |
+| a block's `build` names no step | the block, the step id, and the steps the plan does define |
+| a block's `build` names a step on a sheet with no plan at all | the block and the step id |
+| a block's `build` is set but its `lib` is empty | the block and the step id |
+| a step with no `lang`, or a `lang` outside `c`/`c++` | the step and the languages it could say |
 | a step id used twice | the step id |
 | a step with no `sources` | the step |
 | a step kind this version does not implement | the step and the kind |

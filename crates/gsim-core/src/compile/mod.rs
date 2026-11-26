@@ -19,6 +19,7 @@
 //! implementation, thin bindings" rule.
 
 pub mod capabilities;
+pub mod code_build;
 pub mod library;
 pub mod nets;
 pub mod provenance;
@@ -27,6 +28,7 @@ pub mod spec;
 
 mod general_simulator;
 
+pub use code_build::{ResolvedCodeBuild, ResolvedHeader, ResolvedStep};
 pub use general_simulator::GeneralSimulatorTarget;
 pub use nets::{NetScope, ScopeOptions};
 pub use provenance::{CardRole, ElementOrigin, NetOrigin, PortOrigin, Provenance};
@@ -57,6 +59,25 @@ pub enum CompileError {
     MissingParam {
         block: String,
         param: String,
+    },
+    /// A `-D` the sheet's build plan asks for, whose value cannot be derived from
+    /// `model.params`. **The refusal `docs/decisions/0009` §9 makes normative**, and its own
+    /// variant rather than a message so a front end can route it where a user will see it.
+    ///
+    /// Fatal, like every other arm here, and for a sharper reason: a build that omitted this
+    /// define would compile a block whose constants disagree with the circuit it is wired into,
+    /// and the run would then report a confident wrong answer. A failed compile costs a minute;
+    /// a wrong constant survives a study. So there is no deck, not merely no build.
+    UnderivableDefine {
+        define: String,
+        param: String,
+        reason: String,
+    },
+    /// A build plan this crate cannot make sense of — see `compile::code_build` for the list.
+    /// `at` names the step, block or define at fault, in the words the document uses for it.
+    BadCodeBuild {
+        at: String,
+        reason: String,
     },
     /// A block instantiates a `SubcktDef` that isn't in the model.
     UnknownSubcktDef {
@@ -202,6 +223,17 @@ impl std::fmt::Display for CompileError {
                 f,
                 "block '{block}' has type '{type_name}', which no netlist emitter knows -- add a TypeSpec for it in compile::spec::REGISTRY"
             ),
+            CompileError::UnderivableDefine {
+                define,
+                param,
+                reason,
+            } => write!(
+                f,
+                "define '{define}' is built from model parameter '{param}', and that parameter is {reason}. Refusing to build rather than guess: a block compiled without this define would disagree with the circuit it is wired into, and the run would report a confident wrong answer"
+            ),
+            CompileError::BadCodeBuild { at, reason } => {
+                write!(f, "this sheet's build plan: {at} {reason}")
+            }
             CompileError::BadRating {
                 block,
                 field,
@@ -339,6 +371,14 @@ pub struct CompileOutput {
     /// re-derives it from the block ids gets the wrong answer whenever two ids differ only by a
     /// device-letter prefix.
     pub provenance: Provenance,
+    /// How this sheet's code blocks are built, resolved against the same `model.params` this
+    /// netlist was generated from — see [`code_build`] and `docs/decisions/0009`. `None` when
+    /// the document carries no plan, which is every document written before that record.
+    ///
+    /// A field of this struct rather than a separate call on purpose: it is what makes "the
+    /// `-D` and the element card carry the same number" true by construction instead of by
+    /// review.
+    pub code_build: Option<ResolvedCodeBuild>,
 }
 
 /// A netlist backend. One implementation per simulator dialect; the pipeline above
@@ -781,8 +821,14 @@ pub fn compile_with(
     // Before emission: a name claimed twice is a property of the document, and reporting it
     // from a half-written netlist would bury it under whatever the emitter tripped over next.
     let provenance = provenance::build(&ctx)?;
+    // Also before emission, and for a stronger reason than tidiness: an underivable define has
+    // to mean there is no deck at all (`docs/decisions/0009` §1). Resolving after emission
+    // would still refuse, but it would refuse holding a netlist in its hand, and the next
+    // person to touch this would be one `if` away from returning it.
+    let code_build = code_build::resolve(model)?;
     let mut out = target.emit(&ctx)?;
     out.notes.extend(ctx.notes.iter().cloned());
     out.provenance = provenance;
+    out.code_build = code_build;
     Ok(out)
 }

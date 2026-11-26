@@ -132,6 +132,28 @@ pub struct Block {
         skip_serializing_if = "Vec::is_empty"
     )]
     pub comment_after: Vec<String>,
+    /// The file the user edits to change this block's behaviour — a `cscript` block's `.c`,
+    /// which its `lib` parameter does **not** name because `lib` is the compiled artifact.
+    ///
+    /// **A sibling of `params`, not an entry in it**, for the reason [`Block::ratings`] is:
+    /// it is not a model parameter, no `TypeSpec` field emits it onto a card, and switching
+    /// fidelity tier removes the parameters the target tier does not declare — so a source path
+    /// stored in `params` would vanish the first time someone touched the tier dropdown.
+    ///
+    /// Settles this crate's half of `GLODI-Engineering/omni-schematics#222`: without it the
+    /// editor finds a `cscript` block's source by trying `blocks/<stem>.c`, then the library's
+    /// own directory, then `<stem>.c`, then `src/<stem>.c` — a convention it has to tell the
+    /// user it is guessing at, and one that reaches no project whose sources live in `code/`.
+    /// Never emitted into a netlist: `general-mna` rejects an unknown field on a `kind=cscript`
+    /// card outright (`docs/decisions/0009` §5).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
+    /// The id of the [`super::CodeBuildStep`] that produces this block's artifact, in the
+    /// sheet's [`super::Model::code_build`]. `None` — the overwhelmingly common case, and every
+    /// document written before `docs/decisions/0009` — means nothing builds this block and
+    /// whatever its `lib` names is used as found.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build: Option<String>,
     /// `Some(def_id)` exactly when `paradigm == Paradigm::SpiceSubckt`: names which
     /// [`super::SubcktDef`] this block instantiates. A subckt-instance block's own wireable
     /// ports are exactly that def's `ports[].id` list.
@@ -164,6 +186,9 @@ pub struct NewBlock {
     pub label: Option<String>,
     pub comment_before: Vec<String>,
     pub comment_after: Vec<String>,
+    /// See [`Block::source`] / [`Block::build`]. `None` for both is the common case.
+    pub source: Option<String>,
+    pub build: Option<String>,
     pub subckt_ref: Option<String>,
 }
 
@@ -196,6 +221,8 @@ impl Block {
             label: spec.label,
             comment_before: spec.comment_before,
             comment_after: spec.comment_after,
+            source: spec.source,
+            build: spec.build,
             subckt_ref: spec.subckt_ref,
             extra: Map::new(),
         })
@@ -222,6 +249,8 @@ mod tests {
             label: None,
             comment_before: Vec::new(),
             comment_after: Vec::new(),
+            source: None,
+            build: None,
             subckt_ref: None,
         }
     }
