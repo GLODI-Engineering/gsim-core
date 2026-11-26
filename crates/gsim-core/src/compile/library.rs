@@ -139,6 +139,59 @@ pub fn find_component(name: &str) -> Option<&'static Component> {
     })
 }
 
+/// The port-kind domain the library declares for one port of one component.
+///
+/// `None` when nothing is knowable: an unrecognised component or port, or a port carrying
+/// `domain_from` — a subsystem boundary port, whose domain is a parameter's *value*, so the
+/// library genuinely does not know it.
+///
+/// Why this exists, given that a [`crate::document::Wire`] already carries a `kind`: §8.4 makes
+/// that field a *duplicate* of the endpoints' port kind, so schema validation never needs the
+/// catalogue — and a duplicate can be wrong. Real documents spell a wire into a signal port
+/// `physical-electrical`, this repository's own `buck_state_space_pi` example among them, and a
+/// net invented for a causal connection is a node `general-simulator`'s grammar cannot express
+/// (#80, #77). This is how [`super::build_scope`] asks the one description that cannot be wrong.
+///
+/// Variadic ports resolve through their group's template: `resolve-ports.ts` names an expanded
+/// port `<template.id><index>`, so `in3` on a `control.sum` answers with the template's domain.
+pub fn port_domain(type_name: &str, port: &str) -> Option<&'static str> {
+    let component = find_component(type_name)?;
+    let groups = component.presentation.get("ports")?;
+
+    let domain_of = |declared: &'static serde_json::Value| -> Option<&'static str> {
+        if declared.get("domain_from").is_some() {
+            return None;
+        }
+        declared.get("kind")?.get("domain")?.as_str()
+    };
+
+    for group in ["inputs", "outputs"] {
+        if let Some(list) = groups.get(group).and_then(|g| g.as_array()) {
+            if let Some(declared) = list
+                .iter()
+                .find(|p| p.get("id").and_then(|v| v.as_str()) == Some(port))
+            {
+                return domain_of(declared);
+            }
+        }
+    }
+    for group in ["variadic_inputs", "variadic_outputs"] {
+        let Some(template) = groups.get(group).and_then(|g| g.get("template")) else {
+            continue;
+        };
+        let Some(prefix) = template.get("id").and_then(|v| v.as_str()) else {
+            continue;
+        };
+        let Some(index) = port.strip_prefix(prefix) else {
+            continue;
+        };
+        if !index.is_empty() && index.chars().all(|c| c.is_ascii_digit()) {
+            return domain_of(template);
+        }
+    }
+    None
+}
+
 /// [`catalog`] as JSON.
 pub fn catalog_json() -> String {
     serde_json::to_string_pretty(&catalog()).expect("Catalog serialises")
