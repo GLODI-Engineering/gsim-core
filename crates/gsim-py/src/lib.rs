@@ -91,6 +91,8 @@ fn compile_err_to_py(e: CompileError) -> PyErr {
         CompileError::DuplicateName(_) => "duplicate-name",
         CompileError::DuplicateNet(_) => "duplicate-net",
         CompileError::BadRating { .. } => "bad-rating",
+        CompileError::UnderivableDefine { .. } => "underivable-define",
+        CompileError::BadCodeBuild { .. } => "bad-code-build",
     };
     PyErr::new::<PyValueError, _>(format!("{keyword}: {e}"))
 }
@@ -249,6 +251,11 @@ struct CompileResult {
     /// letter is prefixed onto a block id only when the id does not already start with it, so
     /// `load` and `Rload` both compile to `Rload`.
     provenance: gsim_core::compile::Provenance,
+    /// How this sheet's code blocks are built, resolved against the same parameters this
+    /// netlist came from — see `gsim_core::compile::code_build`. Absent from the JSON when the
+    /// document carries no plan, so a script written before this field keeps working.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    code_build: Option<gsim_core::compile::ResolvedCodeBuild>,
 }
 
 /// Compiles a `Model` into netlist text for `target` (currently only `"general-simulator"`).
@@ -258,12 +265,13 @@ struct CompileResult {
 /// {"elements": [{"element": "<netlist name>", "blocks": ["<block id>", ...], "role":
 /// "element"|"block"|"element_and_block"|"part"|"instance", "suffix"?, "def"?}, ...],
 /// "nets": [{"net": "<node name>", "ports": [{"blocks": [...], "port": "<port id>"}, ...]},
-/// ...]}}`. Raises a
+/// ...]}}`, plus `"code_build": {"steps": [...]}` when the document carries a build plan
+/// (`docs/decisions/0009`). Raises a
 /// `ValueError` whose message is keyword-prefixed the same way the builder errors are
 /// (`duplicate-name:`, `duplicate-net:`, `unknown-type:`, `unknown-target:`, `floating-port:`, `unconnected-ref:`,
 /// `missing-param:`, `unknown-subckt-def:`, `unconnected-subckt-port:`, `unknown-variant:`, `vector-output-port:`,
 /// `indexed-ref-arity:`, `unresolved-from-tag:`, `ambiguous-from-tag:`, `cyclic-from-tag:`,
-/// `routing-kind-unsupported:`),
+/// `routing-kind-unsupported:`, `underivable-define:`, `bad-code-build:`),
 /// with the real underlying message following unmodified.
 #[pyfunction]
 fn compile(model_json: &str, target: &str) -> PyResult<String> {
@@ -273,6 +281,7 @@ fn compile(model_json: &str, target: &str) -> PyResult<String> {
         netlist: out.netlist,
         notes: out.notes,
         provenance: out.provenance,
+        code_build: out.code_build,
     })
 }
 

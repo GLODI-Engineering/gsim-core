@@ -5,6 +5,7 @@
 //! calls this "out of scope for the connectivity/builder work"), not a gap unique to this crate.
 
 use super::block::Block;
+use super::code_build::CodeBuild;
 use super::subckt::SubcktDef;
 use super::wire::Wire;
 use serde::{Deserialize, Serialize};
@@ -68,6 +69,12 @@ pub struct Model {
     /// roundtrip guarantee holds for every document written before this field existed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub role: Option<ModelRole>,
+    /// How this sheet's code blocks are built — see [`super::CodeBuild`] and
+    /// `docs/decisions/0009`. `None`, and absent from the emitted JSON, for every document
+    /// written before that record, which is why a sheet with no plan compiles byte for byte as
+    /// it always did.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code_build: Option<CodeBuild>,
     #[serde(default)]
     pub lines: Vec<Value>,
     #[serde(default)]
@@ -111,6 +118,7 @@ impl Model {
             wires: Vec::new(),
             subckt_defs: Vec::new(),
             role: None,
+            code_build: None,
             lines: Vec::new(),
             nets: Vec::new(),
             simulation: Map::new(),

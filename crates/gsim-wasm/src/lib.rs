@@ -170,6 +170,14 @@ struct NewBlockSpecJson {
     comment_before: Vec<String>,
     #[serde(default, deserialize_with = "deserialize_comment")]
     comment_after: Vec<String>,
+    /// See `gsim_core::document::Block::source` — the file the user edits, which a `cscript`
+    /// block's `lib` does not name.
+    #[serde(default)]
+    source: Option<String>,
+    /// See `gsim_core::document::Block::build` — the build step that produces this block's
+    /// artifact.
+    #[serde(default)]
+    build: Option<String>,
     #[serde(default)]
     id: Option<String>,
 }
@@ -190,6 +198,8 @@ impl From<NewBlockSpecJson> for NewBlockSpec {
             label: spec.label,
             comment_before: spec.comment_before,
             comment_after: spec.comment_after,
+            source: spec.source,
+            build: spec.build,
             id: spec.id,
         }
     }
@@ -220,13 +230,17 @@ fn compile_impl(model_json: &str, target: &str) -> Result<String, String> {
         // The front end's half of the bridge: which drawn block each netlist name came from.
         // Not derivable here -- see `gsim_core::compile::provenance`.
         "provenance": out.provenance,
+        // Null when the document carries no build plan, so a front end that does not look for
+        // this field sees exactly what it saw before `docs/decisions/0009`.
+        "code_build": out.code_build,
     }))
 }
 
 /// Compiles a `Model` into netlist text for `target` (currently only `"general-simulator"`).
 ///
 /// **Shared JSON contract** (identical to `gsim-py`'s `compile`): returns
-/// `{"netlist": "<text>", "notes": [...], "provenance": {"elements": [...], "nets": [...]}}`;
+/// `{"netlist": "<text>", "notes": [...], "provenance": {"elements": [...], "nets": [...]},
+/// "code_build": {"steps": [...]} | null}`;
 /// throws a real JS `Error` carrying the compiler's own message on failure. See
 /// `gsim_core::compile::provenance` for the provenance shape and why it is carried rather than
 /// re-derived on the JS side.
