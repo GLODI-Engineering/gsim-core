@@ -14,6 +14,27 @@
 //! The data lives in `data/component-library.json`, embedded at build time. It is generated
 //! from the front end's metadata as a one-time migration and edited here afterwards: this is
 //! now the place a component's label or default is changed.
+//!
+//! # A parameter's `type` says whether its value is real
+//!
+//! `number` means real-valued; `integer` means integral. The distinction is not decoration
+//! and it is not a choice of input widget: it is what a writer of a `.gsim_sch` needs in
+//! order to write the value, and nothing else can supply it. JSON has one number type and so
+//! do Rust and JavaScript, so `48` and `48.0` are indistinguishable once parsed — but
+//! `json.loads` reads the first as an `int` and the second as a `float`, and a Python
+//! consumer of the document (`gsim-tools`, a user's own script) cannot un-see which it was
+//! handed. A writer that emits `48` for a `number` has therefore changed a real-valued
+//! parameter into an integer in the file. See GLODI-Engineering/omni-schematics#268.
+//!
+//! Two consequences for anyone editing the data file:
+//!
+//! * A `number`'s `default` is written in real form — `0.0`, not `0` — so that the default
+//!   this library hands out is the same kind of value the declaration promises. An `integer`'s
+//!   is written as an integer. `a_numeric_default_is_written_in_the_form_its_type_declares`
+//!   holds both.
+//! * `vector` and `matrix` name the container, not the element, so they say nothing about the
+//!   numbers inside one. That is deliberate: a writer leaves those alone rather than assuming.
+//!   Declaring the element kind would need a new field and no consumer has asked for one.
 
 use std::sync::OnceLock;
 
@@ -233,6 +254,129 @@ mod tests {
             library().len(),
             emittable + DESCRIBED_UNIVERSALS,
             "the embedded library did not parse whole, or a type was added on one side only"
+        );
+    }
+
+    /// Every parameter declaration in the library, as `(component id, where, param)`.
+    ///
+    /// Both halves, because a component declares its parameters twice: once in its own
+    /// `params` for an inspector to lay out, and once per `fidelities[].params` for the tier a
+    /// block is actually placed at. A guard that read one of them would leave the other free
+    /// to say something else.
+    fn every_param_declaration() -> Vec<(&'static str, String, &'static serde_json::Value)> {
+        let mut found = Vec::new();
+        for component in library() {
+            if let Some(list) = component
+                .presentation
+                .get("params")
+                .and_then(|p| p.as_array())
+            {
+                for param in list {
+                    found.push((component.id.as_str(), "params".to_string(), param));
+                }
+            }
+            for tier in component
+                .presentation
+                .get("fidelities")
+                .and_then(|f| f.as_array())
+                .map(Vec::as_slice)
+                .unwrap_or_default()
+            {
+                let name = tier
+                    .get("tier")
+                    .and_then(|t| t.as_str())
+                    .unwrap_or("<unnamed>");
+                for param in tier
+                    .get("params")
+                    .and_then(|p| p.as_array())
+                    .map(Vec::as_slice)
+                    .unwrap_or_default()
+                {
+                    found.push((component.id.as_str(), format!("fidelity {name}"), param));
+                }
+            }
+        }
+        found
+    }
+
+    /// A `number`'s default is spelled as a real; an `integer`'s is spelled as an integer.
+    ///
+    /// The declaration and the default have to say the same thing, because a Python reader of
+    /// this catalogue can tell them apart and a Rust or JavaScript one cannot. 210 of the
+    /// library's `number` defaults were written `0`, `5`, `-100` — so
+    /// `examples/_builder.py`'s `defaults_for` handed a *Python int* to every example it
+    /// generated for a parameter declared real, and the document it wrote said `"g_on": 5`
+    /// for a conductance in siemens. See the module doc and
+    /// GLODI-Engineering/omni-schematics#268.
+    ///
+    /// `serde_json` keeps the two apart in a parsed `Number`, which is why this can be asked
+    /// of the embedded library rather than of the file's text.
+    #[test]
+    fn a_numeric_default_is_written_in_the_form_its_type_declares() {
+        let mut wrong: Vec<String> = Vec::new();
+        for (id, origin, param) in every_param_declaration() {
+            let Some(declared) = param.get("type").and_then(|t| t.as_str()) else {
+                continue; // `a_component_carries_what_a_front_end_needs_to_draw_it` requires it
+            };
+            let Some(default) = param.get("default") else {
+                continue; // a parameter with no default has nothing to spell
+            };
+            let name = param
+                .get("name")
+                .or_else(|| param.get("id"))
+                .and_then(|n| n.as_str())
+                .unwrap_or("<unnamed>");
+            let ok = match declared {
+                "number" => default.is_f64(),
+                "integer" => default.is_i64() || default.is_u64(),
+                _ => true,
+            };
+            if !ok {
+                wrong.push(format!(
+                    "{id} @ {origin}: '{name}' is declared {declared} and its default is {default}"
+                ));
+            }
+        }
+        assert!(
+            wrong.is_empty(),
+            "{} default(s) contradict their own declaration:\n  {}",
+            wrong.len(),
+            wrong.join("\n  ")
+        );
+    }
+
+    /// A parameter is declared the same type wherever it is declared.
+    ///
+    /// A front end asks the tier first and the component's own `params` as a fallback, so the
+    /// two disagreeing would make the answer depend on which one happened to be consulted —
+    /// and for a real-versus-integer answer that is the difference between writing `0.0` and
+    /// writing `0` into somebody's file.
+    #[test]
+    fn a_parameter_is_declared_one_type_everywhere_it_appears() {
+        let mut seen: BTreeMap<(&str, String), &str> = BTreeMap::new();
+        let mut clashes: Vec<String> = Vec::new();
+        for (id, origin, param) in every_param_declaration() {
+            let (Some(name), Some(declared)) = (
+                param
+                    .get("name")
+                    .or_else(|| param.get("id"))
+                    .and_then(|n| n.as_str()),
+                param.get("type").and_then(|t| t.as_str()),
+            ) else {
+                continue;
+            };
+            match seen.insert((id, name.to_string()), declared) {
+                Some(first) if first != declared => clashes.push(format!(
+                    "{id}: '{name}' is {first} elsewhere and {declared} in {origin}"
+                )),
+                _ => {}
+            }
+        }
+        assert!(
+            clashes.is_empty(),
+            "{} parameter(s) are declared two types:\n  {}",
+            clashes.len(),
+            clashes.join("\n  ")
         );
     }
 

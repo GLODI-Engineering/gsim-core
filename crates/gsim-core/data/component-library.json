@@ -727,7 +727,7 @@
       },
       "params": [
         {
-          "default": 1,
+          "default": 1.0,
           "description": "Scalar multiplier applied to the input.",
           "label": "Gain",
           "name": "k",
@@ -744,7 +744,7 @@
           "doc": "Scalar gain `y = k * u`.",
           "params": [
             {
-              "default": 1,
+              "default": 1.0,
               "doc": "Scalar multiplier applied to the input.",
               "id": "k",
               "type": "number"
@@ -839,7 +839,7 @@
       },
       "params": [
         {
-          "default": 0,
+          "default": 0.0,
           "description": "Integrator state at t = 0.",
           "label": "Initial state",
           "name": "x0",
@@ -870,7 +870,7 @@
           "doc": "Continuous-time integrator `dx/dt = u`, with optional output limits.",
           "params": [
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "Integrator state at t = 0.",
               "id": "x0",
               "type": "number"
@@ -976,25 +976,25 @@
       },
       "params": [
         {
-          "default": 1,
+          "default": 1.0,
           "label": "Kp",
           "name": "kp",
           "type": "number"
         },
         {
-          "default": 0,
+          "default": 0.0,
           "label": "Ki",
           "name": "ki",
           "type": "number"
         },
         {
-          "default": 0,
+          "default": 0.0,
           "label": "Kd",
           "name": "kd",
           "type": "number"
         },
         {
-          "default": 100,
+          "default": 100.0,
           "label": "Filter N",
           "name": "n",
           "type": "number"
@@ -1032,27 +1032,27 @@
           "doc": "PID controller `u = Kp·e + Ki·∫e dt + Kd·de/dt`, with optional anti-windup.",
           "params": [
             {
-              "default": 1,
+              "default": 1.0,
               "doc": "Proportional gain.",
               "id": "kp",
               "type": "number"
             },
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "Integral gain.",
               "id": "ki",
               "min": 0,
               "type": "number"
             },
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "Derivative gain.",
               "id": "kd",
               "min": 0,
               "type": "number"
             },
             {
-              "default": 100,
+              "default": 100.0,
               "doc": "Derivative filter coefficient N.",
               "id": "n",
               "type": "number"
@@ -1267,19 +1267,19 @@
       },
       "params": [
         {
-          "default": 1,
+          "default": 1.0,
           "label": "Symmetric limit",
           "name": "limit",
           "type": "number"
         },
         {
-          "default": -1,
+          "default": -1.0,
           "label": "Lower limit",
           "name": "lo",
           "type": "number"
         },
         {
-          "default": 1,
+          "default": 1.0,
           "label": "Upper limit",
           "name": "hi",
           "type": "number"
@@ -1294,13 +1294,13 @@
           "doc": "Clamp output to the interval `[lo, hi]`.",
           "params": [
             {
-              "default": -1,
+              "default": -1.0,
               "doc": "Inclusive lower bound on the output.",
               "id": "lo",
               "type": "number"
             },
             {
-              "default": 1,
+              "default": 1.0,
               "doc": "Inclusive upper bound on the output.",
               "id": "hi",
               "type": "number"
@@ -2902,7 +2902,7 @@
       },
       "params": [
         {
-          "default": 1,
+          "default": 1.0,
           "description": "Frequency at the lowest input, in Hz.",
           "label": "Minimum frequency",
           "min": 0,
@@ -2910,7 +2910,7 @@
           "type": "number"
         },
         {
-          "default": 1000,
+          "default": 1000.0,
           "description": "Frequency at the highest input, in Hz.",
           "label": "Maximum frequency",
           "min": 0,
@@ -2928,14 +2928,14 @@
           "doc": "Voltage-controlled oscillator: maps the input signal onto a frequency ramp.",
           "params": [
             {
-              "default": 1,
+              "default": 1.0,
               "doc": "Frequency at the lowest input, in Hz.",
               "id": "f_min",
               "min": 0,
               "type": "number"
             },
             {
-              "default": 1000,
+              "default": 1000.0,
               "doc": "Frequency at the highest input, in Hz.",
               "id": "f_max",
               "min": 0,
@@ -4455,7 +4455,7 @@
       },
       "params": [
         {
-          "default": 5,
+          "default": 5.0,
           "description": "Forward conductance in siemens.",
           "label": "On conductance",
           "min": 0,
@@ -4478,14 +4478,14 @@
           "type": "number"
         },
         {
-          "default": -100,
+          "default": -100.0,
           "description": "Reverse breakdown voltage in volts.",
           "label": "Breakdown voltage",
           "name": "v_breakdown",
           "type": "number"
         },
         {
-          "default": 0,
+          "default": 0.0,
           "description": "Conductance past reverse breakdown, in siemens.",
           "label": "Breakdown conductance",
           "min": 0,
@@ -4499,7 +4499,7 @@
           "doc": "Ideal diode: piecewise-conductance forward/reverse model with a breakdown branch.",
           "params": [
             {
-              "default": 5,
+              "default": 5.0,
               "doc": "Forward conductance in siemens.",
               "id": "g_on",
               "min": 0,
@@ -4519,13 +4519,13 @@
               "type": "number"
             },
             {
-              "default": -100,
+              "default": -100.0,
               "doc": "Reverse breakdown voltage in volts.",
               "id": "v_breakdown",
               "type": "number"
             },
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "Conductance past reverse breakdown, in siemens.",
               "id": "g_breakdown",
               "min": 0,
@@ -4575,7 +4575,7 @@
           ],
           "params": [
             {
-              "default": 5,
+              "default": 5.0,
               "doc": "Forward conductance in siemens.",
               "id": "g_on",
               "min": 0,
@@ -4595,13 +4595,13 @@
               "type": "number"
             },
             {
-              "default": -100,
+              "default": -100.0,
               "doc": "Reverse breakdown voltage in volts.",
               "id": "v_breakdown",
               "type": "number"
             },
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "Conductance past reverse breakdown, in siemens.",
               "id": "g_breakdown",
               "min": 0,
@@ -4632,7 +4632,7 @@
           ],
           "params": [
             {
-              "default": 5,
+              "default": 5.0,
               "doc": "Forward conductance in siemens.",
               "id": "g_on",
               "min": 0,
@@ -4652,13 +4652,13 @@
               "type": "number"
             },
             {
-              "default": -100,
+              "default": -100.0,
               "doc": "Reverse breakdown voltage in volts.",
               "id": "v_breakdown",
               "type": "number"
             },
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "Conductance past reverse breakdown, in siemens.",
               "id": "g_breakdown",
               "min": 0,
@@ -4753,7 +4753,7 @@
           "type": "number"
         },
         {
-          "default": 5,
+          "default": 5.0,
           "description": "Body diode forward conductance in siemens. Not the channel -- that is r_on.",
           "label": "Body diode on conductance",
           "min": 0,
@@ -4776,14 +4776,14 @@
           "type": "number"
         },
         {
-          "default": -100,
+          "default": -100.0,
           "description": "Body diode reverse breakdown voltage in volts.",
           "label": "Body diode breakdown voltage",
           "name": "body_v_breakdown",
           "type": "number"
         },
         {
-          "default": 0,
+          "default": 0.0,
           "description": "Body diode conductance past reverse breakdown, in siemens.",
           "label": "Body diode breakdown conductance",
           "min": 0,
@@ -4811,7 +4811,7 @@
               "type": "number"
             },
             {
-              "default": 5,
+              "default": 5.0,
               "doc": "Body diode forward conductance in siemens. Not the channel -- that is r_on.",
               "id": "body_g_on",
               "min": 0,
@@ -4831,13 +4831,13 @@
               "type": "number"
             },
             {
-              "default": -100,
+              "default": -100.0,
               "doc": "Body diode reverse breakdown voltage in volts.",
               "id": "body_v_breakdown",
               "type": "number"
             },
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "Body diode conductance past reverse breakdown, in siemens.",
               "id": "body_g_breakdown",
               "min": 0,
@@ -4917,7 +4917,7 @@
               "type": "number"
             },
             {
-              "default": 5,
+              "default": 5.0,
               "doc": "Body diode forward conductance in siemens. Not the channel -- that is r_on.",
               "id": "body_g_on",
               "min": 0,
@@ -4937,13 +4937,13 @@
               "type": "number"
             },
             {
-              "default": -100,
+              "default": -100.0,
               "doc": "Body diode reverse breakdown voltage in volts.",
               "id": "body_v_breakdown",
               "type": "number"
             },
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "Body diode conductance past reverse breakdown, in siemens.",
               "id": "body_g_breakdown",
               "min": 0,
@@ -5404,14 +5404,14 @@
       },
       "params": [
         {
-          "default": -1,
+          "default": -1.0,
           "description": "Falling-edge threshold.",
           "label": "Low threshold",
           "name": "low",
           "type": "number"
         },
         {
-          "default": 1,
+          "default": 1.0,
           "description": "Rising-edge threshold.",
           "label": "High threshold",
           "name": "high",
@@ -5428,13 +5428,13 @@
           "doc": "Schmitt-trigger hysteresis comparator with separate low and high thresholds.",
           "params": [
             {
-              "default": -1,
+              "default": -1.0,
               "doc": "Falling-edge threshold.",
               "id": "low",
               "type": "number"
             },
             {
-              "default": 1,
+              "default": 1.0,
               "doc": "Rising-edge threshold.",
               "id": "high",
               "type": "number"
@@ -6557,7 +6557,7 @@
           "type": "number"
         },
         {
-          "default": 0,
+          "default": 0.0,
           "description": "Initial voltage across capacitor in volts.",
           "label": "Initial Condition",
           "name": "IC",
@@ -6576,7 +6576,7 @@
               "unit": "F"
             },
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "Initial voltage across capacitor in volts.",
               "id": "IC",
               "type": "number",
@@ -6722,7 +6722,7 @@
           "type": "number"
         },
         {
-          "default": 0,
+          "default": 0.0,
           "description": "Initial current through inductor in amperes.",
           "label": "Initial Condition",
           "name": "IC",
@@ -6741,7 +6741,7 @@
               "unit": "H"
             },
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "Initial current through inductor in amperes.",
               "id": "IC",
               "type": "number",
@@ -7042,7 +7042,7 @@
       },
       "params": [
         {
-          "default": 1000,
+          "default": 1000.0,
           "description": "Resistance in ohms.",
           "label": "Resistance",
           "name": "R",
@@ -7054,7 +7054,7 @@
           "doc": "Ideal linear resistor.",
           "params": [
             {
-              "default": 1000,
+              "default": 1000.0,
               "doc": "Resistance in ohms.",
               "id": "R",
               "type": "number",
@@ -7085,7 +7085,7 @@
           "doc": "Behavioral resistor.",
           "params": [
             {
-              "default": 1000,
+              "default": 1000.0,
               "id": "R",
               "type": "number"
             }
@@ -7108,7 +7108,7 @@
           "doc": "SPICE resistor.",
           "params": [
             {
-              "default": 1000,
+              "default": 1000.0,
               "id": "R",
               "type": "number"
             }
@@ -7475,7 +7475,7 @@
       },
       "params": [
         {
-          "default": 1,
+          "default": 1.0,
           "label": "Turns ratio",
           "name": "n",
           "type": "number"
@@ -7521,7 +7521,7 @@
           ],
           "params": [
             {
-              "default": 1,
+              "default": 1.0,
               "id": "n",
               "type": "number"
             }
@@ -7566,7 +7566,7 @@
           ],
           "params": [
             {
-              "default": 1,
+              "default": 1.0,
               "id": "n",
               "type": "number"
             }
@@ -7611,7 +7611,7 @@
           ],
           "params": [
             {
-              "default": 1,
+              "default": 1.0,
               "id": "n",
               "type": "number"
             }
@@ -7692,7 +7692,7 @@
       },
       "params": [
         {
-          "default": 10000,
+          "default": 10000.0,
           "description": "Carrier frequency in Hz.",
           "label": "Carrier frequency",
           "min": 0,
@@ -7700,7 +7700,7 @@
           "type": "number"
         },
         {
-          "default": 0,
+          "default": 0.0,
           "description": "Rising-edge dead time in seconds.",
           "label": "Rising dead time",
           "min": 0,
@@ -7708,7 +7708,7 @@
           "type": "number"
         },
         {
-          "default": 0,
+          "default": 0.0,
           "description": "Falling-edge dead time in seconds.",
           "label": "Falling dead time",
           "min": 0,
@@ -7727,21 +7727,21 @@
           "doc": "Fixed-carrier PWM modulator with complementary output and dead time.",
           "params": [
             {
-              "default": 10000,
+              "default": 10000.0,
               "doc": "Carrier frequency in Hz.",
               "id": "freq",
               "min": 0,
               "type": "number"
             },
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "Rising-edge dead time in seconds.",
               "id": "red",
               "min": 0,
               "type": "number"
             },
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "Falling-edge dead time in seconds.",
               "id": "fed",
               "min": 0,
@@ -7872,7 +7872,7 @@
       },
       "params": [
         {
-          "default": 1000,
+          "default": 1000.0,
           "description": "Lower carrier-frequency bound in Hz.",
           "label": "Minimum frequency",
           "min": 0,
@@ -7880,7 +7880,7 @@
           "type": "number"
         },
         {
-          "default": 50000,
+          "default": 50000.0,
           "description": "Upper carrier-frequency bound in Hz.",
           "label": "Maximum frequency",
           "min": 0,
@@ -7888,7 +7888,7 @@
           "type": "number"
         },
         {
-          "default": 0,
+          "default": 0.0,
           "description": "Rising-edge dead time in seconds.",
           "label": "Rising dead time",
           "min": 0,
@@ -7896,7 +7896,7 @@
           "type": "number"
         },
         {
-          "default": 0,
+          "default": 0.0,
           "description": "Falling-edge dead time in seconds.",
           "label": "Falling dead time",
           "min": 0,
@@ -7917,28 +7917,28 @@
           "doc": "Phase-shift PWM modulator driven by live frequency, phase and duty signals.",
           "params": [
             {
-              "default": 1000,
+              "default": 1000.0,
               "doc": "Lower carrier-frequency bound in Hz.",
               "id": "f_min",
               "min": 0,
               "type": "number"
             },
             {
-              "default": 50000,
+              "default": 50000.0,
               "doc": "Upper carrier-frequency bound in Hz.",
               "id": "f_max",
               "min": 0,
               "type": "number"
             },
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "Rising-edge dead time in seconds.",
               "id": "red",
               "min": 0,
               "type": "number"
             },
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "Falling-edge dead time in seconds.",
               "id": "fed",
               "min": 0,
@@ -8301,7 +8301,7 @@
       },
       "params": [
         {
-          "default": 1,
+          "default": 1.0,
           "description": "Time at which the step occurs.",
           "label": "Step time",
           "min": 0,
@@ -8309,14 +8309,14 @@
           "type": "number"
         },
         {
-          "default": 0,
+          "default": 0.0,
           "description": "Output value for t < t_step.",
           "label": "Initial value",
           "name": "before",
           "type": "number"
         },
         {
-          "default": 1,
+          "default": 1.0,
           "description": "Output value for t >= t_step.",
           "label": "Final value",
           "name": "after",
@@ -8332,20 +8332,20 @@
           "doc": "Step input — outputs `before` for t < t_step, `after` afterwards.",
           "params": [
             {
-              "default": 1,
+              "default": 1.0,
               "doc": "Time at which the step occurs.",
               "id": "t_step",
               "min": 0,
               "type": "number"
             },
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "Output value for t < t_step.",
               "id": "before",
               "type": "number"
             },
             {
-              "default": 1,
+              "default": 1.0,
               "doc": "Output value for t >= t_step.",
               "id": "after",
               "type": "number"
@@ -8415,7 +8415,7 @@
       },
       "params": [
         {
-          "default": 10,
+          "default": 10.0,
           "label": "Time window",
           "name": "t_window",
           "type": "number"
@@ -8429,7 +8429,7 @@
           "doc": "Signal scope sink.",
           "params": [
             {
-              "default": 10,
+              "default": 10.0,
               "id": "t_window",
               "type": "number"
             }
@@ -8497,19 +8497,19 @@
       },
       "params": [
         {
-          "default": 0,
+          "default": 0.0,
           "label": "Before",
           "name": "before",
           "type": "number"
         },
         {
-          "default": 1,
+          "default": 1.0,
           "label": "After",
           "name": "after",
           "type": "number"
         },
         {
-          "default": 1,
+          "default": 1.0,
           "label": "Step time",
           "name": "t_step",
           "type": "number"
@@ -8523,17 +8523,17 @@
           "doc": "Step signal source.",
           "params": [
             {
-              "default": 0,
+              "default": 0.0,
               "id": "before",
               "type": "number"
             },
             {
-              "default": 1,
+              "default": 1.0,
               "id": "after",
               "type": "number"
             },
             {
-              "default": 1,
+              "default": 1.0,
               "id": "t_step",
               "type": "number"
             }
@@ -8604,7 +8604,7 @@
       },
       "params": [
         {
-          "default": 10,
+          "default": 10.0,
           "description": "Display window in seconds. The waveform viewer shows the most recent `t_window` of data.",
           "label": "Time window",
           "min": 0,
@@ -8621,7 +8621,7 @@
           "doc": "Captures the input signal for display in the waveform viewer.",
           "params": [
             {
-              "default": 10,
+              "default": 10.0,
               "doc": "Display window in seconds. The waveform viewer shows the most recent `t_window` of data.",
               "id": "t_window",
               "min": 0,
@@ -8697,7 +8697,7 @@
       },
       "params": [
         {
-          "default": 1,
+          "default": 1.0,
           "description": "Constant output value.",
           "label": "Value",
           "name": "value",
@@ -8713,7 +8713,7 @@
           "doc": "Constant signal source.",
           "params": [
             {
-              "default": 1,
+              "default": 1.0,
               "doc": "Constant output value.",
               "id": "value",
               "type": "number"
@@ -8797,7 +8797,7 @@
       },
       "params": [
         {
-          "default": 0,
+          "default": 0.0,
           "description": "DC current in amperes.",
           "label": "Current",
           "name": "I",
@@ -8809,7 +8809,7 @@
           "doc": "Ideal DC current source. SPICE element I.",
           "params": [
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "DC current in amperes.",
               "id": "I",
               "type": "number"
@@ -8898,21 +8898,21 @@
       },
       "params": [
         {
-          "default": 0,
+          "default": 0.0,
           "description": "Initial current in amperes.",
           "label": "Initial Current",
           "name": "I1",
           "type": "number"
         },
         {
-          "default": 1,
+          "default": 1.0,
           "description": "Pulsed current in amperes.",
           "label": "Pulsed Current",
           "name": "I2",
           "type": "number"
         },
         {
-          "default": 0,
+          "default": 0.0,
           "description": "Rise delay.",
           "label": "Rise Delay",
           "name": "TD1",
@@ -8945,19 +8945,19 @@
           "doc": "Exponential current source. SPICE element I with EXP waveform.",
           "params": [
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "Initial current in amperes.",
               "id": "I1",
               "type": "number"
             },
             {
-              "default": 1,
+              "default": 1.0,
               "doc": "Pulsed current in amperes.",
               "id": "I2",
               "type": "number"
             },
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "Rise delay.",
               "id": "TD1",
               "type": "number"
@@ -9064,21 +9064,21 @@
       },
       "params": [
         {
-          "default": 0,
+          "default": 0.0,
           "description": "Initial current in amperes.",
           "label": "Initial Current",
           "name": "I1",
           "type": "number"
         },
         {
-          "default": 1,
+          "default": 1.0,
           "description": "Pulsed current in amperes.",
           "label": "Pulsed Current",
           "name": "I2",
           "type": "number"
         },
         {
-          "default": 0,
+          "default": 0.0,
           "description": "Delay before the first pulse.",
           "label": "Delay Time",
           "name": "TD",
@@ -9118,19 +9118,19 @@
           "doc": "Pulsed current source. SPICE element I with PULSE waveform.",
           "params": [
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "Initial current in amperes.",
               "id": "I1",
               "type": "number"
             },
             {
-              "default": 1,
+              "default": 1.0,
               "doc": "Pulsed current in amperes.",
               "id": "I2",
               "type": "number"
             },
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "Delay before the first pulse.",
               "id": "TD",
               "type": "number"
@@ -9345,21 +9345,21 @@
       },
       "params": [
         {
-          "default": 0,
+          "default": 0.0,
           "description": "Offset current in amperes.",
           "label": "Offset Current",
           "name": "VO",
           "type": "number"
         },
         {
-          "default": 1,
+          "default": 1.0,
           "description": "Amplitude in amperes.",
           "label": "Amplitude",
           "name": "VA",
           "type": "number"
         },
         {
-          "default": 1000,
+          "default": 1000.0,
           "description": "Carrier frequency in hertz.",
           "label": "Carrier Frequency",
           "name": "FC",
@@ -9373,7 +9373,7 @@
           "type": "number"
         },
         {
-          "default": 100,
+          "default": 100.0,
           "description": "Signal frequency in hertz.",
           "label": "Signal Frequency",
           "name": "FS",
@@ -9385,19 +9385,19 @@
           "doc": "Single-frequency FM current source. SPICE element I with SFFM waveform.",
           "params": [
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "Offset current in amperes.",
               "id": "VO",
               "type": "number"
             },
             {
-              "default": 1,
+              "default": 1.0,
               "doc": "Amplitude in amperes.",
               "id": "VA",
               "type": "number"
             },
             {
-              "default": 1000,
+              "default": 1000.0,
               "doc": "Carrier frequency in hertz.",
               "id": "FC",
               "type": "number"
@@ -9409,7 +9409,7 @@
               "type": "number"
             },
             {
-              "default": 100,
+              "default": 100.0,
               "doc": "Signal frequency in hertz.",
               "id": "FS",
               "type": "number"
@@ -9499,42 +9499,42 @@
       },
       "params": [
         {
-          "default": 0,
+          "default": 0.0,
           "description": "Offset current in amperes.",
           "label": "Offset Current",
           "name": "VO",
           "type": "number"
         },
         {
-          "default": 1,
+          "default": 1.0,
           "description": "Amplitude in amperes.",
           "label": "Amplitude",
           "name": "VA",
           "type": "number"
         },
         {
-          "default": 1000,
+          "default": 1000.0,
           "description": "Frequency in hertz.",
           "label": "Frequency",
           "name": "FREQ",
           "type": "number"
         },
         {
-          "default": 0,
+          "default": 0.0,
           "description": "Delay before waveform starts.",
           "label": "Delay Time",
           "name": "TD",
           "type": "number"
         },
         {
-          "default": 0,
+          "default": 0.0,
           "description": "Exponential damping factor.",
           "label": "Damping Factor",
           "name": "THETA",
           "type": "number"
         },
         {
-          "default": 0,
+          "default": 0.0,
           "description": "Phase in degrees.",
           "label": "Phase",
           "name": "PHASE",
@@ -9546,37 +9546,37 @@
           "doc": "Sinusoidal current source. SPICE element I with SIN waveform.",
           "params": [
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "Offset current in amperes.",
               "id": "VO",
               "type": "number"
             },
             {
-              "default": 1,
+              "default": 1.0,
               "doc": "Amplitude in amperes.",
               "id": "VA",
               "type": "number"
             },
             {
-              "default": 1000,
+              "default": 1000.0,
               "doc": "Frequency in hertz.",
               "id": "FREQ",
               "type": "number"
             },
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "Delay before waveform starts.",
               "id": "TD",
               "type": "number"
             },
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "Exponential damping factor.",
               "id": "THETA",
               "type": "number"
             },
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "Phase in degrees.",
               "id": "PHASE",
               "type": "number"
@@ -9674,7 +9674,7 @@
           "type": "string"
         },
         {
-          "default": 1,
+          "default": 1.0,
           "label": "Current gain",
           "name": "gain",
           "type": "number"
@@ -9709,7 +9709,7 @@
               "type": "string"
             },
             {
-              "default": 1,
+              "default": 1.0,
               "id": "gain",
               "type": "number"
             }
@@ -9787,7 +9787,7 @@
           "type": "string"
         },
         {
-          "default": 1,
+          "default": 1.0,
           "label": "Transresistance",
           "name": "gain",
           "type": "number"
@@ -9822,7 +9822,7 @@
               "type": "string"
             },
             {
-              "default": 1,
+              "default": 1.0,
               "id": "gain",
               "type": "number"
             }
@@ -10050,7 +10050,7 @@
       },
       "params": [
         {
-          "default": 1,
+          "default": 1.0,
           "description": "Voltage gain.",
           "label": "Gain",
           "name": "gain",
@@ -10062,7 +10062,7 @@
           "doc": "Voltage-controlled voltage source. SPICE element E.",
           "params": [
             {
-              "default": 1,
+              "default": 1.0,
               "doc": "Voltage gain.",
               "id": "gain",
               "type": "number"
@@ -10159,21 +10159,21 @@
       },
       "params": [
         {
-          "default": 0,
+          "default": 0.0,
           "description": "Value before the rise starts.",
           "label": "Initial value",
           "name": "v1",
           "type": "number"
         },
         {
-          "default": 1,
+          "default": 1.0,
           "description": "Asymptotic value of the rise.",
           "label": "Pulsed value",
           "name": "v2",
           "type": "number"
         },
         {
-          "default": 0,
+          "default": 0.0,
           "description": "Delay before the rise, in seconds.",
           "label": "Rise delay",
           "min": 0,
@@ -10181,7 +10181,7 @@
           "type": "number"
         },
         {
-          "default": 1,
+          "default": 1.0,
           "description": "Rise time constant in seconds.",
           "label": "Rise time constant",
           "min": 0,
@@ -10197,7 +10197,7 @@
           "type": "number"
         },
         {
-          "default": 1,
+          "default": 1.0,
           "description": "Fall time constant in seconds.",
           "label": "Fall time constant",
           "min": 0,
@@ -10214,26 +10214,26 @@
           "doc": "Exponential rise/fall signal source, using ngspice EXP() semantics.",
           "params": [
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "Value before the rise starts.",
               "id": "v1",
               "type": "number"
             },
             {
-              "default": 1,
+              "default": 1.0,
               "doc": "Asymptotic value of the rise.",
               "id": "v2",
               "type": "number"
             },
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "Delay before the rise, in seconds.",
               "id": "td1",
               "min": 0,
               "type": "number"
             },
             {
-              "default": 1,
+              "default": 1.0,
               "doc": "Rise time constant in seconds.",
               "id": "tau1",
               "min": 0,
@@ -10247,7 +10247,7 @@
               "type": "number"
             },
             {
-              "default": 1,
+              "default": 1.0,
               "doc": "Fall time constant in seconds.",
               "id": "tau2",
               "min": 0,
@@ -10324,21 +10324,21 @@
       },
       "params": [
         {
-          "default": 0,
+          "default": 0.0,
           "description": "Value before the first pulse.",
           "label": "Initial value",
           "name": "v1",
           "type": "number"
         },
         {
-          "default": 1,
+          "default": 1.0,
           "description": "Value during the pulse.",
           "label": "Pulsed value",
           "name": "v2",
           "type": "number"
         },
         {
-          "default": 0,
+          "default": 0.0,
           "description": "Delay before the first edge, in seconds.",
           "label": "Delay",
           "min": 0,
@@ -10346,7 +10346,7 @@
           "type": "number"
         },
         {
-          "default": 0,
+          "default": 0.0,
           "description": "Rise time in seconds.",
           "label": "Rise time",
           "min": 0,
@@ -10354,7 +10354,7 @@
           "type": "number"
         },
         {
-          "default": 0,
+          "default": 0.0,
           "description": "Fall time in seconds.",
           "label": "Fall time",
           "min": 0,
@@ -10387,33 +10387,33 @@
           "doc": "Trapezoidal pulse signal source, using ngspice PULSE() semantics.",
           "params": [
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "Value before the first pulse.",
               "id": "v1",
               "type": "number"
             },
             {
-              "default": 1,
+              "default": 1.0,
               "doc": "Value during the pulse.",
               "id": "v2",
               "type": "number"
             },
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "Delay before the first edge, in seconds.",
               "id": "td",
               "min": 0,
               "type": "number"
             },
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "Rise time in seconds.",
               "id": "tr",
               "min": 0,
               "type": "number"
             },
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "Fall time in seconds.",
               "id": "tf",
               "min": 0,
@@ -10501,14 +10501,14 @@
       },
       "params": [
         {
-          "default": 1,
+          "default": 1.0,
           "description": "Peak amplitude.",
           "label": "Amplitude",
           "name": "va",
           "type": "number"
         },
         {
-          "default": 1000,
+          "default": 1000.0,
           "description": "Carrier frequency in Hz.",
           "label": "Carrier frequency",
           "min": 0,
@@ -10516,7 +10516,7 @@
           "type": "number"
         },
         {
-          "default": 100,
+          "default": 100.0,
           "description": "Modulating frequency in Hz.",
           "label": "Signal frequency",
           "min": 0,
@@ -10524,14 +10524,14 @@
           "type": "number"
         },
         {
-          "default": 0,
+          "default": 0.0,
           "description": "DC offset.",
           "label": "Offset",
           "name": "v0",
           "type": "number"
         },
         {
-          "default": 0,
+          "default": 0.0,
           "description": "Modulation index.",
           "label": "Modulation index",
           "min": 0,
@@ -10548,33 +10548,33 @@
           "doc": "Single-frequency FM signal source, using ngspice SFFM() semantics.",
           "params": [
             {
-              "default": 1,
+              "default": 1.0,
               "doc": "Peak amplitude.",
               "id": "va",
               "type": "number"
             },
             {
-              "default": 1000,
+              "default": 1000.0,
               "doc": "Carrier frequency in Hz.",
               "id": "fc",
               "min": 0,
               "type": "number"
             },
             {
-              "default": 100,
+              "default": 100.0,
               "doc": "Modulating frequency in Hz.",
               "id": "fs",
               "min": 0,
               "type": "number"
             },
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "DC offset.",
               "id": "v0",
               "type": "number"
             },
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "Modulation index.",
               "id": "mdi",
               "min": 0,
@@ -10651,14 +10651,14 @@
       },
       "params": [
         {
-          "default": 1,
+          "default": 1.0,
           "description": "Peak amplitude.",
           "label": "Amplitude",
           "name": "va",
           "type": "number"
         },
         {
-          "default": 1000,
+          "default": 1000.0,
           "description": "Frequency in Hz.",
           "label": "Frequency",
           "min": 0,
@@ -10666,14 +10666,14 @@
           "type": "number"
         },
         {
-          "default": 0,
+          "default": 0.0,
           "description": "DC offset.",
           "label": "Offset",
           "name": "v0",
           "type": "number"
         },
         {
-          "default": 0,
+          "default": 0.0,
           "description": "Start delay in seconds.",
           "label": "Delay",
           "min": 0,
@@ -10681,14 +10681,14 @@
           "type": "number"
         },
         {
-          "default": 0,
+          "default": 0.0,
           "description": "Exponential damping factor in 1/s.",
           "label": "Damping factor",
           "name": "theta",
           "type": "number"
         },
         {
-          "default": 0,
+          "default": 0.0,
           "description": "Phase offset in degrees.",
           "label": "Phase",
           "name": "phase",
@@ -10704,39 +10704,39 @@
           "doc": "Damped sine signal source, using ngspice SIN() semantics.",
           "params": [
             {
-              "default": 1,
+              "default": 1.0,
               "doc": "Peak amplitude.",
               "id": "va",
               "type": "number"
             },
             {
-              "default": 1000,
+              "default": 1000.0,
               "doc": "Frequency in Hz.",
               "id": "freq",
               "min": 0,
               "type": "number"
             },
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "DC offset.",
               "id": "v0",
               "type": "number"
             },
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "Start delay in seconds.",
               "id": "td",
               "min": 0,
               "type": "number"
             },
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "Exponential damping factor in 1/s.",
               "id": "theta",
               "type": "number"
             },
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "Phase offset in degrees.",
               "id": "phase",
               "type": "number"
@@ -10893,7 +10893,7 @@
       },
       "params": [
         {
-          "default": 0,
+          "default": 0.0,
           "description": "DC voltage in volts",
           "label": "Voltage",
           "name": "V",
@@ -10905,7 +10905,7 @@
           "doc": "Ideal DC voltage source. SPICE element V.",
           "params": [
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "DC voltage in volts",
               "id": "V",
               "type": "number"
@@ -10994,21 +10994,21 @@
       },
       "params": [
         {
-          "default": 0,
+          "default": 0.0,
           "description": "initial voltage in volts",
           "label": "Initial Voltage",
           "name": "V1",
           "type": "number"
         },
         {
-          "default": 1,
+          "default": 1.0,
           "description": "pulsed voltage in volts",
           "label": "Pulsed Voltage",
           "name": "V2",
           "type": "number"
         },
         {
-          "default": 0,
+          "default": 0.0,
           "description": "rise delay",
           "label": "Rise Delay",
           "name": "TD1",
@@ -11041,19 +11041,19 @@
           "doc": "Exponential voltage source. SPICE element V with EXP waveform.",
           "params": [
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "initial voltage in volts",
               "id": "V1",
               "type": "number"
             },
             {
-              "default": 1,
+              "default": 1.0,
               "doc": "pulsed voltage in volts",
               "id": "V2",
               "type": "number"
             },
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "rise delay",
               "id": "TD1",
               "type": "number"
@@ -11164,21 +11164,21 @@
       },
       "params": [
         {
-          "default": 0,
+          "default": 0.0,
           "description": "Initial (off) voltage in volts",
           "label": "Initial Voltage",
           "name": "V1",
           "type": "number"
         },
         {
-          "default": 1,
+          "default": 1.0,
           "description": "Pulsed (on) voltage in volts",
           "label": "Pulsed Voltage",
           "name": "V2",
           "type": "number"
         },
         {
-          "default": 0,
+          "default": 0.0,
           "description": "delay",
           "label": "Delay Time",
           "name": "TD",
@@ -11218,19 +11218,19 @@
           "doc": "Pulsed voltage source. SPICE element V with PULSE waveform.",
           "params": [
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "Initial (off) voltage in volts",
               "id": "V1",
               "type": "number"
             },
             {
-              "default": 1,
+              "default": 1.0,
               "doc": "Pulsed (on) voltage in volts",
               "id": "V2",
               "type": "number"
             },
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "delay",
               "id": "TD",
               "type": "number"
@@ -11445,21 +11445,21 @@
       },
       "params": [
         {
-          "default": 0,
+          "default": 0.0,
           "description": "offset voltage in volts",
           "label": "Offset Voltage",
           "name": "VO",
           "type": "number"
         },
         {
-          "default": 1,
+          "default": 1.0,
           "description": "amplitude in volts",
           "label": "Amplitude",
           "name": "VA",
           "type": "number"
         },
         {
-          "default": 1000,
+          "default": 1000.0,
           "description": "carrier freq",
           "label": "Carrier Frequency",
           "name": "FC",
@@ -11473,7 +11473,7 @@
           "type": "number"
         },
         {
-          "default": 100,
+          "default": 100.0,
           "description": "signal freq",
           "label": "Signal Frequency",
           "name": "FS",
@@ -11485,19 +11485,19 @@
           "doc": "Single-frequency FM voltage source. SPICE element V with SFFM waveform.",
           "params": [
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "offset voltage in volts",
               "id": "VO",
               "type": "number"
             },
             {
-              "default": 1,
+              "default": 1.0,
               "doc": "amplitude in volts",
               "id": "VA",
               "type": "number"
             },
             {
-              "default": 1000,
+              "default": 1000.0,
               "doc": "carrier freq",
               "id": "FC",
               "type": "number"
@@ -11509,7 +11509,7 @@
               "type": "number"
             },
             {
-              "default": 100,
+              "default": 100.0,
               "doc": "signal freq",
               "id": "FS",
               "type": "number"
@@ -11599,42 +11599,42 @@
       },
       "params": [
         {
-          "default": 0,
+          "default": 0.0,
           "description": "offset",
           "label": "Offset Voltage",
           "name": "VO",
           "type": "number"
         },
         {
-          "default": 1,
+          "default": 1.0,
           "description": "amplitude",
           "label": "Amplitude",
           "name": "VA",
           "type": "number"
         },
         {
-          "default": 1000,
+          "default": 1000.0,
           "description": "frequency Hz",
           "label": "Frequency",
           "name": "FREQ",
           "type": "number"
         },
         {
-          "default": 0,
+          "default": 0.0,
           "description": "delay",
           "label": "Delay Time",
           "name": "TD",
           "type": "number"
         },
         {
-          "default": 0,
+          "default": 0.0,
           "description": "damping",
           "label": "Damping Factor",
           "name": "THETA",
           "type": "number"
         },
         {
-          "default": 0,
+          "default": 0.0,
           "description": "phase in degrees",
           "label": "Phase",
           "name": "PHASE",
@@ -11646,37 +11646,37 @@
           "doc": "Sinusoidal voltage source. SPICE element V with SIN waveform.",
           "params": [
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "offset",
               "id": "VO",
               "type": "number"
             },
             {
-              "default": 1,
+              "default": 1.0,
               "doc": "amplitude",
               "id": "VA",
               "type": "number"
             },
             {
-              "default": 1000,
+              "default": 1000.0,
               "doc": "frequency Hz",
               "id": "FREQ",
               "type": "number"
             },
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "delay",
               "id": "TD",
               "type": "number"
             },
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "damping",
               "id": "THETA",
               "type": "number"
             },
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "phase in degrees",
               "id": "PHASE",
               "type": "number"
@@ -11834,14 +11834,14 @@
           "type": "string"
         },
         {
-          "default": 1,
+          "default": 1.0,
           "description": "Every value is scaled by this, for a x10 probe.",
           "label": "Scale",
           "name": "scale",
           "type": "number"
         },
         {
-          "default": 0,
+          "default": 0.0,
           "description": "Added to every value after scaling, to remove a DC offset.",
           "label": "Offset",
           "name": "offset",
@@ -11945,13 +11945,13 @@
               "type": "string"
             },
             {
-              "default": 1,
+              "default": 1.0,
               "doc": "Every value is scaled by this, for a x10 probe.",
               "id": "scale",
               "type": "number"
             },
             {
-              "default": 0,
+              "default": 0.0,
               "doc": "Added to every value after scaling, to remove a DC offset.",
               "id": "offset",
               "type": "number"
