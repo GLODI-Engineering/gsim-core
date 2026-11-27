@@ -29,15 +29,19 @@ impl NetlistTarget for GeneralSimulatorTarget {
         for def in &ctx.model.subckt_defs {
             let scope = &ctx.defs[&def.id];
             lines.push(String::new());
-            lines.push(format!(
-                ".subckt {} {}",
-                def.name,
-                def.ports
+            let mut header = vec![format!(".subckt {}", def.name)];
+            header.extend(def.ports.iter().map(|p| p.id.clone()));
+            // The formal parameter list, after the ports and in declared order (#111). Until
+            // `general-simulator 0.11.0` there was nowhere for it to go: the solver parsed the
+            // list and bound nothing, so emitting it would have produced a deck that parsed
+            // cleanly and lost the values one repository further down -- which is why decision
+            // 0010's amendment made the ordering a rule rather than a preference.
+            header.extend(
+                def.params
                     .iter()
-                    .map(|p| p.id.as_str())
-                    .collect::<Vec<_>>()
-                    .join(" ")
-            ));
+                    .map(|p| format!("{}={}", p.name, spec::render_value(&p.value))),
+            );
+            lines.push(header.join(" "));
             emit_scope(scope, &mut lines)?;
             // Nested X cards: a def may instantiate another def, exactly as a real `.SUBCKT`
             // body may contain `X` cards of its own. Two spellings reach the same place --
@@ -1014,7 +1018,44 @@ fn emit_nested_instance(
     let mut tokens = vec![x_card_name(&instance.id)];
     tokens.extend(instance.connections.iter().cloned());
     tokens.push(def.name.clone());
+    tokens.extend(instance_param_tokens(&instance.id, def, &instance.params)?);
     Ok(tokens.join(" "))
+}
+
+/// The `name=value` tail of one `X` card: this instance's own values for the parameters its
+/// definition declares.
+///
+/// Emitted in the **definition's** declared order rather than the instance's, for two reasons.
+/// One is that a `Map` here is sorted by key, so "the order they were written" is not available
+/// to be preserved anyway, and a deck should not reorder itself when a parameter is renamed.
+/// The other is that walking the declaration is what makes the refusal below free: anything
+/// left over afterwards is a name the definition does not have.
+fn instance_param_tokens(
+    block: &str,
+    def: &SubcktDef,
+    given: &serde_json::Map<String, serde_json::Value>,
+) -> Result<Vec<String>, CompileError> {
+    let declared: Vec<String> = def.params.iter().map(|p| p.name.clone()).collect();
+    if let Some(unknown) = given.keys().find(|k| !declared.contains(k)) {
+        return Err(CompileError::UndeclaredSubcktParam {
+            block: block.to_string(),
+            def: def.name.clone(),
+            param: unknown.clone(),
+            declared,
+        });
+    }
+    Ok(def
+        .params
+        .iter()
+        .filter_map(|p| {
+            // Only what this instance actually sets. A parameter it leaves alone is already on
+            // the `.subckt` card as the definition's default, and repeating the default on
+            // every call site would make a deck where the two could silently disagree.
+            given
+                .get(&p.name)
+                .map(|value| format!("{}={}", p.name, spec::render_value(value)))
+        })
+        .collect())
 }
 
 /// `X<name> <connections...> <def_name>` — the connections are **positional**, one per
@@ -1058,6 +1099,10 @@ fn emit_x_card(
         tokens.push(token);
     }
     tokens.push(def.name.clone());
+    // A `spice-subckt.instance` block carries no catalogue entry and no ratings -- see
+    // `instantiate_subckt` -- so every one of its `params` is a value for one of the
+    // definition's own parameters, and nothing else is competing for that map.
+    tokens.extend(instance_param_tokens(&block.id, def, &block.params)?);
     // A subckt instance is a block too, so `instantiate_subckt`'s comment slots reach its X card
     // the same way `add_block`'s reach an element card. `emit_nested_instance` is deliberately
     // left out: a `SubcktInstance` is not a `Block` and carries no comment fields.

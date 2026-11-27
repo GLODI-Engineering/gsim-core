@@ -85,6 +85,7 @@ fn compile_err_to_py(e: CompileError) -> PyErr {
         CompileError::MissingParam { .. } => "missing-param",
         CompileError::UnknownSubcktDef { .. } => "unknown-subckt-def",
         CompileError::UnconnectedSubcktPort { .. } => "unconnected-subckt-port",
+        CompileError::UndeclaredSubcktParam { .. } => "undeclared-subckt-param",
         CompileError::UnknownVariant { .. } => "unknown-variant",
         CompileError::VectorOutputPort { .. } => "vector-output-port",
         CompileError::IndexedRefArity { .. } => "indexed-ref-arity",
@@ -281,7 +282,8 @@ struct CompileResult {
 /// Raises a
 /// `ValueError` whose message is keyword-prefixed the same way the builder errors are
 /// (`duplicate-name:`, `duplicate-net:`, `unknown-type:`, `unknown-target:`, `floating-port:`, `unconnected-ref:`,
-/// `missing-param:`, `unknown-subckt-def:`, `unconnected-subckt-port:`, `unknown-variant:`, `vector-output-port:`,
+/// `missing-param:`, `unknown-subckt-def:`, `unconnected-subckt-port:`,
+/// `undeclared-subckt-param:`, `unknown-variant:`, `vector-output-port:`,
 /// `indexed-ref-arity:`, `unresolved-from-tag:`, `ambiguous-from-tag:`, `cyclic-from-tag:`,
 /// `routing-kind-unsupported:`, `underivable-define:`, `bad-code-build:`, `bad-params:`),
 /// with the real underlying message following unmodified.
@@ -1193,6 +1195,33 @@ mod tests {
         );
         assert!(msg.starts_with("unknown-subckt-def:"), "got: {msg}");
         assert!(msg.contains("ghost"), "got: {msg}");
+    }
+
+    #[test]
+    fn compiling_an_instance_parameter_the_def_does_not_declare_raises_its_own_keyword() {
+        // The keyword is the contract: a front end routes on it, so a new refusal that reached
+        // Python under someone else's keyword would be worse than one that reached it under
+        // none. This is also the arm `cargo test --workspace --exclude gsim-py` cannot see --
+        // the match on `CompileError` is exhaustive, so a new variant breaks *this* crate and
+        // nothing else, which is how #107's keyword was nearly shipped missing.
+        let model = new_model("m1", "M", 10).unwrap();
+        // No ports, so the positional-connection refusal cannot fire first and hide this one.
+        let d = r#"{"id":"d1","name":"D","ports":[],"params":[{"name":"Rv","value":1000.0}]}"#;
+        let model = {
+            let r: serde_json::Value =
+                serde_json::from_str(&add_subckt_def(&model, d).unwrap()).unwrap();
+            r["model"].to_string()
+        };
+        let model = {
+            let spec = r#"{"def_ref":"d1","position":[0,0],"id":"X1","params":{"Rw":10.0}}"#;
+            let r: serde_json::Value =
+                serde_json::from_str(&instantiate_subckt(&model, spec).unwrap()).unwrap();
+            r["model"].to_string()
+        };
+        let msg = err_msg(compile(&model, "general-simulator").unwrap_err());
+        assert!(msg.starts_with("undeclared-subckt-param:"), "got: {msg}");
+        assert!(msg.contains("Rw"), "got: {msg}");
+        assert!(msg.contains("Rv"), "got: {msg}");
     }
 
     #[test]
