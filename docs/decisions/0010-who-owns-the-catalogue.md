@@ -162,7 +162,7 @@ change if it ever happens, which is a consequence and not a reason.
 The section above calls per-instance parameters *"the one that matters most"*, and it is the one
 thing this record left unplaced: it says a sub-schematic must take parameters per instance, and
 never says which layer turns `Rv=100` on an `X` card into a resistance. Measured on 2026-11-27,
-against `general-simulator 0.8.0`, the answer was **no layer at all**.
+against `general-simulator 0.10.0`, the answer was **no layer at all**.
 
 Two decks. The first solves:
 
@@ -184,7 +184,8 @@ V1 A 0 5
 X1 A MID RPART Rv=100
 X2 MID 0 RPART Rv=220
 ```
-→ `error: Evaluate(MissingSymbol("Rv"))`.
+→ `error: Evaluate(MissingSymbol): evaluating an expression failed: missing value for symbol
+'Rv'`.
 
 The grammar is not the problem — `spice-lsp/docs/GRAMMAR.md` already specifies both the formal
 list and the instance tail, and both parse. What is missing is a **scope**: nothing binds a
