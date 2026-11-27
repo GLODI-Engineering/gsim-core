@@ -339,10 +339,87 @@ pub fn substitute(model: &Model, table: &ResolvedParams) -> Result<Model, ParamE
         }
     }
 
+    let nothing_shadowed = BTreeSet::new();
     for block in &mut out.blocks {
         let at = |field: &str, key: &str| Site(format!("block '{}' {field} '{key}'", block.id));
-        substitute_map(&mut block.params, table, &|k| at("parameter", k))?;
-        substitute_map(&mut block.ic, table, &|k| at("initial condition", k))?;
+        substitute_map(
+            &mut block.params,
+            table,
+            &|k| at("parameter", k),
+            &nothing_shadowed,
+        )?;
+        substitute_map(
+            &mut block.ic,
+            table,
+            &|k| at("initial condition", k),
+            &nothing_shadowed,
+        )?;
+    }
+
+    // A `.subckt` definition's body is part of the model, and before `#121` this loop did not
+    // exist -- so the invariant above held everywhere except inside a definition, where a
+    // reference was emitted into the deck verbatim and failed two repositories away as a
+    // symbol nothing declared.
+    //
+    // A definition brings a second scope with it, which is why this is not simply the loop
+    // above repeated. A body's reference to one of the definition's **own** declared
+    // parameters is not this crate's to resolve: the instance supplies it and the solver binds
+    // it where the subcircuit is expanded (`general-mna#63`). Those names are therefore
+    // shadowed here -- left exactly as written -- and everything else resolves against the
+    // sheet's table as usual.
+    for index in 0..out.subckt_defs.len() {
+        let def_id = out.subckt_defs[index].id.clone();
+        let formals: BTreeSet<String> = out.subckt_defs[index]
+            .params
+            .iter()
+            .map(|p| p.name.clone())
+            .collect();
+
+        // The definition's own declared defaults resolve in the *sheet's* scope, with nothing
+        // shadowed: a default is written in the document beside everything else, so
+        // `Rv = "{Rload}"` is a sheet reference and means 330. A default naming another formal
+        // of the same definition is not supported and says so, as an unresolvable reference
+        // naming the definition and the parameter.
+        for param in &mut out.subckt_defs[index].params {
+            let site = Site(format!(
+                "subcircuit '{def_id}' parameter '{}' default",
+                param.name
+            ));
+            substitute_json(&mut param.value, table, &site, &nothing_shadowed)?;
+        }
+
+        for block in &mut out.subckt_defs[index].blocks {
+            let block_id = block.id.clone();
+            let at = |field: &str, key: &str| {
+                Site(format!(
+                    "subcircuit '{def_id}' block '{block_id}' {field} '{key}'"
+                ))
+            };
+            substitute_map(&mut block.params, table, &|k| at("parameter", k), &formals)?;
+            substitute_map(
+                &mut block.ic,
+                table,
+                &|k| at("initial condition", k),
+                &formals,
+            )?;
+        }
+
+        // A nested instance's values are written at *its* call site, which is this
+        // definition's body -- so they are read in this definition's scope, the same rule the
+        // solver applies when it binds them one level further down.
+        for instance in &mut out.subckt_defs[index].instances {
+            let instance_id = instance.id.clone();
+            substitute_map(
+                &mut instance.params,
+                table,
+                &|k| {
+                    Site(format!(
+                        "subcircuit '{def_id}' instance '{instance_id}' parameter '{k}'"
+                    ))
+                },
+                &formals,
+            )?;
+        }
     }
 
     // §5.3's third use site: "any numeric field" of an analysis directive. This crate does not
@@ -355,6 +432,7 @@ pub fn substitute(model: &Model, table: &ResolvedParams) -> Result<Model, ParamE
         &mut simulation,
         table,
         &Site("a simulation directive".to_string()),
+        &nothing_shadowed,
     )?;
     if let Value::Object(map) = simulation {
         out.simulation = map;
@@ -367,9 +445,10 @@ fn substitute_map(
     map: &mut Map<String, Value>,
     table: &ResolvedParams,
     site: &dyn Fn(&str) -> Site,
+    shadowed: &BTreeSet<String>,
 ) -> Result<(), ParamError> {
     for (key, value) in map.iter_mut() {
-        substitute_json(value, table, &site(key))?;
+        substitute_json(value, table, &site(key), shadowed)?;
     }
     Ok(())
 }
@@ -381,6 +460,7 @@ fn substitute_json(
     value: &mut Value,
     table: &ResolvedParams,
     site: &Site,
+    shadowed: &BTreeSet<String>,
 ) -> Result<(), ParamError> {
     match value {
         Value::String(text) => {
@@ -391,9 +471,48 @@ fn substitute_json(
                         text: text.clone(),
                         reason: e.message,
                     })?;
+                    // A name the enclosing subcircuit declares belongs to the scope the solver
+                    // binds, not to this table. The expression is left exactly as written.
+                    let shadowing: Vec<String> = parsed
+                        .dependencies()
+                        .into_iter()
+                        .filter(|d| shadowed.contains(d))
+                        .collect();
+                    if !shadowing.is_empty() {
+                        // Unless it also names a sheet parameter, in which case there is no
+                        // one scope to read it in and guessing would be a silently different
+                        // circuit.
+                        let sheet: Vec<String> = parsed
+                            .dependencies()
+                            .into_iter()
+                            .filter(|d| !shadowed.contains(d) && table.contains(d))
+                            .collect();
+                        if !sheet.is_empty() {
+                            return Err(ParamError::Unresolvable {
+                                site: site.clone(),
+                                text: text.clone(),
+                                reason: format!(
+                                    "names both the subcircuit's own parameter(s) {} and the \
+                                     sheet parameter(s) {}; a value is resolved in one scope or \
+                                     the other. Pass the sheet parameter at the instance, or \
+                                     make it the subcircuit parameter's default",
+                                    shadowing.join(", "),
+                                    sheet.join(", ")
+                                ),
+                            });
+                        }
+                        return Ok(());
+                    }
                     (text.clone(), parsed)
                 }
                 Form::Reference(name) => {
+                    // The same rule for the bare-identifier form. It would fall through to the
+                    // "not a declared parameter, leave it alone" arm below and reach the deck
+                    // unchanged either way -- but saying it here is what makes the shadowing
+                    // rule one rule rather than two behaviours that happen to agree.
+                    if shadowed.contains(&name) {
+                        return Ok(());
+                    }
                     // A §5.1 reference to a structured constant hands over the constant.
                     if let Some(resolved @ Value::Array(_)) = table.get(&name) {
                         *value = resolved;
@@ -421,13 +540,13 @@ fn substitute_json(
         }
         Value::Array(items) => {
             for item in items {
-                substitute_json(item, table, site)?;
+                substitute_json(item, table, site, shadowed)?;
             }
             Ok(())
         }
         Value::Object(map) => {
             for (_, item) in map.iter_mut() {
-                substitute_json(item, table, site)?;
+                substitute_json(item, table, site, shadowed)?;
             }
             Ok(())
         }
@@ -533,7 +652,7 @@ mod tests {
         let m = model(json!([{ "name": "R", "value": 10 }]));
         let table = resolve_table(&m).unwrap();
         let mut value = json!({ "lib": "./ctrl.so", "ts": "variable", "R": "R" });
-        substitute_json(&mut value, &table, &Site("test".into())).unwrap();
+        substitute_json(&mut value, &table, &Site("test".into()), &BTreeSet::new()).unwrap();
         assert_eq!(value["lib"], json!("./ctrl.so"));
         assert_eq!(value["ts"], json!("variable"));
         // And the one that *is* a declared parameter resolves.
@@ -545,7 +664,7 @@ mod tests {
         let m = model(json!([{ "name": "k", "value": 4 }]));
         let table = resolve_table(&m).unwrap();
         let mut value = json!([["k", 0], [0, "{k / 2}"]]);
-        substitute_json(&mut value, &table, &Site("test".into())).unwrap();
+        substitute_json(&mut value, &table, &Site("test".into()), &BTreeSet::new()).unwrap();
         assert_eq!(value, json!([[4, 0], [0, 2]]));
     }
 }
