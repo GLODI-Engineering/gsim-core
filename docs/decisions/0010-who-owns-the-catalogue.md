@@ -1,6 +1,8 @@
 # 0010 — Who owns the catalogue, and what a composite component is
 
-**Status:** accepted 2026-11-26. Refines [0007](0007-the-library-is-what-the-engine-compiles.md)
+**Status:** accepted 2026-11-26, **amended 2026-11-27** (see
+[Amendment](#amendment--a-parameterised-subcircuit-is-bound-by-the-solver-not-substituted-here-2026-11-27)).
+Refines [0007](0007-the-library-is-what-the-engine-compiles.md)
 (the library is exactly what this engine compiles) and
 [0006](0006-the-components-the-editor-owns.md) (the components the editor owns). Extends
 [0008](0008-subsystems-and-buses.md) (subsystems and buses) with what a composite component is.
@@ -154,3 +156,69 @@ sub-schematic work. A composite that cannot yet be shared is still worth having.
 **Whether a second target ever exists.** 0007 and `AGENTS.md` invariant 2 say `general-simulator`
 is the one `NetlistTarget`. Nothing here changes that; the split makes a second target a smaller
 change if it ever happens, which is a consequence and not a reason.
+
+## Amendment — a parameterised subcircuit is bound by the solver, not substituted here (2026-11-27)
+
+The section above calls per-instance parameters *"the one that matters most"*, and it is the one
+thing this record left unplaced: it says a sub-schematic must take parameters per instance, and
+never says which layer turns `Rv=100` on an `X` card into a resistance. Measured on 2026-11-27,
+against `general-simulator 0.8.0`, the answer was **no layer at all**.
+
+Two decks. The first solves:
+
+```spice
+.param Rv=330
+V1 A 0 5
+R1 A 0 {Rv}
+```
+→ `t,V(A),I(V1)` / `0,5,-0.015151515151515152` — 5 V over 330 Ω, so the §5.2 evaluator and its
+symbol table work.
+
+The second does not:
+
+```spice
+.subckt RPART p n Rv=1000
+R p n {Rv}
+.ends RPART
+V1 A 0 5
+X1 A MID RPART Rv=100
+X2 MID 0 RPART Rv=220
+```
+→ `error: Evaluate(MissingSymbol("Rv"))`.
+
+The grammar is not the problem — `spice-lsp/docs/GRAMMAR.md` already specifies both the formal
+list and the instance tail, and both parse. What is missing is a **scope**: nothing binds a
+definition's formals inside the body it expands.
+
+The capability stops in three places, and each stores the value it then ignores:
+
+| layer | what it holds | what it does with it |
+| --- | --- | --- |
+| `gsim-core` | `SubcktDef::params`, `SubcktInstance::params` (`document/subckt.rs`) | nothing — `.subckt NAME ports` carries no formals and an `X` card is `X<id> <connections> <def>`; no code under `compile/` reads either field |
+| `spice-lsp` | `Subckt::params` | parsed, and no consumer anywhere |
+| `general-mna` | the `X` card's tail | `hierarchy::expand_body` threads a `port_map` for nodes and nothing for parameters |
+
+So two instances with different parameters compile byte-identically, with no diagnostic. That is
+the silent-wrongness class this project treats as its worst defect, and it is why the repair is
+not simply "emit the cards".
+
+**The owner's decision: the solver substitutes.** `general-mna`'s flatten binds the definition's
+declared defaults, overrides them from the instance's `ident=value` tail, and resolves brace
+expressions as it expands — `GLODI-Engineering/general-mna#63`.
+
+**Why not here.** This crate could substitute at compile time, by emitting one `.subckt` per
+distinct parameter set or by inlining the body per instance. Both make the compiler a second
+implementation of flattening, which is the failure this record opens by naming, and both destroy
+what the netlist is for: the owner reads these decks, and a deck in which `X1` and `X2` differ by
+a resolved number no longer shows that one definition is instantiated twice.
+
+**The ordering rule this makes normative.** *This crate must not emit a parameter it cannot show
+the solver binds.* Emitting `Rv=100` before a `general-simulator` release carries general-mna#63
+is worse than today's state, not better: the deck parses cleanly and loses the value one
+repository further down, where nothing is looking for it. Until then, a per-instance parameter
+on a subcircuit instance is **refused with the instance and parameter named** — never dropped.
+Refusal is correct under either answer, so it is not waiting on anything.
+
+The sequence is therefore: general-mna#63 → a `general-simulator` release carrying it → `#111`
+emits formals and the instance tail → `#112`'s composite component, which is the first feature
+that needs any of it.
