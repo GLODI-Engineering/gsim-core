@@ -846,30 +846,13 @@ mod tests {
         assert!(find_component("no.such.component").is_none());
     }
 
-    #[test]
-    fn a_main_parameter_names_one_of_the_components_own_parameters() {
-        // Merging the duplicate spellings took one entry's parameters and left the other's
-        // `main_param` beside them, so two components pointed at a parameter that was no
-        // longer there and the front end refused to load the whole catalogue. A main parameter
-        // that names nothing is worse than none: an inspector would highlight a field that
-        // does not exist.
-        let broken: Vec<_> = library()
-            .iter()
-            .filter_map(|c| {
-                let main = c.presentation.get("main_param")?.as_str()?;
-                let params = c.presentation.get("params")?.as_array()?;
-                let named = params
-                    .iter()
-                    .filter_map(|p| p.get("name")?.as_str())
-                    .any(|n| n == main);
-                (!named).then_some((c.id.as_str(), main))
-            })
-            .collect();
-        assert!(
-            broken.is_empty(),
-            "main_param names no parameter: {broken:?}"
-        );
-    }
+    // `a_main_parameter_names_one_of_the_components_own_parameters` was here. `main_param` left
+    // this crate with the other five display fields in #115, so the rule's loop found no
+    // `main_param` on any of the 78 components, skipped every one of them and reported success
+    // -- a fifth gate passing while checking nothing. It is `omni-schematics`'
+    // `the-editor-owns-what-it-draws.test.ts` now, where the field it is about lives, and the
+    // parameter it names still comes from here: a cross-catalogue assertion that neither side
+    // could make alone, which is what gsim-core#110 asserts in both directions.
 
     #[test]
     fn the_catalog_covers_the_components_a_schematic_actually_uses() {
