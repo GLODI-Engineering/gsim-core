@@ -111,7 +111,14 @@ struct LibraryFile {
     components: Vec<Component>,
 }
 
-fn library() -> &'static Vec<Component> {
+/// The embedded catalogue, parsed once.
+///
+/// `pub(crate)` rather than private since #107: `document::number_form` asserts that a
+/// component's own parameter declarations and its fidelity tiers' agree about type, which is
+/// what lets its lookup read one of the two halves instead of carrying a branch no test can
+/// reach. Still not `pub`: outside this crate the catalogue is [`catalog`]'s JSON, so that
+/// consumers depend on a format rather than on a Rust type.
+pub(crate) fn library() -> &'static Vec<Component> {
     static LIBRARY: OnceLock<Vec<Component>> = OnceLock::new();
     LIBRARY.get_or_init(|| {
         // A parse failure here is a broken build artefact, not a runtime condition: the file
