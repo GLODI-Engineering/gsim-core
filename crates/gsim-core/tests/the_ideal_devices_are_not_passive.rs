@@ -125,21 +125,12 @@ fn passive_holds_exactly_the_six_lumped_elements() {
     );
 }
 
-#[test]
-fn the_ideal_family_is_its_own_palette_group() {
-    // The group is what carries the distinction, so it has to reach a front end. The diode
-    // used to sit under `semiconductor`, which is the one word that invites reading it as a
-    // SPICE model's variant.
-    for id in ["ideal.diode", "ideal.switch"] {
-        let component = find_component(id).expect("present");
-        assert_eq!(
-            component.category.as_deref(),
-            Some("ideal"),
-            "{id} must be grouped as `ideal`, not with the SPICE semiconductors"
-        );
-        assert!(
-            !component.tags.iter().any(|t| t == "passive"),
-            "{id} must not be tagged `passive`"
-        );
-    }
-}
+// `the_ideal_family_is_its_own_palette_group` was here, asserting that `ideal.diode` and
+// `ideal.switch` carry `category: "ideal"` and are not tagged `passive`. A palette group is a
+// drawing decision, so decision 0010 moved `category` and `tags` to the front end and the
+// assertion went with them, to `omni-schematics`'
+// `apps/frontend/src/library/the-editor-owns-what-it-draws.test.ts`.
+//
+// The distinction it protects is unchanged and still worth protecting: the diode used to sit
+// under `semiconductor`, which is the one word that invites reading it as a SPICE model's
+// variant. What changed is only who stores the word.

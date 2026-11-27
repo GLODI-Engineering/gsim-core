@@ -4,18 +4,9 @@
     {
       "id": "control.counter",
       "name": "control.counter",
-      "label": "Counter",
-      "category": "control",
       "aliases": [
         "counter",
         "cnt"
-      ],
-      "tags": [
-        "control",
-        "logic",
-        "counter",
-        "discrete",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [
@@ -73,7 +64,6 @@
           "type": "integer"
         }
       ],
-      "main_param": "modulus",
       "port_sigs": {
         "clk": "[1]",
         "count": "[1]",
@@ -129,14 +119,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          66
-        ],
-        "shape": "rect",
-        "text": "CNT"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -146,14 +128,11 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Edge-triggered up/down counter with an optional modulus and reset.",
       "compiles_to": "control.counter"
     },
     {
       "id": "control.delay",
       "name": "control.delay",
-      "label": "Delay",
-      "category": "control",
       "type": "signal-flow.discrete.unit_delay",
       "aliases": [
         "delay",
@@ -163,11 +142,6 @@
         "prev",
         "signal_flow.discrete.unit_delay",
         "signal-flow.discrete.unit_delay"
-      ],
-      "tags": [
-        "delay",
-        "control",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [
@@ -225,14 +199,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "rect",
-        "text": "z⁻¹"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -242,14 +208,11 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "One-simulation-step delay: reads its input's value from the previous step (general-simulator's own `prev:` reference).",
       "compiles_to": "control.delay"
     },
     {
       "id": "control.derivative",
       "name": "control.derivative",
-      "label": "Derivative",
-      "category": "control",
       "type": "signal-flow.continuous.derivative",
       "aliases": [
         "du/dt",
@@ -258,12 +221,6 @@
         "derivative",
         "signal_flow.continuous.derivative",
         "signal-flow.continuous.derivative"
-      ],
-      "tags": [
-        "derivative",
-        "continuous",
-        "control",
-        "linear"
       ],
       "ports": {
         "inputs": [
@@ -321,14 +278,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "rect",
-        "text": "du/dt"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -338,25 +287,14 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Continuous-time derivative `y = du/dt`.",
       "compiles_to": "control.derivative"
     },
     {
       "id": "control.discrete_state_space",
       "name": "control.discrete_state_space",
-      "label": "Discrete State Space",
-      "category": "control",
       "aliases": [
         "discrete state space",
         "dss"
-      ],
-      "tags": [
-        "control",
-        "signal",
-        "linear",
-        "discrete",
-        "state-space",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [
@@ -438,7 +376,6 @@
           "type": "number"
         }
       ],
-      "main_param": "ts",
       "fidelities": [
         {
           "doc": "Discrete-time linear state-space block x[k+1] = Ax[k] + Bu[k], y = Cx + Du.",
@@ -512,14 +449,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "rect",
-        "text": "DSS"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -529,25 +458,15 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Discrete-time linear state-space block x[k+1] = Ax[k] + Bu[k], y = Cx + Du.",
       "compiles_to": "control.discrete_state_space"
     },
     {
       "id": "control.discrete_transfer_function",
       "name": "control.discrete_transfer_function",
-      "label": "Discrete Transfer Function",
-      "category": "control",
       "aliases": [
         "discrete transfer function",
         "dtf",
         "z transform"
-      ],
-      "tags": [
-        "control",
-        "signal",
-        "discrete",
-        "transfer-function",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [
@@ -604,7 +523,6 @@
           "type": "number"
         }
       ],
-      "main_param": "ts",
       "port_sigs": {
         "in": "inherit",
         "out": "from(in)"
@@ -659,14 +577,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "rect",
-        "text": "N(z)/D(z)"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -676,14 +586,11 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Discrete-time SISO transfer function num(z)/den(z) at a fixed sample period.",
       "compiles_to": "control.discrete_transfer_function"
     },
     {
       "id": "control.gain",
       "name": "control.gain",
-      "label": "Gain",
-      "category": "control",
       "type": "signal-flow.math.gain",
       "aliases": [
         "k",
@@ -692,12 +599,6 @@
         "gain",
         "signal_flow.math.gain",
         "signal-flow.math.gain"
-      ],
-      "tags": [
-        "gain",
-        "multiplier",
-        "control",
-        "linear"
       ],
       "ports": {
         "inputs": [
@@ -734,7 +635,6 @@
           "type": "number"
         }
       ],
-      "main_param": "k",
       "port_sigs": {
         "in": "inherit",
         "out": "from(in)"
@@ -771,14 +671,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "triangle",
-        "text": "{k}"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -788,14 +680,11 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Scalar gain `y = k * u`.",
       "compiles_to": "control.gain"
     },
     {
       "id": "control.integrator",
       "name": "control.integrator",
-      "label": "Integrator",
-      "category": "control",
       "type": "signal-flow.continuous.integrator",
       "aliases": [
         "1/s",
@@ -804,12 +693,6 @@
         "integrator",
         "signal_flow.continuous.integrator",
         "signal-flow.continuous.integrator"
-      ],
-      "tags": [
-        "integrator",
-        "continuous",
-        "control",
-        "linear"
       ],
       "ports": {
         "inputs": [
@@ -860,7 +743,6 @@
           "type": "number"
         }
       ],
-      "main_param": "x0",
       "port_sigs": {
         "in": "inherit",
         "out": "from(in)"
@@ -909,14 +791,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "rect",
-        "text": "1/s"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -926,14 +800,11 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Continuous-time integrator `dx/dt = u`, with optional output limits.",
       "compiles_to": "control.integrator"
     },
     {
       "id": "control.pid",
       "name": "control.pid",
-      "label": "PID Controller",
-      "category": "control",
       "type": "signal-flow.continuous.pid",
       "aliases": [
         "pid",
@@ -941,12 +812,6 @@
         "controller",
         "signal_flow.continuous.pid",
         "signal-flow.continuous.pid"
-      ],
-      "tags": [
-        "pid",
-        "controller",
-        "feedback",
-        "control"
       ],
       "ports": {
         "inputs": [
@@ -1022,14 +887,13 @@
           "type": "enum"
         }
       ],
-      "main_param": "kp",
       "port_sigs": {
         "in": "inherit",
         "out": "from(in)"
       },
       "fidelities": [
         {
-          "doc": "PID controller `u = Kp·e + Ki·∫e dt + Kd·de/dt`, with optional anti-windup.",
+          "doc": "PID controller `u = Kp\u00b7e + Ki\u00b7\u222be dt + Kd\u00b7de/dt`, with optional anti-windup.",
           "params": [
             {
               "default": 1.0,
@@ -1091,14 +955,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "rect",
-        "text": "PID"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -1108,14 +964,11 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Continuous PID controller.",
       "compiles_to": "control.pid"
     },
     {
       "id": "control.product",
       "name": "control.product",
-      "label": "Product",
-      "category": "control",
       "type": "signal-flow.math.product",
       "aliases": [
         "product",
@@ -1123,12 +976,6 @@
         "mul",
         "signal_flow.math.product",
         "signal-flow.math.product"
-      ],
-      "tags": [
-        "control",
-        "signal",
-        "arithmetic",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [],
@@ -1168,7 +1015,6 @@
           "type": "integer"
         }
       ],
-      "main_param": "n_inputs",
       "port_sigs": {
         "in*": "inherit",
         "out": "from(in0)"
@@ -1198,14 +1044,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "rect",
-        "text": "x"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -1215,14 +1053,11 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Multiplies all of its input signals together.",
       "compiles_to": "control.product"
     },
     {
       "id": "control.saturation",
       "name": "control.saturation",
-      "label": "Saturation",
-      "category": "control",
       "type": "signal-flow.discontinuity.saturation",
       "aliases": [
         "clamp",
@@ -1232,12 +1067,6 @@
         "saturation",
         "signal_flow.discontinuity.saturation",
         "signal-flow.discontinuity.saturation"
-      ],
-      "tags": [
-        "saturation",
-        "clamp",
-        "nonlinear",
-        "control"
       ],
       "ports": {
         "inputs": [
@@ -1327,14 +1156,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "rect",
-        "text": "sat"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -1344,14 +1165,11 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Saturates a signal between lower and upper limits.",
       "compiles_to": "control.saturation"
     },
     {
       "id": "control.state_space",
       "name": "control.state_space",
-      "label": "State Space",
-      "category": "control",
       "type": "signal-flow.continuous.state_space",
       "aliases": [
         "state space",
@@ -1359,13 +1177,6 @@
         "abcd",
         "signal_flow.continuous.state_space",
         "signal-flow.continuous.state_space"
-      ],
-      "tags": [
-        "control",
-        "signal",
-        "linear",
-        "state-space",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [
@@ -1505,14 +1316,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "rect",
-        "text": "SS"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -1522,14 +1325,11 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Continuous-time linear state-space block dx/dt = Ax + Bu, y = Cx + Du.",
       "compiles_to": "control.state_space"
     },
     {
       "id": "control.sum",
       "name": "control.sum",
-      "label": "Sum",
-      "category": "control",
       "type": "signal-flow.math.sum",
       "aliases": [
         "adder",
@@ -1539,12 +1339,6 @@
         "sum",
         "signal_flow.math.sum",
         "signal-flow.math.sum"
-      ],
-      "tags": [
-        "sum",
-        "adder",
-        "control",
-        "linear"
       ],
       "ports": {
         "inputs": [],
@@ -1583,7 +1377,6 @@
           "type": "string"
         }
       ],
-      "main_param": "signs",
       "port_sigs": {
         "in*": "inherit",
         "out": "from(in0)"
@@ -1612,14 +1405,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "circle",
-        "text": "Σ"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -1629,14 +1414,11 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Weighted summation. Number of inputs and their signs come from `signs`.",
       "compiles_to": "control.sum"
     },
     {
       "id": "control.transfer_function",
       "name": "control.transfer_function",
-      "label": "Transfer Function",
-      "category": "control",
       "type": "signal-flow.continuous.transfer_function",
       "aliases": [
         "tf",
@@ -1645,13 +1427,6 @@
         "lti",
         "signal_flow.continuous.transfer_function",
         "signal-flow.continuous.transfer_function"
-      ],
-      "tags": [
-        "transfer function",
-        "continuous",
-        "control",
-        "frequency",
-        "linear"
       ],
       "ports": {
         "inputs": [
@@ -1700,7 +1475,6 @@
           "type": "vector"
         }
       ],
-      "main_param": "num",
       "port_sigs": {
         "in": "inherit",
         "out": "from(in)"
@@ -1748,14 +1522,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "rect",
-        "text": "H(s)"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -1765,25 +1531,15 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Rational transfer function `H(s) = num(s) / den(s)`, realised as state-space.",
       "compiles_to": "control.transfer_function"
     },
     {
       "id": "control.transform.clarke",
       "name": "control.transform.clarke",
-      "label": "Clarke Transform",
-      "category": "control",
       "aliases": [
         "clarke",
         "transform",
         "coordinate transform"
-      ],
-      "tags": [
-        "control",
-        "signal",
-        "transform",
-        "motor-control",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [
@@ -1917,14 +1673,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          80,
-          66
-        ],
-        "shape": "rect",
-        "text": "abc/αβ0"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -1934,25 +1682,15 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Clarke (abc to alpha-beta-zero) transform.",
       "compiles_to": "control.transform.clarke"
     },
     {
       "id": "control.transform.clarke_inv",
       "name": "control.transform.clarke_inv",
-      "label": "Inverse Clarke Transform",
-      "category": "control",
       "aliases": [
         "clarke inv",
         "transform",
         "coordinate transform"
-      ],
-      "tags": [
-        "control",
-        "signal",
-        "transform",
-        "motor-control",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [
@@ -2086,14 +1824,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          80,
-          66
-        ],
-        "shape": "rect",
-        "text": "αβ0/abc"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -2103,25 +1833,15 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Inverse Clarke (alpha-beta-zero to abc) transform.",
       "compiles_to": "control.transform.clarke_inv"
     },
     {
       "id": "control.transform.clarke_park",
       "name": "control.transform.clarke_park",
-      "label": "Clarke-Park Transform",
-      "category": "control",
       "aliases": [
         "clarke park",
         "transform",
         "coordinate transform"
-      ],
-      "tags": [
-        "control",
-        "signal",
-        "transform",
-        "motor-control",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [
@@ -2274,14 +1994,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          80,
-          88
-        ],
-        "shape": "rect",
-        "text": "abc/dq0"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -2291,25 +2003,15 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Combined Clarke-Park (abc to dq0) transform.",
       "compiles_to": "control.transform.clarke_park"
     },
     {
       "id": "control.transform.clarke_park_inv",
       "name": "control.transform.clarke_park_inv",
-      "label": "Inverse Clarke-Park Transform",
-      "category": "control",
       "aliases": [
         "clarke park inv",
         "transform",
         "coordinate transform"
-      ],
-      "tags": [
-        "control",
-        "signal",
-        "transform",
-        "motor-control",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [
@@ -2462,14 +2164,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          80,
-          88
-        ],
-        "shape": "rect",
-        "text": "dq0/abc"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -2479,25 +2173,15 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Combined inverse Clarke-Park (dq0 to abc) transform.",
       "compiles_to": "control.transform.clarke_park_inv"
     },
     {
       "id": "control.transform.park",
       "name": "control.transform.park",
-      "label": "Park Transform",
-      "category": "control",
       "aliases": [
         "park",
         "transform",
         "coordinate transform"
-      ],
-      "tags": [
-        "control",
-        "signal",
-        "transform",
-        "motor-control",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [
@@ -2650,14 +2334,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          80,
-          88
-        ],
-        "shape": "rect",
-        "text": "αβ0/dq0"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -2667,25 +2343,15 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Park (alpha-beta-zero to dq0) transform.",
       "compiles_to": "control.transform.park"
     },
     {
       "id": "control.transform.park_inv",
       "name": "control.transform.park_inv",
-      "label": "Inverse Park Transform",
-      "category": "control",
       "aliases": [
         "park inv",
         "transform",
         "coordinate transform"
-      ],
-      "tags": [
-        "control",
-        "signal",
-        "transform",
-        "motor-control",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [
@@ -2838,14 +2504,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          80,
-          88
-        ],
-        "shape": "rect",
-        "text": "dq0/αβ0"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -2855,24 +2513,15 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Inverse Park (dq0 to alpha-beta-zero) transform.",
       "compiles_to": "control.transform.park_inv"
     },
     {
       "id": "control.vco",
       "name": "control.vco",
-      "label": "VCO",
-      "category": "control",
       "aliases": [
         "vco",
         "oscillator",
         "voltage controlled oscillator"
-      ],
-      "tags": [
-        "control",
-        "signal",
-        "oscillator",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [
@@ -2918,7 +2567,6 @@
           "type": "number"
         }
       ],
-      "main_param": "f_max",
       "port_sigs": {
         "in": "inherit",
         "out": "from(in)"
@@ -2963,14 +2611,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "rect",
-        "text": "VCO"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -2980,24 +2620,15 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Voltage-controlled oscillator: maps the input signal onto a frequency ramp.",
       "compiles_to": "control.vco"
     },
     {
       "id": "converter.phys2sig",
       "name": "converter.phys2sig",
-      "label": "Physical to Signal",
-      "category": "power",
       "aliases": [
         "phys2sig",
         "p2s",
         "physical to signal"
-      ],
-      "tags": [
-        "converter",
-        "signal",
-        "electrical",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [],
@@ -3063,14 +2694,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "rect",
-        "text": "P2S"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "mixed",
@@ -3080,24 +2703,15 @@
       "paradigm": "converter",
       "domain": "mixed",
       "version": 1,
-      "description": "Reads a circuit node voltage or branch current back out as a signal.",
       "compiles_to": "converter.phys2sig"
     },
     {
       "id": "converter.sig2phys",
       "name": "converter.sig2phys",
-      "label": "Signal to Physical",
-      "category": "power",
       "aliases": [
         "sig2phys",
         "s2p",
         "signal to physical"
-      ],
-      "tags": [
-        "converter",
-        "signal",
-        "electrical",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [
@@ -3137,7 +2751,6 @@
           "type": "enum"
         }
       ],
-      "main_param": "domain",
       "port_sigs": {
         "in": "[1]"
       },
@@ -3177,14 +2790,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "rect",
-        "text": "S2P"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "mixed",
@@ -3194,24 +2799,15 @@
       "paradigm": "converter",
       "domain": "mixed",
       "version": 1,
-      "description": "Drives a physical-electrical node from a signal, as a voltage or a current.",
       "compiles_to": "converter.sig2phys"
     },
     {
       "id": "extensibility.cscript",
       "name": "extensibility.cscript",
-      "label": "C Script",
-      "category": "user",
       "aliases": [
         "cscript",
         "script",
         "custom block"
-      ],
-      "tags": [
-        "extensibility",
-        "script",
-        "custom",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [
@@ -3307,7 +2903,6 @@
           "type": "integer"
         }
       ],
-      "main_param": "lib",
       "port_sigs": {
         "in*": "[1]",
         "out*": "[1]"
@@ -3373,14 +2968,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          70,
-          40
-        ],
-        "shape": "rect",
-        "text": "C"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -3390,24 +2977,15 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Stateful block hosted in a precompiled C shared library.",
       "compiles_to": "extensibility.cscript"
     },
     {
       "id": "extensibility.octblock",
       "name": "extensibility.octblock",
-      "label": "Octave Block",
-      "category": "user",
       "aliases": [
         "octblock",
         "script",
         "custom block"
-      ],
-      "tags": [
-        "extensibility",
-        "script",
-        "custom",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [
@@ -3510,7 +3088,6 @@
           "type": "integer"
         }
       ],
-      "main_param": "function",
       "port_sigs": {
         "in*": "[1]",
         "out*": "[1]"
@@ -3582,14 +3159,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          70,
-          40
-        ],
-        "shape": "rect",
-        "text": "OCT"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -3599,24 +3168,15 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Stateful block hosted in an Octave function.",
       "compiles_to": "extensibility.octblock"
     },
     {
       "id": "extensibility.octfunc",
       "name": "extensibility.octfunc",
-      "label": "Octave Function",
-      "category": "user",
       "aliases": [
         "octfunc",
         "script",
         "custom block"
-      ],
-      "tags": [
-        "extensibility",
-        "script",
-        "custom",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [
@@ -3711,7 +3271,6 @@
           "type": "string"
         }
       ],
-      "main_param": "function",
       "port_sigs": {
         "in*": "[1]",
         "out*": "[1]"
@@ -3776,14 +3335,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          70,
-          40
-        ],
-        "shape": "rect",
-        "text": "OCTf"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -3793,24 +3344,15 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Stateless block evaluated by an Octave function.",
       "compiles_to": "extensibility.octfunc"
     },
     {
       "id": "extensibility.pyblock",
       "name": "extensibility.pyblock",
-      "label": "Python Block",
-      "category": "user",
       "aliases": [
         "pyblock",
         "script",
         "custom block"
-      ],
-      "tags": [
-        "extensibility",
-        "script",
-        "custom",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [
@@ -3906,7 +3448,6 @@
           "type": "integer"
         }
       ],
-      "main_param": "path",
       "port_sigs": {
         "in*": "[1]",
         "out*": "[1]"
@@ -3972,14 +3513,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          70,
-          40
-        ],
-        "shape": "rect",
-        "text": "PY"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -3989,24 +3522,15 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Stateful block hosted in a Python module.",
       "compiles_to": "extensibility.pyblock"
     },
     {
       "id": "extensibility.pyfunc",
       "name": "extensibility.pyfunc",
-      "label": "Python Function",
-      "category": "user",
       "aliases": [
         "pyfunc",
         "script",
         "custom block"
-      ],
-      "tags": [
-        "extensibility",
-        "script",
-        "custom",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [
@@ -4101,7 +3625,6 @@
           "type": "string"
         }
       ],
-      "main_param": "function",
       "port_sigs": {
         "in*": "[1]",
         "out*": "[1]"
@@ -4166,14 +3689,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          70,
-          40
-        ],
-        "shape": "rect",
-        "text": "PYf"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -4183,23 +3698,14 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Stateless block evaluated by a Python function.",
       "compiles_to": "extensibility.pyfunc"
     },
     {
       "id": "hierarchy.inport",
       "name": "hierarchy.inport",
-      "label": "Inport",
-      "category": "subsystems",
       "aliases": [
         "inport",
         "boundary inport"
-      ],
-      "tags": [
-        "hierarchy",
-        "subsystem",
-        "inport",
-        "boundary"
       ],
       "ports": {
         "inputs": [],
@@ -4242,7 +3748,7 @@
       ],
       "fidelities": [
         {
-          "doc": "Boundary inport — placed inside a subsystem body to define an input port on the parent-side block (spec §11). The `id` param is the port id; `kind` selects the signal domain.",
+          "doc": "Boundary inport \u2014 placed inside a subsystem body to define an input port on the parent-side block (spec \u00a711). The `id` param is the port id; `kind` selects the signal domain.",
           "params": [
             {
               "default": "in1",
@@ -4277,14 +3783,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          200,
-          40
-        ],
-        "shape": "rect",
-        "text": "In"
-      },
       "behavior": {
         "causality": "source",
         "domain": "signal",
@@ -4294,23 +3792,14 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Boundary inport — placed inside a subsystem body to define an input port on the parent-side block (spec §11). The `id` param is the port id; `kind` selects the signal domain.",
       "compiles_to": "hierarchy.inport"
     },
     {
       "id": "hierarchy.outport",
       "name": "hierarchy.outport",
-      "label": "Outport",
-      "category": "subsystems",
       "aliases": [
         "outport",
         "boundary outport"
-      ],
-      "tags": [
-        "hierarchy",
-        "subsystem",
-        "outport",
-        "boundary"
       ],
       "ports": {
         "inputs": [
@@ -4353,7 +3842,7 @@
       ],
       "fidelities": [
         {
-          "doc": "Boundary outport — placed inside a subsystem body to define an output port on the parent-side block (spec §11). The `id` param is the port id; `kind` selects the signal domain.",
+          "doc": "Boundary outport \u2014 placed inside a subsystem body to define an output port on the parent-side block (spec \u00a711). The `id` param is the port id; `kind` selects the signal domain.",
           "params": [
             {
               "default": "out1",
@@ -4388,14 +3877,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          200,
-          40
-        ],
-        "shape": "rect",
-        "text": "Out"
-      },
       "behavior": {
         "causality": "sink",
         "domain": "signal",
@@ -4405,14 +3886,11 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Boundary outport — placed inside a subsystem body to define an output port on the parent-side block (spec §11). The `id` param is the port id; `kind` selects the signal domain.",
       "compiles_to": "hierarchy.outport"
     },
     {
       "id": "ideal.diode",
       "name": "ideal.diode",
-      "label": "Ideal Diode",
-      "category": "ideal",
       "type": "physical-electrical.semiconductor.diode",
       "aliases": [
         "passive.diode.ideal",
@@ -4421,13 +3899,6 @@
         "d",
         "physical_electrical.semiconductor.diode",
         "physical-electrical.semiconductor.diode"
-      ],
-      "tags": [
-        "ideal-device",
-        "electrical",
-        "diode",
-        "ideal",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [
@@ -4493,7 +3964,6 @@
           "type": "number"
         }
       ],
-      "main_param": "v_f",
       "fidelities": [
         {
           "doc": "Ideal diode: piecewise-conductance forward/reverse model with a breakdown branch.",
@@ -4553,7 +4023,7 @@
           "tier": "ideal"
         },
         {
-          "doc": "Behavioral diode — Shockley equation.",
+          "doc": "Behavioral diode \u2014 Shockley equation.",
           "tier": "behavioral",
           "ports": [
             {
@@ -4667,14 +4137,6 @@
           ]
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "rect",
-        "text": "D"
-      },
       "behavior": {
         "causality": "acausal",
         "domain": "electrical",
@@ -4684,14 +4146,11 @@
       "paradigm": "physical-network",
       "domain": "physical-electrical",
       "version": 1,
-      "description": "Ideal diode: piecewise-conductance forward/reverse model with a breakdown branch.",
       "compiles_to": "ideal.diode"
     },
     {
       "id": "ideal.switch",
       "name": "ideal.switch",
-      "label": "Ideal Switch",
-      "category": "ideal",
       "type": "physical-electrical.switch.generic",
       "aliases": [
         "passive.switch.ideal",
@@ -4702,13 +4161,6 @@
         "generic_switch",
         "physical_electrical.switch.generic",
         "physical-electrical.switch.generic"
-      ],
-      "tags": [
-        "ideal-device",
-        "electrical",
-        "switch",
-        "ideal",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [
@@ -4798,7 +4250,6 @@
           "type": "number"
         }
       ],
-      "main_param": "r_on",
       "fidelities": [
         {
           "doc": "Block-gated ideal switch: a channel resistance plus an intrinsic body diode, gated at v_gs_th.",
@@ -4959,14 +4410,6 @@
           ]
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          60
-        ],
-        "shape": "rect",
-        "text": "SW"
-      },
       "behavior": {
         "causality": "acausal",
         "domain": "electrical",
@@ -4976,27 +4419,17 @@
       "paradigm": "physical-network",
       "domain": "physical-electrical",
       "version": 1,
-      "description": "Block-gated ideal switch: on/off conductance with a threshold and breakdown branch.",
       "compiles_to": "ideal.switch"
     },
     {
       "id": "logic.flip_flop",
       "name": "logic.flip_flop",
-      "label": "Flip-Flop",
-      "category": "signal",
       "aliases": [
         "flip flop",
         "dff",
         "jkff",
         "tff",
         "register"
-      ],
-      "tags": [
-        "logic",
-        "signal",
-        "flip-flop",
-        "discrete",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [
@@ -5088,7 +4521,6 @@
           "type": "enum"
         }
       ],
-      "main_param": "kind",
       "port_sigs": {
         "clk": "[1]",
         "d": "[1]",
@@ -5175,14 +4607,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          132
-        ],
-        "shape": "rect",
-        "text": "{kind}"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -5192,14 +4616,11 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Edge-triggered flip-flop: D, T or JK, with an optional asynchronous reset.",
       "compiles_to": "logic.flip_flop"
     },
     {
       "id": "logic.gate",
       "name": "logic.gate",
-      "label": "Logic Gate",
-      "category": "signal",
       "aliases": [
         "gate",
         "and",
@@ -5210,12 +4631,6 @@
         "xnor",
         "not",
         "boolean"
-      ],
-      "tags": [
-        "logic",
-        "signal",
-        "boolean",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [
@@ -5279,7 +4694,6 @@
           "type": "integer"
         }
       ],
-      "main_param": "op",
       "port_sigs": {
         "in*": "inherit",
         "out": "from(in0)"
@@ -5340,14 +4754,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          50,
-          44
-        ],
-        "shape": "rect",
-        "text": "{op}"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -5357,24 +4763,15 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Boolean gate (and/or/xor/nand/nor/xnor/not) over its input signals.",
       "compiles_to": "logic.gate"
     },
     {
       "id": "logic.hysteresis",
       "name": "logic.hysteresis",
-      "label": "Hysteresis",
-      "category": "signal",
       "aliases": [
         "hysteresis",
         "schmitt trigger",
         "comparator"
-      ],
-      "tags": [
-        "logic",
-        "signal",
-        "hysteresis",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [
@@ -5418,7 +4815,6 @@
           "type": "number"
         }
       ],
-      "main_param": "high",
       "port_sigs": {
         "in": "inherit",
         "out": "from(in)"
@@ -5461,14 +4857,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "rect",
-        "text": "HYST"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -5478,24 +4866,15 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Schmitt-trigger hysteresis comparator with separate low and high thresholds.",
       "compiles_to": "logic.hysteresis"
     },
     {
       "id": "logic.sr_latch",
       "name": "logic.sr_latch",
-      "label": "SR Latch",
-      "category": "signal",
       "aliases": [
         "sr latch",
         "latch",
         "set reset"
-      ],
-      "tags": [
-        "logic",
-        "signal",
-        "latch",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [
@@ -5546,7 +4925,6 @@
           "type": "enum"
         }
       ],
-      "main_param": "priority",
       "port_sigs": {
         "q": "[1]",
         "reset": "[1]",
@@ -5596,14 +4974,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          50,
-          44
-        ],
-        "shape": "rect",
-        "text": "SR"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -5613,26 +4983,16 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Level-triggered set/reset latch with a configurable priority input.",
       "compiles_to": "logic.sr_latch"
     },
     {
       "id": "machine.pmsm",
       "name": "machine.pmsm",
-      "label": "PMSM",
-      "category": "power",
       "aliases": [
         "pmsm",
         "motor",
         "synchronous machine",
         "bldc"
-      ],
-      "tags": [
-        "machine",
-        "motor",
-        "power",
-        "dq",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [
@@ -5694,7 +5054,7 @@
               "dims": "scalar",
               "domain": "signal"
             },
-            "label": "ω",
+            "label": "\u03c9",
             "offset": 53,
             "side": "right"
           },
@@ -5704,7 +5064,7 @@
               "dims": "scalar",
               "domain": "signal"
             },
-            "label": "θe",
+            "label": "\u03b8e",
             "offset": 70,
             "side": "right"
           }
@@ -5753,7 +5113,7 @@
         },
         {
           "default": 0.001,
-          "description": "Rotor inertia in kg·m².",
+          "description": "Rotor inertia in kg\u00b7m\u00b2.",
           "label": "Inertia",
           "min": 0,
           "name": "inertia",
@@ -5761,14 +5121,13 @@
         },
         {
           "default": 0.0001,
-          "description": "Viscous friction coefficient in N·m·s.",
+          "description": "Viscous friction coefficient in N\u00b7m\u00b7s.",
           "label": "Viscous friction",
           "min": 0,
           "name": "friction",
           "type": "number"
         }
       ],
-      "main_param": "pole_pairs",
       "port_sigs": {
         "id": "[1]",
         "iq": "[1]",
@@ -5819,14 +5178,14 @@
             },
             {
               "default": 0.001,
-              "doc": "Rotor inertia in kg·m².",
+              "doc": "Rotor inertia in kg\u00b7m\u00b2.",
               "id": "inertia",
               "min": 0,
               "type": "number"
             },
             {
               "default": 0.0001,
-              "doc": "Viscous friction coefficient in N·m·s.",
+              "doc": "Viscous friction coefficient in N\u00b7m\u00b7s.",
               "id": "friction",
               "min": 0,
               "type": "number"
@@ -5877,7 +5236,7 @@
               "direction": "out",
               "id": "omega_m",
               "kind": "signal",
-              "label": "ω",
+              "label": "\u03c9",
               "offset": 53,
               "side": "right"
             },
@@ -5885,7 +5244,7 @@
               "direction": "out",
               "id": "theta_e",
               "kind": "signal",
-              "label": "θe",
+              "label": "\u03b8e",
               "offset": 70,
               "side": "right"
             }
@@ -5893,14 +5252,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          80,
-          88
-        ],
-        "shape": "rect",
-        "text": "PMSM"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -5910,24 +5261,15 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Permanent-magnet synchronous machine in the dq frame, with mechanical dynamics.",
       "compiles_to": "machine.pmsm"
     },
     {
       "id": "math.fn1",
       "name": "math.fn1",
-      "label": "Math Function (unary)",
-      "category": "signal",
       "aliases": [
         "fn1",
         "unary function",
         "math function"
-      ],
-      "tags": [
-        "math",
-        "signal",
-        "arithmetic",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [
@@ -5992,7 +5334,6 @@
           "type": "enum"
         }
       ],
-      "main_param": "fn",
       "port_sigs": {
         "in": "inherit",
         "out": "from(in)"
@@ -6057,14 +5398,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "rect",
-        "text": "{fn}"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -6074,24 +5407,15 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Unary waveform-arithmetic function applied to one signal.",
       "compiles_to": "math.fn1"
     },
     {
       "id": "math.fn2",
       "name": "math.fn2",
-      "label": "Math Function (binary)",
-      "category": "signal",
       "aliases": [
         "fn2",
         "binary function",
         "math function"
-      ],
-      "tags": [
-        "math",
-        "signal",
-        "arithmetic",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [
@@ -6148,7 +5472,6 @@
           "type": "enum"
         }
       ],
-      "main_param": "fn",
       "port_sigs": {
         "in1": "inherit",
         "in2": "inherit",
@@ -6204,14 +5527,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          44
-        ],
-        "shape": "rect",
-        "text": "{fn}"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -6221,24 +5536,15 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Binary waveform-arithmetic function applied to two signals.",
       "compiles_to": "math.fn2"
     },
     {
       "id": "math.fn3",
       "name": "math.fn3",
-      "label": "Math Function (ternary)",
-      "category": "signal",
       "aliases": [
         "fn3",
         "ternary function",
         "math function"
-      ],
-      "tags": [
-        "math",
-        "signal",
-        "arithmetic",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [
@@ -6299,7 +5605,6 @@
           "type": "enum"
         }
       ],
-      "main_param": "fn",
       "port_sigs": {
         "in1": "inherit",
         "in2": "inherit",
@@ -6358,14 +5663,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          66
-        ],
-        "shape": "rect",
-        "text": "{fn}"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -6375,25 +5672,16 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Ternary waveform-arithmetic function applied to three signals.",
       "compiles_to": "math.fn3"
     },
     {
       "id": "math.table_lookup",
       "name": "math.table_lookup",
-      "label": "Table Lookup",
-      "category": "signal",
       "aliases": [
         "table",
         "lookup",
         "lut",
         "breakpoints"
-      ],
-      "tags": [
-        "math",
-        "signal",
-        "lookup",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [
@@ -6439,7 +5727,6 @@
           "type": "matrix"
         }
       ],
-      "main_param": "points",
       "port_sigs": {
         "in": "inherit",
         "out": "from(in)"
@@ -6485,14 +5772,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          80,
-          60
-        ],
-        "shape": "rect",
-        "text": "LUT"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -6502,14 +5781,11 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Piecewise-linear lookup table over a list of [x, y] breakpoints.",
       "compiles_to": "math.table_lookup"
     },
     {
       "id": "passive.capacitor",
       "name": "passive.capacitor",
-      "label": "Capacitor",
-      "category": "passive",
       "type": "physical-electrical.passive.capacitor",
       "aliases": [
         "C",
@@ -6517,12 +5793,6 @@
         "linear capacitor",
         "physical_electrical.passive.capacitor",
         "physical-electrical.passive.capacitor"
-      ],
-      "tags": [
-        "passive",
-        "electrical",
-        "capacitor",
-        "linear"
       ],
       "ports": {
         "inputs": [
@@ -6650,14 +5920,6 @@
           "tier": "spice"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "rect",
-        "text": "C"
-      },
       "behavior": {
         "causality": "acausal",
         "domain": "electrical",
@@ -6667,14 +5929,11 @@
       "paradigm": "physical-network",
       "domain": "physical-electrical",
       "version": 1,
-      "description": "Linear capacitor. SPICE element C.",
       "compiles_to": "passive.capacitor"
     },
     {
       "id": "passive.inductor",
       "name": "passive.inductor",
-      "label": "Inductor",
-      "category": "passive",
       "type": "physical-electrical.passive.inductor",
       "aliases": [
         "L",
@@ -6682,12 +5941,6 @@
         "linear inductor",
         "physical_electrical.passive.inductor",
         "physical-electrical.passive.inductor"
-      ],
-      "tags": [
-        "passive",
-        "electrical",
-        "inductor",
-        "linear"
       ],
       "ports": {
         "inputs": [
@@ -6815,14 +6068,6 @@
           "tier": "spice"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "rect",
-        "text": "L"
-      },
       "behavior": {
         "causality": "acausal",
         "domain": "electrical",
@@ -6832,25 +6077,15 @@
       "paradigm": "physical-network",
       "domain": "physical-electrical",
       "version": 1,
-      "description": "Linear inductor. SPICE element L.",
       "compiles_to": "passive.inductor"
     },
     {
       "id": "passive.inductor.coupled",
       "name": "passive.inductor.coupled",
-      "label": "Coupled Inductors",
-      "category": "passive",
       "aliases": [
         "K",
         "coupled inductors",
         "mutual inductance"
-      ],
-      "tags": [
-        "passive",
-        "electrical",
-        "inductor",
-        "coupled",
-        "mutual"
       ],
       "ports": {
         "inputs": [
@@ -6977,14 +6212,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          60
-        ],
-        "shape": "rect",
-        "text": "K"
-      },
       "behavior": {
         "causality": "acausal",
         "domain": "electrical",
@@ -6994,14 +6221,11 @@
       "paradigm": "physical-network",
       "domain": "physical-electrical",
       "version": 1,
-      "description": "Coupled inductors (mutual inductance). SPICE element K.",
       "compiles_to": "passive.inductor.coupled"
     },
     {
       "id": "passive.resistor",
       "name": "passive.resistor",
-      "label": "Resistor",
-      "category": "passive",
       "type": "physical-electrical.passive.resistor",
       "aliases": [
         "R",
@@ -7009,12 +6233,6 @@
         "linear resistor",
         "physical_electrical.passive.resistor",
         "physical-electrical.passive.resistor"
-      ],
-      "tags": [
-        "passive",
-        "electrical",
-        "resistor",
-        "linear"
       ],
       "ports": {
         "inputs": [
@@ -7058,7 +6276,7 @@
               "doc": "Resistance in ohms.",
               "id": "R",
               "type": "number",
-              "unit": "Ω"
+              "unit": "\u03a9"
             }
           ],
           "ports": [
@@ -7128,14 +6346,6 @@
           "tier": "spice"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "rect",
-        "text": "R"
-      },
       "behavior": {
         "causality": "acausal",
         "domain": "electrical",
@@ -7145,25 +6355,17 @@
       "paradigm": "physical-network",
       "domain": "physical-electrical",
       "version": 1,
-      "description": "Linear resistor. SPICE element R.",
       "compiles_to": "passive.resistor"
     },
     {
       "id": "passive.mutual_inductor",
       "name": "passive.mutual_inductor",
-      "label": "Mutual Inductor",
-      "category": "passive",
       "type": "physical-electrical.passive.mutual_inductor",
       "aliases": [
         "mutual_inductor",
         "M",
         "physical_electrical.passive.mutual_inductor",
         "physical-electrical.passive.mutual_inductor"
-      ],
-      "tags": [
-        "physical",
-        "electrical",
-        "passive"
       ],
       "ports": {
         "inputs": [
@@ -7394,14 +6596,6 @@
           ]
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          60
-        ],
-        "shape": "rect",
-        "text": "M"
-      },
       "behavior": {
         "causality": "acausal",
         "domain": "electrical",
@@ -7411,25 +6605,17 @@
       "paradigm": "physical-network",
       "domain": "physical-electrical",
       "version": 1,
-      "description": "Magnetically coupled inductors with coupling coefficient k.",
       "compiles_to": "passive.mutual_inductor"
     },
     {
       "id": "passive.transformer",
       "name": "passive.transformer",
-      "label": "Transformer",
-      "category": "passive",
       "type": "physical-electrical.passive.transformer",
       "aliases": [
         "transformer",
         "T",
         "physical_electrical.passive.transformer",
         "physical-electrical.passive.transformer"
-      ],
-      "tags": [
-        "physical",
-        "electrical",
-        "passive"
       ],
       "ports": {
         "inputs": [
@@ -7618,14 +6804,6 @@
           ]
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          60
-        ],
-        "shape": "rect",
-        "text": "TX"
-      },
       "behavior": {
         "causality": "acausal",
         "domain": "electrical",
@@ -7635,24 +6813,15 @@
       "paradigm": "physical-network",
       "domain": "physical-electrical",
       "version": 1,
-      "description": "Ideal transformer with turns ratio n.",
       "compiles_to": "passive.transformer"
     },
     {
       "id": "power.pwm1",
       "name": "power.pwm1",
-      "label": "PWM Modulator",
-      "category": "power",
       "aliases": [
         "pwm",
         "pwm1",
         "modulator"
-      ],
-      "tags": [
-        "power",
-        "pwm",
-        "modulator",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [
@@ -7716,7 +6885,6 @@
           "type": "number"
         }
       ],
-      "main_param": "freq",
       "port_sigs": {
         "comp": "[1]",
         "in": "[1]",
@@ -7777,14 +6945,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          44
-        ],
-        "shape": "rect",
-        "text": "PWM"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -7794,25 +6954,15 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Fixed-carrier PWM modulator with complementary output and dead time.",
       "compiles_to": "power.pwm1"
     },
     {
       "id": "power.pwm2",
       "name": "power.pwm2",
-      "label": "Phase-Shift PWM Modulator",
-      "category": "power",
       "aliases": [
         "pspwm",
         "pwm2",
         "phase-shift pwm"
-      ],
-      "tags": [
-        "power",
-        "pwm",
-        "modulator",
-        "phase-shift",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [
@@ -7904,7 +7054,6 @@
           "type": "number"
         }
       ],
-      "main_param": "f_max",
       "port_sigs": {
         "comp": "[1]",
         "duty": "[1]",
@@ -7990,14 +7139,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          70,
-          66
-        ],
-        "shape": "rect",
-        "text": "PS-PWM"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -8007,22 +7148,14 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Phase-shift PWM modulator driven by live frequency, phase and duty signals.",
       "compiles_to": "power.pwm2"
     },
     {
       "id": "routing.from",
       "name": "routing.from",
-      "label": "From",
-      "category": null,
       "aliases": [
         "from",
         "tag-recv"
-      ],
-      "tags": [
-        "routing",
-        "signal-flow",
-        "tag"
       ],
       "ports": {
         "inputs": [],
@@ -8071,14 +7204,6 @@
           "tier": "n_a"
         }
       ],
-      "symbol": {
-        "bbox": [
-          70,
-          40
-        ],
-        "shape": "rect",
-        "text": "From"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -8088,22 +7213,14 @@
       "paradigm": "routing",
       "domain": "signal",
       "version": 1,
-      "description": "Receives a signal from a matching Goto tag.",
       "compiles_to": "routing.from"
     },
     {
       "id": "routing.goto",
       "name": "routing.goto",
-      "label": "Goto",
-      "category": null,
       "aliases": [
         "goto",
         "tag-route"
-      ],
-      "tags": [
-        "routing",
-        "signal-flow",
-        "tag"
       ],
       "ports": {
         "inputs": [
@@ -8178,14 +7295,6 @@
           "tier": "n_a"
         }
       ],
-      "symbol": {
-        "bbox": [
-          70,
-          40
-        ],
-        "shape": "rect",
-        "text": "Goto"
-      },
       "behavior": {
         "causality": "causal",
         "domain": "signal",
@@ -8195,14 +7304,11 @@
       "paradigm": "routing",
       "domain": "signal",
       "version": 1,
-      "description": "Routes a signal by tag within local/scoped/global visibility.",
       "compiles_to": "routing.goto"
     },
     {
       "id": "routing.ground",
       "name": "routing.ground",
-      "label": "Ground",
-      "category": "reference",
       "type": "physical-electrical.reference.ground",
       "aliases": [
         "ground",
@@ -8210,12 +7316,6 @@
         "0V",
         "physical_electrical.reference.ground",
         "physical-electrical.reference.ground"
-      ],
-      "tags": [
-        "routing",
-        "reference",
-        "ground",
-        "electrical"
       ],
       "ports": {
         "inputs": [
@@ -8249,14 +7349,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          40,
-          40
-        ],
-        "shape": "rect",
-        "text": "GND"
-      },
       "behavior": {
         "causality": "acausal",
         "domain": "electrical",
@@ -8266,23 +7358,15 @@
       "paradigm": "physical-network",
       "domain": "physical-electrical",
       "version": 1,
-      "description": "Circuit ground / 0 V reference node.",
       "compiles_to": "routing.ground"
     },
     {
       "id": "signal.step",
       "name": "signal.step",
-      "label": "Step",
-      "category": "signal",
       "aliases": [
         "step",
         "unit step",
         "heaviside"
-      ],
-      "tags": [
-        "source",
-        "signal",
-        "step"
       ],
       "ports": {
         "inputs": [],
@@ -8323,13 +7407,12 @@
           "type": "number"
         }
       ],
-      "main_param": "t_step",
       "port_sigs": {
         "out": "[1]"
       },
       "fidelities": [
         {
-          "doc": "Step input — outputs `before` for t < t_step, `after` afterwards.",
+          "doc": "Step input \u2014 outputs `before` for t < t_step, `after` afterwards.",
           "params": [
             {
               "default": 1.0,
@@ -8364,14 +7447,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "rect",
-        "text": "Step"
-      },
       "behavior": {
         "causality": "source",
         "domain": "signal",
@@ -8381,22 +7456,15 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Step input — outputs `before` for t < t_step, `after` afterwards.",
       "compiles_to": "signal.step"
     },
     {
       "id": "signal-flow.sink.scope",
       "name": "signal_flow.sink.scope",
-      "label": "Scope (legacy spelling)",
-      "category": "sinks",
       "type": "signal-flow.sink.scope",
       "aliases": [
         "scope",
         "signal_flow.sink.scope"
-      ],
-      "tags": [
-        "signal-flow",
-        "sink"
       ],
       "ports": {
         "inputs": [
@@ -8446,14 +7514,6 @@
           "tier": "n_a"
         }
       ],
-      "symbol": {
-        "bbox": [
-          70,
-          40
-        ],
-        "shape": "rect",
-        "text": "scope"
-      },
       "behavior": {
         "causality": "sink",
         "domain": "signal",
@@ -8463,22 +7523,15 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Signal scope sink, under the GSF v2 spelling `signal_flow.sink.scope`. Identical to Scope: both emit no netlist card at all. Kept so a sheet saved under this name still opens; place Scope on a new sheet.",
       "compiles_to": "signal-flow.sink.scope"
     },
     {
       "id": "signal-flow.source.step",
       "name": "signal_flow.source.step",
-      "label": "Step (legacy spelling)",
-      "category": "signal",
       "type": "signal-flow.source.step",
       "aliases": [
         "step",
         "signal_flow.source.step"
-      ],
-      "tags": [
-        "signal-flow",
-        "source"
       ],
       "ports": {
         "inputs": [],
@@ -8550,14 +7603,6 @@
           "tier": "n_a"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "rect",
-        "text": "step"
-      },
       "behavior": {
         "causality": "source",
         "domain": "signal",
@@ -8567,25 +7612,16 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Step input, under the GSF v2 spelling `signal_flow.source.step`. Identical to Step: both compile to the same `kind=pulsewave` card. Kept so a sheet saved under this name still opens; place Step on a new sheet.",
       "compiles_to": "signal-flow.source.step"
     },
     {
       "id": "sinks.scope",
       "name": "sinks.scope",
-      "label": "Scope",
-      "category": "sinks",
       "aliases": [
         "scope",
         "plot",
         "oscilloscope",
         "viewer"
-      ],
-      "tags": [
-        "scope",
-        "sink",
-        "visualization",
-        "output"
       ],
       "ports": {
         "inputs": [
@@ -8612,7 +7648,6 @@
           "type": "number"
         }
       ],
-      "main_param": "t_window",
       "port_sigs": {
         "in": "inherit"
       },
@@ -8641,14 +7676,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "rect",
-        "text": "Scope"
-      },
       "behavior": {
         "causality": "sink",
         "domain": "signal",
@@ -8658,14 +7685,11 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Captures the input signal for display in the waveform viewer.",
       "compiles_to": "sinks.scope"
     },
     {
       "id": "source.const",
       "name": "source.const",
-      "label": "Constant",
-      "category": "sources",
       "type": "signal-flow.source.constant",
       "aliases": [
         "const",
@@ -8673,12 +7697,6 @@
         "dc signal",
         "signal_flow.source.constant",
         "signal-flow.source.constant"
-      ],
-      "tags": [
-        "source",
-        "signal",
-        "constant",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [],
@@ -8704,7 +7722,6 @@
           "type": "number"
         }
       ],
-      "main_param": "value",
       "port_sigs": {
         "out": "[1]"
       },
@@ -8732,14 +7749,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "rect",
-        "text": "CONST"
-      },
       "behavior": {
         "causality": "source",
         "domain": "signal",
@@ -8749,14 +7758,11 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Constant signal source.",
       "compiles_to": "source.const"
     },
     {
       "id": "source.current.dc",
       "name": "source.current.dc",
-      "label": "I (DC)",
-      "category": "sources",
       "type": "physical-electrical.source.current_dc",
       "aliases": [
         "IDC",
@@ -8764,12 +7770,6 @@
         "current_dc",
         "physical_electrical.source.current_dc",
         "physical-electrical.source.current_dc"
-      ],
-      "tags": [
-        "source",
-        "electrical",
-        "current",
-        "dc"
       ],
       "ports": {
         "inputs": [
@@ -8836,14 +7836,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "circle",
-        "text": "I (DC)"
-      },
       "behavior": {
         "causality": "source",
         "domain": "electrical",
@@ -8853,24 +7845,14 @@
       "paradigm": "physical-network",
       "domain": "physical-electrical",
       "version": 1,
-      "description": "Ideal DC current source. SPICE element I.",
       "compiles_to": "source.current.dc"
     },
     {
       "id": "source.current.exp",
       "name": "source.current.exp",
-      "label": "I (EXP)",
-      "category": "sources",
       "aliases": [
         "IEXP",
         "exponential current source"
-      ],
-      "tags": [
-        "source",
-        "electrical",
-        "current",
-        "exponential",
-        "transient"
       ],
       "ports": {
         "inputs": [
@@ -9002,14 +7984,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "circle",
-        "text": "I (EXP)"
-      },
       "behavior": {
         "causality": "source",
         "domain": "electrical",
@@ -9019,24 +7993,14 @@
       "paradigm": "physical-network",
       "domain": "physical-electrical",
       "version": 1,
-      "description": "Exponential current source. SPICE element I with EXP waveform.",
       "compiles_to": "source.current.exp"
     },
     {
       "id": "source.current.pulse",
       "name": "source.current.pulse",
-      "label": "I (PULSE)",
-      "category": "sources",
       "aliases": [
         "IPULSE",
         "pulse current source"
-      ],
-      "tags": [
-        "source",
-        "electrical",
-        "current",
-        "pulse",
-        "transient"
       ],
       "ports": {
         "inputs": [
@@ -9181,14 +8145,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "circle",
-        "text": "I (PULSE)"
-      },
       "behavior": {
         "causality": "source",
         "domain": "electrical",
@@ -9198,24 +8154,14 @@
       "paradigm": "physical-network",
       "domain": "physical-electrical",
       "version": 1,
-      "description": "Pulsed current source. SPICE element I with PULSE waveform.",
       "compiles_to": "source.current.pulse"
     },
     {
       "id": "source.current.pwl",
       "name": "source.current.pwl",
-      "label": "I (PWL)",
-      "category": "sources",
       "aliases": [
         "IPWL",
         "piecewise linear current source"
-      ],
-      "tags": [
-        "source",
-        "electrical",
-        "current",
-        "pwl",
-        "transient"
       ],
       "ports": {
         "inputs": [
@@ -9282,14 +8228,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "circle",
-        "text": "I (PWL)"
-      },
       "behavior": {
         "causality": "source",
         "domain": "electrical",
@@ -9299,25 +8237,14 @@
       "paradigm": "physical-network",
       "domain": "physical-electrical",
       "version": 1,
-      "description": "Piecewise-linear current source. SPICE element I with PWL waveform.",
       "compiles_to": "source.current.pwl"
     },
     {
       "id": "source.current.sffm",
       "name": "source.current.sffm",
-      "label": "I (SFFM)",
-      "category": "sources",
       "aliases": [
         "ISFFM",
         "FM current source"
-      ],
-      "tags": [
-        "source",
-        "electrical",
-        "current",
-        "sffm",
-        "fm",
-        "transient"
       ],
       "ports": {
         "inputs": [
@@ -9436,14 +8363,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "circle",
-        "text": "I (SFFM)"
-      },
       "behavior": {
         "causality": "source",
         "domain": "electrical",
@@ -9453,25 +8372,14 @@
       "paradigm": "physical-network",
       "domain": "physical-electrical",
       "version": 1,
-      "description": "Single-frequency FM current source. SPICE element I with SFFM waveform.",
       "compiles_to": "source.current.sffm"
     },
     {
       "id": "source.current.sin",
       "name": "source.current.sin",
-      "label": "I (SIN)",
-      "category": "sources",
       "aliases": [
         "ISIN",
         "sinusoidal current source"
-      ],
-      "tags": [
-        "source",
-        "electrical",
-        "current",
-        "sine",
-        "ac",
-        "transient"
       ],
       "ports": {
         "inputs": [
@@ -9603,14 +8511,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "circle",
-        "text": "I (SIN)"
-      },
       "behavior": {
         "causality": "source",
         "domain": "electrical",
@@ -9620,14 +8520,11 @@
       "paradigm": "physical-network",
       "domain": "physical-electrical",
       "version": 1,
-      "description": "Sinusoidal current source. SPICE element I with SIN waveform.",
       "compiles_to": "source.current.sin"
     },
     {
       "id": "source.dependent.cccs",
       "name": "source.dependent.cccs",
-      "label": "CCCS",
-      "category": "dependent",
       "type": "physical-electrical.source.cccs",
       "aliases": [
         "F",
@@ -9635,12 +8532,6 @@
         "current-controlled current source",
         "physical_electrical.source.cccs",
         "physical-electrical.source.cccs"
-      ],
-      "tags": [
-        "source",
-        "electrical",
-        "dependent",
-        "cccs"
       ],
       "ports": {
         "inputs": [
@@ -9716,14 +8607,6 @@
           ]
         }
       ],
-      "symbol": {
-        "bbox": [
-          80,
-          60
-        ],
-        "shape": "rect",
-        "text": "CCCS"
-      },
       "behavior": {
         "causality": "acausal",
         "domain": "electrical",
@@ -9733,14 +8616,11 @@
       "paradigm": "physical-network",
       "domain": "physical-electrical",
       "version": 1,
-      "description": "Physical electrical Current-Controlled Current Source.",
       "compiles_to": "source.dependent.cccs"
     },
     {
       "id": "source.dependent.ccvs",
       "name": "source.dependent.ccvs",
-      "label": "CCVS",
-      "category": "dependent",
       "type": "physical-electrical.source.ccvs",
       "aliases": [
         "H",
@@ -9748,12 +8628,6 @@
         "current-controlled voltage source",
         "physical_electrical.source.ccvs",
         "physical-electrical.source.ccvs"
-      ],
-      "tags": [
-        "source",
-        "electrical",
-        "dependent",
-        "ccvs"
       ],
       "ports": {
         "inputs": [
@@ -9829,14 +8703,6 @@
           ]
         }
       ],
-      "symbol": {
-        "bbox": [
-          80,
-          60
-        ],
-        "shape": "rect",
-        "text": "CCVS"
-      },
       "behavior": {
         "causality": "acausal",
         "domain": "electrical",
@@ -9846,14 +8712,11 @@
       "paradigm": "physical-network",
       "domain": "physical-electrical",
       "version": 1,
-      "description": "Physical electrical Current-Controlled Voltage Source.",
       "compiles_to": "source.dependent.ccvs"
     },
     {
       "id": "source.dependent.vccs",
       "name": "source.dependent.vccs",
-      "label": "VCCS",
-      "category": "dependent",
       "type": "physical-electrical.source.vccs",
       "aliases": [
         "G",
@@ -9861,12 +8724,6 @@
         "voltage-controlled current source",
         "physical_electrical.source.vccs",
         "physical-electrical.source.vccs"
-      ],
-      "tags": [
-        "source",
-        "electrical",
-        "dependent",
-        "vccs"
       ],
       "ports": {
         "inputs": [
@@ -9967,14 +8824,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          120,
-          80
-        ],
-        "shape": "rect",
-        "text": "G"
-      },
       "behavior": {
         "causality": "acausal",
         "domain": "electrical",
@@ -9984,14 +8833,11 @@
       "paradigm": "physical-network",
       "domain": "physical-electrical",
       "version": 1,
-      "description": "Voltage-controlled current source. SPICE element G.",
       "compiles_to": "source.dependent.vccs"
     },
     {
       "id": "source.dependent.vcvs",
       "name": "source.dependent.vcvs",
-      "label": "VCVS",
-      "category": "dependent",
       "type": "physical-electrical.source.vcvs",
       "aliases": [
         "E",
@@ -9999,12 +8845,6 @@
         "voltage-controlled voltage source",
         "physical_electrical.source.vcvs",
         "physical-electrical.source.vcvs"
-      ],
-      "tags": [
-        "source",
-        "electrical",
-        "dependent",
-        "vcvs"
       ],
       "ports": {
         "inputs": [
@@ -10105,14 +8945,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          120,
-          80
-        ],
-        "shape": "rect",
-        "text": "E"
-      },
       "behavior": {
         "causality": "acausal",
         "domain": "electrical",
@@ -10122,25 +8954,15 @@
       "paradigm": "physical-network",
       "domain": "physical-electrical",
       "version": 1,
-      "description": "Voltage-controlled voltage source. SPICE element E.",
       "compiles_to": "source.dependent.vcvs"
     },
     {
       "id": "source.expwave",
       "name": "source.expwave",
-      "label": "Exponential Wave Source",
-      "category": "sources",
       "aliases": [
         "expwave",
         "exp",
         "exponential source"
-      ],
-      "tags": [
-        "source",
-        "signal",
-        "exponential",
-        "transient",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [],
@@ -10205,7 +9027,6 @@
           "type": "number"
         }
       ],
-      "main_param": "tau1",
       "port_sigs": {
         "out": "[1]"
       },
@@ -10267,14 +9088,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "rect",
-        "text": "EXP"
-      },
       "behavior": {
         "causality": "source",
         "domain": "signal",
@@ -10284,14 +9097,11 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Exponential rise/fall signal source, using ngspice EXP() semantics.",
       "compiles_to": "source.expwave"
     },
     {
       "id": "source.pulsewave",
       "name": "source.pulsewave",
-      "label": "Pulse Wave Source",
-      "category": "sources",
       "type": "signal-flow.source.pulse",
       "aliases": [
         "pulsewave",
@@ -10299,13 +9109,6 @@
         "square wave",
         "signal_flow.source.pulse",
         "signal-flow.source.pulse"
-      ],
-      "tags": [
-        "source",
-        "signal",
-        "pulse",
-        "transient",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [],
@@ -10378,7 +9181,6 @@
           "type": "number"
         }
       ],
-      "main_param": "per",
       "port_sigs": {
         "out": "[1]"
       },
@@ -10447,14 +9249,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "rect",
-        "text": "PULSE"
-      },
       "behavior": {
         "causality": "source",
         "domain": "signal",
@@ -10464,25 +9258,15 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Trapezoidal pulse signal source, using ngspice PULSE() semantics.",
       "compiles_to": "source.pulsewave"
     },
     {
       "id": "source.sffmwave",
       "name": "source.sffmwave",
-      "label": "SFFM Wave Source",
-      "category": "sources",
       "aliases": [
         "sffmwave",
         "sffm",
         "fm source"
-      ],
-      "tags": [
-        "source",
-        "signal",
-        "fm",
-        "transient",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [],
@@ -10539,7 +9323,6 @@
           "type": "number"
         }
       ],
-      "main_param": "fc",
       "port_sigs": {
         "out": "[1]"
       },
@@ -10594,14 +9377,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "rect",
-        "text": "SFFM"
-      },
       "behavior": {
         "causality": "source",
         "domain": "signal",
@@ -10611,14 +9386,11 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Single-frequency FM signal source, using ngspice SFFM() semantics.",
       "compiles_to": "source.sffmwave"
     },
     {
       "id": "source.sinwave",
       "name": "source.sinwave",
-      "label": "Sine Wave Source",
-      "category": "sources",
       "type": "signal-flow.source.sine",
       "aliases": [
         "sinwave",
@@ -10626,13 +9398,6 @@
         "sin source",
         "signal_flow.source.sine",
         "signal-flow.source.sine"
-      ],
-      "tags": [
-        "source",
-        "signal",
-        "sine",
-        "transient",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [],
@@ -10695,7 +9460,6 @@
           "type": "number"
         }
       ],
-      "main_param": "freq",
       "port_sigs": {
         "out": "[1]"
       },
@@ -10755,14 +9519,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "rect",
-        "text": "SIN"
-      },
       "behavior": {
         "causality": "source",
         "domain": "signal",
@@ -10772,25 +9528,16 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Damped sine signal source, using ngspice SIN() semantics.",
       "compiles_to": "source.sinwave"
     },
     {
       "id": "source.time",
       "name": "source.time",
-      "label": "Simulation Time",
-      "category": "sources",
       "aliases": [
         "time",
         "clock",
         "t",
         "ramp"
-      ],
-      "tags": [
-        "source",
-        "signal",
-        "time",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [],
@@ -10828,14 +9575,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "rect",
-        "text": "t"
-      },
       "behavior": {
         "causality": "source",
         "domain": "signal",
@@ -10845,14 +9584,11 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "Emits the current simulation time t as a signal.",
       "compiles_to": "source.time"
     },
     {
       "id": "source.voltage.dc",
       "name": "source.voltage.dc",
-      "label": "V (DC)",
-      "category": "sources",
       "type": "physical-electrical.source.voltage_dc",
       "aliases": [
         "VDC",
@@ -10860,12 +9596,6 @@
         "voltage_dc",
         "physical_electrical.source.voltage_dc",
         "physical-electrical.source.voltage_dc"
-      ],
-      "tags": [
-        "source",
-        "electrical",
-        "voltage",
-        "dc"
       ],
       "ports": {
         "inputs": [
@@ -10932,14 +9662,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "circle",
-        "text": "V (DC)"
-      },
       "behavior": {
         "causality": "source",
         "domain": "electrical",
@@ -10949,24 +9671,14 @@
       "paradigm": "physical-network",
       "domain": "physical-electrical",
       "version": 1,
-      "description": "Ideal DC voltage source. SPICE element V.",
       "compiles_to": "source.voltage.dc"
     },
     {
       "id": "source.voltage.exp",
       "name": "source.voltage.exp",
-      "label": "V (EXP)",
-      "category": "sources",
       "aliases": [
         "VEXP",
         "exponential voltage source"
-      ],
-      "tags": [
-        "source",
-        "electrical",
-        "voltage",
-        "exponential",
-        "transient"
       ],
       "ports": {
         "inputs": [
@@ -11098,14 +9810,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "circle",
-        "text": "V (EXP)"
-      },
       "behavior": {
         "causality": "source",
         "domain": "electrical",
@@ -11115,14 +9819,11 @@
       "paradigm": "physical-network",
       "domain": "physical-electrical",
       "version": 1,
-      "description": "Exponential voltage source. SPICE element V with EXP waveform.",
       "compiles_to": "source.voltage.exp"
     },
     {
       "id": "source.voltage.pulse",
       "name": "source.voltage.pulse",
-      "label": "V (PULSE)",
-      "category": "sources",
       "type": "physical-electrical.source.voltage_pulse",
       "aliases": [
         "VPULSE",
@@ -11130,13 +9831,6 @@
         "voltage_pulse",
         "physical_electrical.source.voltage_pulse",
         "physical-electrical.source.voltage_pulse"
-      ],
-      "tags": [
-        "source",
-        "electrical",
-        "voltage",
-        "pulse",
-        "transient"
       ],
       "ports": {
         "inputs": [
@@ -11281,14 +9975,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "circle",
-        "text": "V (PULSE)"
-      },
       "behavior": {
         "causality": "source",
         "domain": "electrical",
@@ -11298,24 +9984,14 @@
       "paradigm": "physical-network",
       "domain": "physical-electrical",
       "version": 1,
-      "description": "Pulsed voltage source. SPICE element V with PULSE waveform.",
       "compiles_to": "source.voltage.pulse"
     },
     {
       "id": "source.voltage.pwl",
       "name": "source.voltage.pwl",
-      "label": "V (PWL)",
-      "category": "sources",
       "aliases": [
         "VPWL",
         "piecewise linear voltage source"
-      ],
-      "tags": [
-        "source",
-        "electrical",
-        "voltage",
-        "pwl",
-        "transient"
       ],
       "ports": {
         "inputs": [
@@ -11382,14 +10058,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "circle",
-        "text": "V (PWL)"
-      },
       "behavior": {
         "causality": "source",
         "domain": "electrical",
@@ -11399,25 +10067,14 @@
       "paradigm": "physical-network",
       "domain": "physical-electrical",
       "version": 1,
-      "description": "Piecewise-linear voltage source. SPICE element V with PWL waveform.",
       "compiles_to": "source.voltage.pwl"
     },
     {
       "id": "source.voltage.sffm",
       "name": "source.voltage.sffm",
-      "label": "V (SFFM)",
-      "category": "sources",
       "aliases": [
         "VSFFM",
         "FM voltage source"
-      ],
-      "tags": [
-        "source",
-        "electrical",
-        "voltage",
-        "sffm",
-        "fm",
-        "transient"
       ],
       "ports": {
         "inputs": [
@@ -11536,14 +10193,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "circle",
-        "text": "V (SFFM)"
-      },
       "behavior": {
         "causality": "source",
         "domain": "electrical",
@@ -11553,25 +10202,14 @@
       "paradigm": "physical-network",
       "domain": "physical-electrical",
       "version": 1,
-      "description": "Single-frequency FM voltage source. SPICE element V with SFFM waveform.",
       "compiles_to": "source.voltage.sffm"
     },
     {
       "id": "source.voltage.sin",
       "name": "source.voltage.sin",
-      "label": "V (SIN)",
-      "category": "sources",
       "aliases": [
         "VSIN",
         "sinusoidal voltage source"
-      ],
-      "tags": [
-        "source",
-        "electrical",
-        "voltage",
-        "sine",
-        "ac",
-        "transient"
       ],
       "ports": {
         "inputs": [
@@ -11703,14 +10341,6 @@
           "tier": "ideal"
         }
       ],
-      "symbol": {
-        "bbox": [
-          60,
-          40
-        ],
-        "shape": "circle",
-        "text": "V (SIN)"
-      },
       "behavior": {
         "causality": "source",
         "domain": "electrical",
@@ -11720,14 +10350,11 @@
       "paradigm": "physical-network",
       "domain": "physical-electrical",
       "version": 1,
-      "description": "Sinusoidal voltage source. SPICE element V with SIN waveform.",
       "compiles_to": "source.voltage.sin"
     },
     {
       "id": "source.file",
       "name": "source.file",
-      "label": "File Source",
-      "category": "sources",
       "aliases": [
         "filewave",
         "file source",
@@ -11735,13 +10362,6 @@
         "measured waveform",
         "scope",
         "csv source"
-      ],
-      "tags": [
-        "source",
-        "signal",
-        "file",
-        "measurement",
-        "general-simulator"
       ],
       "ports": {
         "inputs": [],
@@ -11863,15 +10483,6 @@
           "type": "string"
         }
       ],
-      "main_param": "path",
-      "symbol": {
-        "bbox": [
-          70,
-          40
-        ],
-        "shape": "rect",
-        "text": "FILE"
-      },
       "behavior": {
         "causality": "source",
         "domain": "signal",
@@ -11881,7 +10492,6 @@
       "paradigm": "signal-flow",
       "domain": "signal",
       "version": 1,
-      "description": "A measured waveform read from a file: one output per value column, interpolated or held between samples.",
       "compiles_to": "source.file",
       "port_sigs": {
         "out*": "[1]"
