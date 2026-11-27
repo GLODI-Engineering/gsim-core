@@ -99,6 +99,19 @@ pub enum CompileError {
         block: String,
         port: String,
     },
+    /// An instance sets a parameter its definition does not declare.
+    ///
+    /// Fatal rather than dropped, and the reason is the same one `general-mna#63` gives for
+    /// refusing it on the solver side: an override that is ignored solves a different circuit
+    /// than the document describes, and a mistyped parameter name is exactly how that happens.
+    /// Refusing here rather than there also means the message can name the block as the
+    /// document names it, before any `X` card exists to point at.
+    UndeclaredSubcktParam {
+        block: String,
+        def: String,
+        param: String,
+        declared: Vec<String>,
+    },
     /// A `kind=` variant parameter whose value has no mapped `kind=` string.
     UnknownVariant {
         block: String,
@@ -271,6 +284,20 @@ impl std::fmt::Display for CompileError {
             CompileError::UnconnectedSubcktPort { block, port } => write!(
                 f,
                 "subckt instance '{block}' has nothing wired to its port '{port}' -- an X card's connections are positional and cannot have a hole"
+            ),
+            CompileError::UndeclaredSubcktParam {
+                block,
+                def,
+                param,
+                declared,
+            } => write!(
+                f,
+                "subckt instance '{block}' sets parameter '{param}', which '{def}' does not declare ({})",
+                if declared.is_empty() {
+                    "it declares no parameters".to_string()
+                } else {
+                    format!("it declares {}", declared.join(", "))
+                }
             ),
             CompileError::UnknownVariant {
                 block,

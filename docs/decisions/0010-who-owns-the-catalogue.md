@@ -223,3 +223,27 @@ Refusal is correct under either answer, so it is not waiting on anything.
 The sequence is therefore: general-mna#63 → a `general-simulator` release carrying it → `#111`
 emits formals and the instance tail → `#112`'s composite component, which is the first feature
 that needs any of it.
+
+### Closed, 2026-11-27
+
+That sequence ran in a day, so the refusal clause was never needed: `general-mna#63` landed,
+`general-simulator 0.11.0` shipped carrying it, and `#111` emits the formal list on the
+`.subckt` card and the `name=value` tail on each `X` card. The ordering rule is kept in place
+rather than struck out, because it is the general statement and not a note about one feature —
+**this crate does not emit what it cannot show the solver binds**, and the next capability that
+crosses the same seam is held to it the same way.
+
+Two things were found on the way and are worth keeping beside the decision:
+
+**A reference inside a definition was emitted verbatim** (`#121`). §5.3 substitution walked the
+sheet's blocks and never a definition's, so a resistor inside a `.subckt` valued `"{Rload}"`
+reached the deck as `{Rload}` and failed in the solver as a symbol nothing declares — while the
+same reference one line outside the definition resolved. That had to be repaired before this one
+could be, and it is what settled where the boundary between the two scopes lies: a body's
+reference to one of the definition's **own** parameters is left for the solver, anything else
+resolves here, and a value naming both is refused because there is no single scope to read it in.
+
+**An instance parameter the definition does not declare is refused on both sides.** The solver
+refuses it when it binds (`general-mna#63`) and this crate refuses it when it emits, which is
+not duplication: the compiler can name the block as the *document* names it, before any `X` card
+exists to point at, and a front end gets the refusal without a solver in the loop.
