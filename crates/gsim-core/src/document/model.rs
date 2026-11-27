@@ -167,11 +167,27 @@ impl GsimSchDocument {
     /// `docs/specs/gsim-sch-format.md` §3's "the v2 loader rejects any other value. There is no
     /// v1 reader," rather than silently accepting an unrelated document shape.
     pub fn from_json(text: &str) -> Result<GsimSchDocument, DocumentLoadError> {
-        let doc: GsimSchDocument = serde_json::from_str(text)?;
+        let mut doc: GsimSchDocument = serde_json::from_str(text)?;
         if doc.schema_version != 2 {
             return Err(DocumentLoadError::WrongVersion(WrongSchemaVersion {
                 found: doc.schema_version,
             }));
+        }
+        // Every block parameter takes the form its component declares, here at the boundary
+        // where the document enters (#107). This is the arm that repairs a document rather than
+        // merely refusing to make a new bad one: a sheet that arrives with `"R": 5` for a
+        // parameter the library declares real is loaded with `5.0`, so `save_document` -- which
+        // is a parse followed by a serialize and has no policy of its own -- writes it back
+        // declared. The number is unchanged; 5 and 5.0 are the same double. What changes is
+        // that a Python reader is no longer told the author meant an integer.
+        for block in &mut doc.model.blocks {
+            let params = std::mem::take(&mut block.params);
+            block.params = super::number_form::attach_block_params(
+                &block.r#type,
+                &block.fidelity,
+                &block.id,
+                params,
+            )?;
         }
         Ok(doc)
     }
@@ -185,6 +201,11 @@ impl GsimSchDocument {
 pub enum DocumentLoadError {
     Json(serde_json::Error),
     WrongVersion(WrongSchemaVersion),
+    /// A parameter's value cannot carry the form the library declares for it — today only a
+    /// fractional value written to an `integer` parameter. Refused on load rather than
+    /// truncated, because truncating silently is the defect #107 exists to end, and the message
+    /// names the block and the parameter.
+    WrongNumberForm(super::number_form::WrongForm),
 }
 
 impl From<serde_json::Error> for DocumentLoadError {
@@ -193,11 +214,18 @@ impl From<serde_json::Error> for DocumentLoadError {
     }
 }
 
+impl From<super::number_form::WrongForm> for DocumentLoadError {
+    fn from(e: super::number_form::WrongForm) -> Self {
+        DocumentLoadError::WrongNumberForm(e)
+    }
+}
+
 impl std::fmt::Display for DocumentLoadError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             DocumentLoadError::Json(e) => write!(f, "{e}"),
             DocumentLoadError::WrongVersion(e) => write!(f, "{e}"),
+            DocumentLoadError::WrongNumberForm(e) => write!(f, "{e}"),
         }
     }
 }

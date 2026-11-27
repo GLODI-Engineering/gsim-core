@@ -8,6 +8,7 @@
 
 use super::block::{Block, BlockError, Mirror, NewBlock};
 use super::model::Model;
+use super::number_form::WrongForm;
 use super::paradigm::Paradigm;
 use super::port_compat::{self, PortIncompat};
 use super::subckt::{check_no_cyclic_defs, SubcktDef, SubcktError};
@@ -44,6 +45,17 @@ pub enum BuilderError {
     /// An invalid def id / port kind, or a cyclic `def_ref` graph — see [`SubcktError`], whose
     /// `Display` names the actual cycle (`"a -> b -> a"`).
     Subckt(SubcktError),
+    /// A value cannot carry the form the library declares for the parameter it was written to —
+    /// a fractional value for an `integer`, today the only way to reach this. Refused here,
+    /// where the value was introduced, rather than at compile or not at all: see
+    /// [`super::number_form`] and #107.
+    WrongNumberForm(WrongForm),
+}
+
+impl From<WrongForm> for BuilderError {
+    fn from(e: WrongForm) -> Self {
+        BuilderError::WrongNumberForm(e)
+    }
 }
 
 impl From<BlockError> for BuilderError {
@@ -74,6 +86,7 @@ impl std::fmt::Display for BuilderError {
             BuilderError::Block(e) => write!(f, "{e}"),
             BuilderError::UnknownSubcktDef(id) => write!(f, "no SubcktDef with id '{id}'"),
             BuilderError::Subckt(e) => write!(f, "{e}"),
+            BuilderError::WrongNumberForm(e) => write!(f, "{e}"),
         }
     }
 }
@@ -343,6 +356,13 @@ impl ModelBuilder {
             }
             None => self.auto_block_id(),
         };
+        // Before the block exists, so a refused value leaves no half-placed block behind --
+        // the same fail-before-mutating rule `add_subckt_def` states below (#107).
+        // `Block::new` applies the same default below; the declaration is read against the tier
+        // the block will actually be placed at, not against whatever `None` would mean here.
+        let fidelity = spec.fidelity.clone().unwrap_or_else(|| "ideal".to_string());
+        let params =
+            super::number_form::attach_block_params(&spec.r#type, &fidelity, &id, spec.params)?;
         let block = Block::new(NewBlock {
             id: id.clone(),
             r#type: spec.r#type,
@@ -352,7 +372,7 @@ impl ModelBuilder {
             position: spec.position,
             rotation: spec.rotation,
             mirror: spec.mirror,
-            params: spec.params,
+            params,
             ic: spec.ic,
             ratings: spec.ratings,
             label: spec.label,
@@ -478,6 +498,12 @@ impl ModelBuilder {
             .iter_mut()
             .find(|b| b.id == block_id)
             .ok_or_else(|| BuilderError::UnknownBlock(block_id.to_string()))?;
+        // The value carries its declared form from here, so no writer downstream has a policy
+        // about number form (#107). The block is found first, because a value written to a
+        // block that does not exist has no declaration to carry and the useful error is the
+        // one about the block.
+        let form = super::number_form::declared_form(&block.r#type, &block.fidelity, name);
+        let value = super::number_form::attach(form, block_id, name, value)?;
         block.params.insert(name.to_string(), value);
         Ok(())
     }

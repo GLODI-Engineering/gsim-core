@@ -28,6 +28,12 @@ use serde_json::Value;
 
 /// A document carrying all four features, plus a field invented for this test that no struct
 /// anywhere models.
+///
+/// The resistor's `R` is spelled `1000.0` rather than `1000`, and the distinction is #107's:
+/// the library declares `R` real, so the loader attaches that form at the boundary and a
+/// fixture written `1000` comes back `1000.0`. That is a form being *declared*, not a key being
+/// lost, so it is asserted in `the_number_carries_its_declared_form_107.rs` and this file's
+/// value check stays exact.
 fn document_with_everything() -> &'static str {
     r#"{
   "schema_version": 2,
@@ -86,7 +92,7 @@ fn document_with_everything() -> &'static str {
         "position": [0, 0],
         "rotation": 90,
         "mirror": "none",
-        "params": { "R": 1000 },
+        "params": { "R": 1000.0 },
         "ic": {},
         "subsystem": null
       }

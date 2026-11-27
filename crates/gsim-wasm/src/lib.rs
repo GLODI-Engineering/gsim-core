@@ -843,6 +843,44 @@ mod tests {
     }
 
     #[test]
+    fn set_param_attaches_the_declared_form_on_the_editor_s_own_path() {
+        // #107 through the surface the editor actually calls. `1000` in, `1000.0` out, because
+        // the library declares `R` real -- so `omni-schematics`' writer no longer has to decide
+        // a number's form at write time, and a document saved through this binding says what
+        // the library declares.
+        //
+        // The serialized text is asserted, not the `Value`: serde_json compares a `Value` to an
+        // `f64` through `as_f64()`, so `Number(1000) == 1000.0` is true and an assertion
+        // written that way would pass against the old behaviour.
+        let model_json = new_model("m1", "M", 10);
+        let spec = r#"{"type":"passive.resistor","paradigm":"physical-network","domain":"physical-electrical","position":[0,0],"rotation":0,"id":"r1"}"#;
+        let added: Value =
+            serde_json::from_str(&add_block_impl(&model_json, spec).unwrap()).unwrap();
+        let model = added["model"].to_string();
+        let updated = set_param_impl(&model, "r1", "R", "1000").unwrap();
+        let v: Value = serde_json::from_str(&updated).unwrap();
+        assert_eq!(
+            serde_json::to_string(&v["blocks"][0]["params"]["R"]).unwrap(),
+            "1000.0"
+        );
+    }
+
+    #[test]
+    fn set_param_refuses_a_fractional_value_for_an_integer_parameter() {
+        let model_json = new_model("m1", "M", 10);
+        let spec = r#"{"type":"control.product","paradigm":"signal-flow","domain":"signal","position":[0,0],"rotation":0,"id":"p1"}"#;
+        let added: Value =
+            serde_json::from_str(&add_block_impl(&model_json, spec).unwrap()).unwrap();
+        let model = added["model"].to_string();
+        let err = set_param_impl(&model, "p1", "n_inputs", "4.5").unwrap_err();
+        assert!(
+            err.contains("block 'p1' parameter 'n_inputs'"),
+            "got: {err}"
+        );
+        assert!(err.contains("4.5"), "got: {err}");
+    }
+
+    #[test]
     fn add_model_param_round_trips() {
         let model_json = new_model("m1", "M", 10);
         let updated = add_model_param_impl(&model_json, "vcc", "5.0").unwrap();

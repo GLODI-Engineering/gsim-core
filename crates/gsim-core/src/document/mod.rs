@@ -23,6 +23,7 @@ mod block;
 mod builder;
 mod code_build;
 mod model;
+mod number_form;
 mod paradigm;
 pub mod port_compat;
 mod subckt;
@@ -37,6 +38,7 @@ pub use code_build::{CodeBuild, CodeBuildStep, CodeDefine};
 pub use model::{
     DocumentLoadError, GsimSchDocument, Model, ModelParam, ModelRole, WrongSchemaVersion,
 };
+pub use number_form::{attach, attach_block_params, declared_form, DeclaredForm, WrongForm};
 pub use paradigm::Paradigm;
 pub use port_compat::{CompatFailure, PortFacts, PortIncompat};
 pub use subckt::{

@@ -66,6 +66,11 @@ fn builder_err_to_py(e: BuilderError) -> PyErr {
         BuilderError::UnknownSubcktDef(_) => "unknown-subckt-def",
         BuilderError::Subckt(SubcktError::CyclicDefReference { .. }) => "cyclic-subckt-def",
         BuilderError::Subckt(_) => "invalid-subckt",
+        // The keyword a `gsim-tools` caller branches on when it wrote a value whose declared
+        // form it cannot have -- today only a fractional value for an `integer` parameter
+        // (#107). "wrong-number-form" rather than "invalid-param", because the fix is to the
+        // *value's form* and the message names the block and the parameter.
+        BuilderError::WrongNumberForm(_) => "wrong-number-form",
     };
     PyErr::new::<PyValueError, _>(format!("{keyword}: {e}"))
 }
@@ -604,14 +609,54 @@ mod tests {
         let add: Value = serde_json::from_str(&add_block(&model, spec).unwrap()).unwrap();
         let model = add["model"].to_string();
 
+        // `1000` in, `1000.0` out, and that is #107 seen from the binding a `gsim-tools`
+        // caller actually uses: the library declares `R` real, so the value carries that form
+        // from the moment it enters the document and no writer downstream has to remember to
+        // ask. The serialized text is asserted rather than the `Value`, because serde_json
+        // compares a `Value` to an `f64` through `as_f64()` -- `Number(1000) == 1000.0` is
+        // true, so an assertion written that way would pass against the old behaviour and
+        // prove nothing.
         let model = set_param(&model, "r1", "R", "1000").unwrap();
         let model_val: Value = serde_json::from_str(&model).unwrap();
-        assert_eq!(model_val["blocks"][0]["params"]["R"], 1000);
+        assert_eq!(
+            serde_json::to_string(&model_val["blocks"][0]["params"]["R"]).unwrap(),
+            "1000.0"
+        );
 
-        let model = add_model_param(&model, "vcc", "5.0").unwrap();
+        // A model-level parameter has no declaration, so it is carried exactly as given -- one
+        // of the 11 document-level sites #268 declined on purpose.
+        let model = add_model_param(&model, "vcc", "5").unwrap();
         let model_val: Value = serde_json::from_str(&model).unwrap();
         assert_eq!(model_val["params"][0]["name"], "vcc");
-        assert_eq!(model_val["params"][0]["value"], 5.0);
+        assert_eq!(
+            serde_json::to_string(&model_val["params"][0]["value"]).unwrap(),
+            "5"
+        );
+    }
+
+    #[test]
+    fn set_param_refuses_a_fractional_value_for_an_integer_parameter() {
+        // The keyword a caller branches on, and the message a user reads. Truncating 4.5 to 4
+        // is the silent wrongness #107 exists to end, so this is refused at the call that
+        // wrote it rather than at compile or not at all.
+        let model = new_model("m1", "M", 10).unwrap();
+        let spec = r#"{"type":"control.product","paradigm":"signal-flow","domain":"signal","position":[0,0],"rotation":0,"id":"p1"}"#;
+        let add: Value = serde_json::from_str(&add_block(&model, spec).unwrap()).unwrap();
+        let model = add["model"].to_string();
+
+        let err = set_param(&model, "p1", "n_inputs", "4.5").unwrap_err();
+        Python::attach(|py| {
+            // `err.value(py)` rather than `err.to_string()`, matching the port-compat tests
+            // below: that is the message a Python caller reads, without `PyErr`'s own
+            // exception-type prefix, so the keyword can be asserted where it really is.
+            let said = err.value(py).to_string();
+            assert!(said.starts_with("wrong-number-form: "), "got: {said}");
+            assert!(
+                said.contains("block 'p1' parameter 'n_inputs'"),
+                "got: {said}"
+            );
+            assert!(said.contains("4.5"), "got: {said}");
+        });
     }
 
     #[test]
