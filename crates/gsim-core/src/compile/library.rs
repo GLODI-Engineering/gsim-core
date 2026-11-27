@@ -49,9 +49,14 @@ const LIBRARY_JSON: &str = include_str!("../../data/component-library.json");
 
 /// One component, exactly as the library file describes it.
 ///
-/// The presentation fields are deliberately loose [`serde_json::Value`]s: a port's offset or a
-/// symbol's bounding box means nothing to this crate, and parsing it into a type here would
-/// only create something else to keep in step with whatever draws it.
+/// What remains in `presentation` is deliberately loose [`serde_json::Value`]s: a port's offset
+/// means nothing to this crate, and parsing it into a type here would only create something
+/// else to keep in step with whatever draws it.
+///
+/// Decision 0010 moved the fields that were *only* drawing -- label, category, description,
+/// tags, main_param, symbol -- to the front end that draws them. `ports` stays because a port
+/// is also an electrical fact: its id, kind and direction are this crate's business even though
+/// its side and offset are not.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Component {
     /// Stable identity — the component's type when it has one, else its name.
@@ -59,16 +64,13 @@ pub struct Component {
     pub name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub r#type: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub label: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub category: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
+    // `label`, `category`, `description`, `tags`, `main_param` and `symbol` were here until
+    // decision 0010. They are the front end's: a symbol is a drawing, a category is how a
+    // palette groups a list, and this crate has no opinion worth having about either. They now
+    // live in `omni-schematics`' `apps/frontend/src/library/display-catalog.json`, which its
+    // catalogue generator overlays onto what this crate declares.
     #[serde(default)]
     pub aliases: Vec<String>,
-    #[serde(default)]
-    pub tags: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub paradigm: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -478,9 +480,12 @@ mod tests {
             .iter()
             .find(|c| c.id == "passive.resistor")
             .expect("the resistor is in the library");
+        // Half of what this used to assert moved out with decision 0010: the label and the
+        // symbol are the front end's, and `omni-schematics`' `the-editor-owns-what-it-draws`
+        // asserts every placeable component has a label. What is left is this crate's half --
+        // the registry spelling, and the ports and parameters a front end needs to ask for it.
         assert_eq!(r.compiles_to.as_deref(), Some("passive.resistor"));
-        assert!(r.label.is_some(), "no label to show");
-        for key in ["ports", "params", "symbol"] {
+        for key in ["ports", "params"] {
             assert!(
                 r.presentation.contains_key(key),
                 "the resistor has no {key} to draw from"
@@ -876,38 +881,10 @@ mod tests {
         );
     }
 
-    #[test]
-    fn no_two_components_share_a_label() {
-        // The palette shows a component's label and nothing else, so two components wearing one
-        // label are indistinguishable at the moment of choosing between them -- found by
-        // `omni-schematics`' real-VS-Code sweep clicking all 68 entries, not by reading the
-        // data (#83, `omni-schematics#216`).
-        //
-        // Two pairs shared one: `signal.step` / `signal-flow.source.step` and `sinks.scope` /
-        // `signal-flow.sink.scope`. Each pair is one component twice -- the engine's name and
-        // the GSF v2 spelling a saved sheet may carry -- and `compile::spec` says so beside
-        // both ("Both catalogue spellings are here"). So the label says that, which is the only
-        // difference there is to state.
-        let mut by_label: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
-        for component in library() {
-            let Some(label) = component.label.as_deref() else {
-                continue;
-            };
-            by_label.entry(label).or_default().push(&component.id);
-        }
-        let shared: Vec<String> = by_label
-            .iter()
-            .filter(|(_, ids)| ids.len() > 1)
-            .map(|(label, ids)| format!("{label:?}: {}", ids.join(", ")))
-            .collect();
-        assert!(
-            shared.is_empty(),
-            "{} label(s) are worn by more than one component, so the palette cannot tell them \
-             apart:\n  {}",
-            shared.len(),
-            shared.join("\n  ")
-        );
-    }
+    // `no_two_components_share_a_label` was here. It is `omni-schematics`'
+    // `the-editor-owns-what-it-draws.test.ts` now, moved with the labels it is about --
+    // including its finding, that two pairs shared one and the real-VS-Code sweep clicking all
+    // 68 palette entries is what found them rather than reading the data.
 
     // --- `port_sigs`: a signal port says what it carries, or nothing says it ----------------
     //
